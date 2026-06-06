@@ -78,6 +78,21 @@ export interface ContextPack {
   relationships: Array<{ from: string; to: string; kind: string }>;
 }
 
+export interface AgentHandoff {
+  generatedAt: string;
+  counts: {
+    focus: number;
+    neighbors: number;
+    blockers: number;
+    links: number;
+  };
+  focus: Array<{ id: string; title: string; status: string; type: string; priority?: number; deadline?: string }>;
+  blockers: Array<{ itemId: string; blockedBy: string; kind: string; title?: string; status?: string }>;
+  nextActions: Array<{ id: string; title: string; reason: string }>;
+  links: Array<{ itemId: string; kind: "doc" | "file"; value: string }>;
+  suggestedCommand: string;
+}
+
 function asArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.flatMap(asArray);
   if (typeof value !== "string") return [];
@@ -332,6 +347,120 @@ export function renderMarkdown(pack: ContextPack): string {
   return `${lines.join("\n")}\n`;
 }
 
+function titleFor(items: PmItem[], id: string): string | undefined {
+  return items.find((item) => item.id === id)?.title;
+}
+
+function statusFor(items: PmItem[], id: string): string | undefined {
+  return items.find((item) => item.id === id)?.status;
+}
+
+export function buildAgentHandoff(pack: ContextPack): AgentHandoff {
+  const allVisible = [...pack.items, ...pack.neighbors];
+  const focusIds = new Set(pack.items.map((item) => item.id));
+  const blockers = pack.relationships
+    .filter((rel) => focusIds.has(rel.from) && (rel.kind === "blocked_by" || rel.kind === "depends_on"))
+    .map((rel) => ({
+      itemId: rel.from,
+      blockedBy: rel.to,
+      kind: rel.kind,
+      title: titleFor(allVisible, rel.to),
+      status: statusFor(allVisible, rel.to),
+    }));
+  const blockedFocusIds = new Set(blockers.map((blocker) => blocker.itemId));
+  const nextActions = pack.items
+    .filter((item) => !isClosedStatus(itemStatus(item)))
+    .slice(0, 8)
+    .map((item) => ({
+      id: item.id,
+      title: normalizeText(item.title) || "(untitled)",
+      reason: blockedFocusIds.has(item.id)
+        ? "resolve blocker first"
+        : typeof item.priority === "number"
+          ? `priority ${item.priority}`
+          : "selected focus item",
+    }));
+  const ids = pack.items.map((item) => item.id).join(",");
+  const suggestedCommand = ids
+    ? `pm context-pack --id ${ids} --format agent`
+    : "pm context-pack --status in_progress --format agent";
+  return {
+    generatedAt: pack.generatedAt,
+    counts: {
+      focus: pack.summary.selectedItems,
+      neighbors: pack.summary.neighborItems,
+      blockers: blockers.length,
+      links: pack.links.length,
+    },
+    focus: pack.items.map((item) => ({
+      id: item.id,
+      title: normalizeText(item.title) || "(untitled)",
+      status: itemStatus(item),
+      type: itemType(item),
+      priority: typeof item.priority === "number" ? item.priority : undefined,
+      deadline: normalizeText(item.deadline) || undefined,
+    })),
+    blockers,
+    nextActions,
+    links: pack.links.slice(0, 12),
+    suggestedCommand,
+  };
+}
+
+export function renderAgentHandoff(pack: ContextPack): string {
+  const handoff = buildAgentHandoff(pack);
+  const lines: string[] = [
+    "# pm agent handoff",
+    "",
+    `Generated: ${handoff.generatedAt}`,
+    `Focus: ${handoff.counts.focus} | Neighbors: ${handoff.counts.neighbors} | Blockers: ${handoff.counts.blockers} | Links: ${handoff.counts.links}`,
+    "",
+    "## Focus",
+    "",
+  ];
+  if (handoff.focus.length === 0) {
+    lines.push("_No focus items._");
+  } else {
+    for (const item of handoff.focus) {
+      const meta = [
+        item.type,
+        item.status,
+        item.priority === undefined ? "" : `p${item.priority}`,
+        item.deadline ? `due ${item.deadline}` : "",
+      ].filter(Boolean).join(" | ");
+      lines.push(`- ${item.id}: ${markdownEscape(item.title)} (${meta})`);
+    }
+  }
+  lines.push("", "## Blockers", "");
+  if (handoff.blockers.length === 0) {
+    lines.push("_No visible blockers._");
+  } else {
+    for (const blocker of handoff.blockers) {
+      const label = blocker.title ? `${blocker.blockedBy} ${markdownEscape(blocker.title)}` : blocker.blockedBy;
+      const status = blocker.status ? ` (${blocker.status})` : "";
+      lines.push(`- ${blocker.itemId} ${blocker.kind} ${label}${status}`);
+    }
+  }
+  lines.push("", "## Next Actions", "");
+  if (handoff.nextActions.length === 0) {
+    lines.push("_No open focus items._");
+  } else {
+    for (const action of handoff.nextActions) {
+      lines.push(`- ${action.id}: ${markdownEscape(action.title)} - ${action.reason}`);
+    }
+  }
+  lines.push("", "## Linked Context", "");
+  if (handoff.links.length === 0) {
+    lines.push("_No linked files or docs._");
+  } else {
+    for (const link of handoff.links) {
+      lines.push(`- ${link.itemId} ${link.kind}: ${link.value}`);
+    }
+  }
+  lines.push("", "## Refresh", "", `\`${handoff.suggestedCommand}\``, "");
+  return `${lines.join("\n")}\n`;
+}
+
 export function readPmItems(pmRoot: string): PmItem[] {
   const result = spawnSync("pm", ["--path", pmRoot, "list-all", "--json", "--include-body"], {
     encoding: "utf-8",
@@ -356,6 +485,7 @@ function setupCommands(api: any): void {
     intent: "turn selected pm work into portable context",
     examples: [
       "pm context-pack --id pm-1234 --include-body --output context.md",
+      "pm context-pack --id pm-1234 --format agent",
       "pm context-pack --status in_progress --tag release --format json",
     ],
     flags: [
@@ -364,7 +494,7 @@ function setupCommands(api: any): void {
       { long: "--type", value_name: "type", description: "Filter focus items by type", type: "string" },
       { long: "--tag", value_name: "tag", description: "Filter focus items by tag", type: "string" },
       { long: "--limit", value_name: "n", description: "Maximum focus item count (default: 25)", type: "string" },
-      { long: "--format", value_name: "format", description: "Output format: markdown or json", type: "string" },
+      { long: "--format", value_name: "format", description: "Output format: markdown, json, or agent", type: "string" },
       { long: "--output", value_name: "file", description: "Write context pack to a file", type: "string" },
       { long: "--include-body", description: "Include body/description text", type: "boolean" },
       { long: "--include-closed", description: "Include closed/canceled items in filtered packs", type: "boolean" },
@@ -373,8 +503,8 @@ function setupCommands(api: any): void {
     async run(ctx: any) {
       const options = ctx.options as Record<string, unknown>;
       const format = (stringOption(options, "format") ?? "markdown").toLowerCase();
-      if (format !== "markdown" && format !== "json") {
-        throw new CommandError("--format must be markdown or json", EXIT_CODE.USAGE);
+      if (format !== "markdown" && format !== "json" && format !== "agent") {
+        throw new CommandError("--format must be markdown, json, or agent", EXIT_CODE.USAGE);
       }
       const pack = buildContextPack(readPmItems(ctx.pm_root), {
         ids: asArray(options.id),
@@ -386,7 +516,11 @@ function setupCommands(api: any): void {
         includeClosed: boolOption(options, "include-closed", "includeClosed"),
         neighborhood: !boolOption(options, "without-neighborhood", "withoutNeighborhood"),
       });
-      const output = format === "json" ? `${JSON.stringify(pack, null, 2)}\n` : renderMarkdown(pack);
+      const output = format === "json"
+        ? `${JSON.stringify(pack, null, 2)}\n`
+        : format === "agent"
+          ? renderAgentHandoff(pack)
+          : renderMarkdown(pack);
       const outputPath = stringOption(options, "output");
       if (outputPath) {
         writeFileSync(outputPath, output, "utf-8");
