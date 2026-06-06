@@ -16,6 +16,7 @@ pm install github.com/unbraind/pm-context --project
 
 ```bash
 pm context-pack --id pm-1234 --include-body --output context.md
+pm context-pack --id pm-1234 --format agent
 pm context-pack --status in_progress --tag release --format json
 pm context-pack --type Feature --include-closed --limit 20
 ```
@@ -36,6 +37,10 @@ Markdown packs include:
 
 JSON packs expose the same data in a stable shape for automation.
 
+Agent handoff packs (`--format agent`) are intentionally compact. They focus on
+the current work, visible blockers, next actions, linked files/docs, and the
+exact refresh command another agent should run before continuing.
+
 ## Command
 
 `pm context-pack`
@@ -47,7 +52,7 @@ Options:
 - `--type <type>` filter by type
 - `--tag <tag>` filter by tag
 - `--limit <n>` maximum focus item count
-- `--format <markdown|json>` output format
+- `--format <markdown|json|agent>` output format
 - `--output <file>` write the pack to a file
 - `--include-body` include item bodies
 - `--include-closed` include closed/canceled items in filtered packs

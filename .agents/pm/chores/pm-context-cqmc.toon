@@ -6,11 +6,14 @@ status: closed
 priority: 1
 tags[2]: release,testing
 created_at: "2026-06-06T20:55:31.334Z"
-updated_at: "2026-06-06T20:58:50.804Z"
+updated_at: "2026-06-06T21:46:01.384Z"
 author: codex
+estimated_minutes: 30
 acceptance_criteria: "release:check runs npm test before audit and pack checks; changelog generation remains valid"
 resolution: "Added npm test to release:check, removed generated pm runtime/search artifacts from git tracking where present, updated ignore rules, and applied website no-runner/private package governance for pm-web."
 expected_result: Release readiness checks exercise tests and generated local pm caches are not tracked.
 actual_result: Package test sweep completed successfully; npm audit endpoint failures were isolated to registry responses rather than package test failures.
+files[1]{path,scope,note}:
+  CHANGELOG.md,project,release-readiness changelog entry
 close_reason: Release readiness hardening implemented and npm test passed for the package sweep.
 body: ""

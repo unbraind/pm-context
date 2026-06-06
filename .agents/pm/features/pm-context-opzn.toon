@@ -1,0 +1,21 @@
+id: pm-context-opzn
+title: Add agent handoff digest mode to context packs
+description: "Implement an opt-in compact agent handoff view for pm-context that highlights blockers, next actions, dependencies, and linked context while keeping markdown/json defaults stable."
+type: Feature
+status: closed
+priority: 1
+tags[2]: agent,context
+created_at: "2026-06-06T21:35:16.422Z"
+updated_at: "2026-06-06T21:45:32.408Z"
+author: codex
+estimated_minutes: 45
+acceptance_criteria: "--format agent renders compact focus, blockers, next actions, linked context, and refresh command without changing markdown/json defaults"
+resolution: Agent handoff digest added
+expected_result: Agents can request a lower-token handoff directly from pm-context
+actual_result: "Added --format agent, SDK builders/renderers, README coverage, and focused tests."
+files[3]{path,scope,note}:
+  index.ts,project,agent handoff builder and renderer
+  test/context-pack.test.ts,project,agent handoff tests
+  README.md,project,documented agent format
+close_reason: "Implemented agent handoff format with compact focus, blocker, next-action, linked-context, and refresh-command sections; verified with npm test and typecheck."
+body: ""

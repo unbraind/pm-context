@@ -71,6 +71,41 @@ export interface ContextPack {
         kind: string;
     }>;
 }
+export interface AgentHandoff {
+    generatedAt: string;
+    counts: {
+        focus: number;
+        neighbors: number;
+        blockers: number;
+        links: number;
+    };
+    focus: Array<{
+        id: string;
+        title: string;
+        status: string;
+        type: string;
+        priority?: number;
+        deadline?: string;
+    }>;
+    blockers: Array<{
+        itemId: string;
+        blockedBy: string;
+        kind: string;
+        title?: string;
+        status?: string;
+    }>;
+    nextActions: Array<{
+        id: string;
+        title: string;
+        reason: string;
+    }>;
+    links: Array<{
+        itemId: string;
+        kind: "doc" | "file";
+        value: string;
+    }>;
+    suggestedCommand: string;
+}
 export declare function sortContextItems(items: PmItem[]): PmItem[];
 export declare function extractRelationships(item: PmItem): Array<{
     from: string;
@@ -79,6 +114,8 @@ export declare function extractRelationships(item: PmItem): Array<{
 }>;
 export declare function buildContextPack(allItems: PmItem[], options?: ContextPackOptions): ContextPack;
 export declare function renderMarkdown(pack: ContextPack): string;
+export declare function buildAgentHandoff(pack: ContextPack): AgentHandoff;
+export declare function renderAgentHandoff(pack: ContextPack): string;
 export declare function readPmItems(pmRoot: string): PmItem[];
 declare const _default: {
     name: string;
