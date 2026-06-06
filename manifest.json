@@ -1,0 +1,15 @@
+{
+  "name": "pm-context",
+  "version": "0.1.0",
+  "description": "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
+  "author": "@unbraind",
+  "entry": "dist/index.js",
+  "capabilities": [
+    "commands",
+    "schema"
+  ],
+  "compatibility": {
+    "pm": ">=2026.6.6"
+  }
+}
+

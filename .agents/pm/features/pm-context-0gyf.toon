@@ -1,0 +1,22 @@
+id: pm-context-0gyf
+title: Build initial context pack command
+description: ""
+type: Feature
+status: closed
+priority: 1
+tags[3]: context,initial-release,package
+created_at: "2026-06-06T19:12:35.446Z"
+updated_at: "2026-06-06T19:21:48.383Z"
+author: codex
+comments[1]{created_at,author,text}:
+  "2026-06-06T19:18:38.269Z",codex,"Spec correction: the package registers `pm context-pack`, not `pm context pack`, because core pm owns the `pm context|ctx` command path. The package intentionally exposes an explicit `--without-neighborhood` flag for deterministic host parsing."
+files[5]{path,scope,note}:
+  .github/workflows/ci.yml,project,free GitHub CI
+  .github/workflows/release.yml,project,daily change-gated release workflow
+  index.ts,project,context pack command and pure pack builders
+  manifest.json,project,pm package manifest
+  package.json,project,npm package metadata and release checks
+tests[1]{command,path,scope,timeout_seconds,pm_context_mode,env_set,env_clear,shared_host_safe,assert_stdout_contains,assert_stdout_regex,assert_stderr_contains,assert_stderr_regex,assert_stdout_min_lines,assert_json_field_equals,assert_json_field_gte,note}:
+  PM_PATH=.agents/pm PM_GLOBAL_PATH=.agents/pm npm test,null,project,120,null,null,null,null,null,null,null,null,null,null,null,TypeScript build plus node test suite
+close_reason: "Initial pm-context TypeScript package implemented with context-pack command, unit tests, pm-linked test evidence, package metadata, CI, release workflow, and documentation."
+body: "Implement pm-context as an installable TypeScript pm package. Initial slice: register  to generate deterministic markdown/json context packs from workspace items, selected ids, status/type/tag filters, dependency neighborhoods, bodies, and output file writing. Include tests, changelog, release workflow, package metadata, and real-data smoke coverage."
