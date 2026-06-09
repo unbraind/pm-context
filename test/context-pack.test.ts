@@ -4,6 +4,7 @@ import extension, {
   buildAgentHandoff,
   buildContextPack,
   extractRelationships,
+  MAX_NEIGHBORHOOD_DEPTH,
   renderAgentHandoff,
   renderMarkdown,
   sortContextItems,
@@ -75,6 +76,94 @@ test("buildContextPack filters selected items and adds dependency neighbors", ()
   assert.equal(pack.neighbors[0]?.id, "pm-2");
   assert.equal(pack.relationships[0]?.to, "pm-2");
   assert.deepEqual(pack.links, [{ itemId: "pm-1", kind: "doc", value: "docs/context.md" }]);
+});
+
+const chainItems = [
+  {
+    id: "pm-1",
+    title: "Focus",
+    type: "Feature",
+    status: "in_progress",
+    priority: 1,
+    updated_at: "2026-06-06T09:00:00Z",
+    dependencies: [{ id: "pm-2", kind: "depends_on" }],
+  },
+  {
+    id: "pm-2",
+    title: "Direct neighbor",
+    type: "Task",
+    status: "open",
+    priority: 0,
+    updated_at: "2026-06-06T10:00:00Z",
+    dependencies: [{ id: "pm-4", kind: "depends_on" }],
+  },
+  {
+    id: "pm-4",
+    title: "Neighbor of a neighbor",
+    type: "Task",
+    status: "open",
+    priority: 0,
+    updated_at: "2026-06-06T11:00:00Z",
+  },
+  {
+    id: "pm-5",
+    title: "Unrelated",
+    type: "Task",
+    status: "open",
+    priority: 0,
+    updated_at: "2026-06-06T12:00:00Z",
+  },
+];
+
+test("buildContextPack depth 1 (explicit) is byte-identical to the legacy default", () => {
+  const legacy = JSON.stringify(buildContextPack(chainItems, { ids: ["pm-1"], includeBody: true, generatedAt: "now" }));
+  const depth1 = JSON.stringify(buildContextPack(chainItems, { ids: ["pm-1"], includeBody: true, generatedAt: "now", neighborhoodDepth: 1 }));
+  assert.equal(depth1, legacy);
+});
+
+test("buildContextPack renderMarkdown is byte-identical at depth 1 vs default", () => {
+  const legacy = renderMarkdown(buildContextPack(chainItems, { ids: ["pm-1"], includeBody: true, generatedAt: "now" }));
+  const depth1 = renderMarkdown(buildContextPack(chainItems, { ids: ["pm-1"], includeBody: true, generatedAt: "now", neighborhoodDepth: 1 }));
+  assert.equal(depth1, legacy);
+});
+
+test("buildContextPack depth 1 includes only direct neighbors", () => {
+  const pack = buildContextPack(chainItems, { ids: ["pm-1"], neighborhoodDepth: 1, generatedAt: "now" });
+  assert.deepEqual(pack.neighbors.map((item) => item.id), ["pm-2"]);
+  assert.equal(pack.summary.neighborItems, 1);
+});
+
+test("buildContextPack depth 2 pulls a neighbor-of-a-neighbor that depth 1 omits", () => {
+  const depth1 = buildContextPack(chainItems, { ids: ["pm-1"], neighborhoodDepth: 1, generatedAt: "now" });
+  assert.equal(depth1.neighbors.some((item) => item.id === "pm-4"), false);
+  const depth2 = buildContextPack(chainItems, { ids: ["pm-1"], neighborhoodDepth: 2, generatedAt: "now" });
+  assert.deepEqual(depth2.neighbors.map((item) => item.id).sort(), ["pm-2", "pm-4"]);
+  assert.equal(depth2.summary.neighborItems, 2);
+});
+
+test("buildContextPack depth 0 omits all neighbors like --without-neighborhood", () => {
+  const depthZero = buildContextPack(chainItems, { ids: ["pm-1"], neighborhoodDepth: 0, generatedAt: "now" });
+  const without = buildContextPack(chainItems, { ids: ["pm-1"], neighborhood: false, generatedAt: "now" });
+  assert.equal(depthZero.neighbors.length, 0);
+  assert.equal(depthZero.filters.neighborhood, false);
+  assert.equal(JSON.stringify(depthZero), JSON.stringify(without));
+});
+
+test("buildContextPack caps neighborhood depth at MAX_NEIGHBORHOOD_DEPTH", () => {
+  const capped = buildContextPack(chainItems, { ids: ["pm-1"], neighborhoodDepth: 999, generatedAt: "now" });
+  // With a 2-hop chain, both transitive neighbors are reached; cap just bounds traversal.
+  assert.deepEqual(capped.neighbors.map((item) => item.id).sort(), ["pm-2", "pm-4"]);
+  assert.equal(MAX_NEIGHBORHOOD_DEPTH, 5);
+});
+
+test("buildContextPack never includes a focus item as its own neighbor", () => {
+  // pm-1 and pm-2 are both focus; the pm-1<->pm-2 edge must not make either a neighbor.
+  const pack = buildContextPack(chainItems, { ids: ["pm-1", "pm-2"], neighborhoodDepth: 3, generatedAt: "now" });
+  const focusIds = new Set(pack.items.map((item) => item.id));
+  for (const neighbor of pack.neighbors) {
+    assert.equal(focusIds.has(neighbor.id), false, `${neighbor.id} should not be both focus and neighbor`);
+  }
+  assert.deepEqual(pack.neighbors.map((item) => item.id), ["pm-4"]);
 });
 
 test("buildContextPack excludes closed items by default but can include them", () => {

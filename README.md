@@ -19,6 +19,7 @@ pm context-pack --id pm-1234 --include-body --output context.md
 pm context-pack --id pm-1234 --format agent
 pm context-pack --status in_progress --tag release --format json
 pm context-pack --type Feature --include-closed --limit 20
+pm context-pack --id pm-1234 --neighborhood-depth 2
 ```
 
 The command is read-only. It shells out to the active `pm` binary for
@@ -57,6 +58,13 @@ Options:
 - `--include-body` include item bodies
 - `--include-closed` include closed/canceled items in filtered packs
 - `--without-neighborhood` omit dependency/dependent neighbors
+- `--neighborhood-depth <n>` include transitive neighbors up to `n` hops (default `1`).
+  A breadth-first walk over the dependency relationship graph in both directions
+  (`depends_on`/`blocked_by` edges and their reverse). `0` is equivalent to
+  `--without-neighborhood`; the value is capped at `5`. Depth `1` is the historical
+  default and produces byte-identical packs to prior versions. Neighbors discovered
+  at deeper hops are still classified as neighbors (never focus), de-duplicated, and a
+  focus item is never listed as its own neighbor.
 
 ## Philosophy
 

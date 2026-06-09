@@ -43,6 +43,8 @@ export interface PmItem {
   [key: string]: unknown;
 }
 
+export const MAX_NEIGHBORHOOD_DEPTH = 5;
+
 export interface ContextPackOptions {
   ids?: string[];
   status?: string;
@@ -52,6 +54,7 @@ export interface ContextPackOptions {
   includeBody?: boolean;
   includeClosed?: boolean;
   neighborhood?: boolean;
+  neighborhoodDepth?: number;
   generatedAt?: string;
 }
 
@@ -125,6 +128,19 @@ function intOption(options: Record<string, unknown>, key: string, fallback: numb
     throw new CommandError(`--${key} must be a positive integer`, EXIT_CODE.USAGE);
   }
   return parsed;
+}
+
+function intOptionMin0(options: Record<string, unknown>, keys: string[], fallback: number): number {
+  for (const key of keys) {
+    const raw = options[key];
+    if (raw === undefined || raw === null || raw === "") continue;
+    const parsed = Number.parseInt(String(raw), 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      throw new CommandError(`--${keys[0]} must be a non-negative integer`, EXIT_CODE.USAGE);
+    }
+    return parsed;
+  }
+  return fallback;
 }
 
 function normalizeText(value: unknown): string {
@@ -243,12 +259,29 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
     : allItems.filter((item) => matchesFilters(item, options));
   const limited = sortContextItems(selected).slice(0, options.limit ?? 25);
   const selectedIds = new Set(limited.map((item) => item.id));
+  // Resolve the neighborhood depth. --without-neighborhood (neighborhood === false)
+  // forces depth 0. Otherwise default to 1 hop, capped at MAX_NEIGHBORHOOD_DEPTH.
+  let depth = options.neighborhoodDepth ?? 1;
+  if (options.neighborhood === false) depth = 0;
+  if (depth < 0) depth = 0;
+  if (depth > MAX_NEIGHBORHOOD_DEPTH) depth = MAX_NEIGHBORHOOD_DEPTH;
+  // BFS over the (bidirectional) dependency relationship graph starting from the
+  // focus items. Each hop expands the frontier by one degree of separation. The
+  // visited set is seeded with focus ids so a focus item is never a neighbor.
   const neighborIds = new Set<string>();
-  if (options.neighborhood !== false) {
+  const visited = new Set<string>(selectedIds);
+  let frontier = new Set<string>(selectedIds);
+  for (let hop = 0; hop < depth && frontier.size > 0; hop += 1) {
+    const next = new Set<string>();
     for (const rel of allRelationships) {
-      if (selectedIds.has(rel.from)) neighborIds.add(rel.to);
-      if (selectedIds.has(rel.to)) neighborIds.add(rel.from);
+      if (frontier.has(rel.from) && !visited.has(rel.to)) next.add(rel.to);
+      if (frontier.has(rel.to) && !visited.has(rel.from)) next.add(rel.from);
     }
+    for (const id of next) {
+      visited.add(id);
+      neighborIds.add(id);
+    }
+    frontier = next;
   }
   for (const id of selectedIds) neighborIds.delete(id);
   const neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item): item is PmItem => Boolean(item)));
@@ -269,7 +302,7 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
       type: options.type,
       tag: options.tag,
       includeClosed: options.includeClosed === true,
-      neighborhood: options.neighborhood !== false,
+      neighborhood: depth > 0,
     },
     summary: {
       totalItems: allItems.length,
@@ -499,6 +532,7 @@ function setupCommands(api: any): void {
       { long: "--include-body", description: "Include body/description text", type: "boolean" },
       { long: "--include-closed", description: "Include closed/canceled items in filtered packs", type: "boolean" },
       { long: "--without-neighborhood", description: "Omit dependency/dependent neighbors", type: "boolean" },
+      { long: "--neighborhood-depth", value_name: "n", description: `Transitive neighbor hops via dependency graph (0-${MAX_NEIGHBORHOOD_DEPTH}, default: 1; 0 = none)`, type: "string" },
     ],
     async run(ctx: any) {
       const options = ctx.options as Record<string, unknown>;
@@ -515,6 +549,7 @@ function setupCommands(api: any): void {
         includeBody: boolOption(options, "include-body", "includeBody"),
         includeClosed: boolOption(options, "include-closed", "includeClosed"),
         neighborhood: !boolOption(options, "without-neighborhood", "withoutNeighborhood"),
+        neighborhoodDepth: intOptionMin0(options, ["neighborhood-depth", "neighborhoodDepth"], 1),
       });
       const output = format === "json"
         ? `${JSON.stringify(pack, null, 2)}\n`
