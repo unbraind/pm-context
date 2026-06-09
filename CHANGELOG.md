@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add --neighborhood-depth for transitive context neighbors ([pm-context-qbmf](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-qbmf.toon))
+
 ## 2026.06.07 - 2026-06-06
 
 ### Added
