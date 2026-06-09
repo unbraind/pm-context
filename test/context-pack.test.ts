@@ -189,9 +189,10 @@ test("renderMarkdown includes summary, relationships and optional bodies", () =>
 });
 
 test("buildAgentHandoff extracts compact focus, blockers, next actions and refresh command", () => {
-  const handoff = buildAgentHandoff(buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }));
+  const handoff = buildAgentHandoff(buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }), { recentLimit: 1 });
   assert.equal(handoff.counts.focus, 1);
   assert.equal(handoff.counts.blockers, 1);
+  assert.equal(handoff.counts.recent, 1);
   assert.deepEqual(handoff.focus.map((item) => item.id), ["pm-1"]);
   assert.deepEqual(handoff.blockers, [{
     itemId: "pm-1",
@@ -205,14 +206,22 @@ test("buildAgentHandoff extracts compact focus, blockers, next actions and refre
     title: "Build context dashboard",
     reason: "resolve blocker first",
   }]);
+  assert.deepEqual(handoff.recent, [{
+    id: "pm-2",
+    title: "Normalize source data",
+    status: "open",
+    updatedAt: "2026-06-06T10:00:00Z",
+  }]);
   assert.equal(handoff.suggestedCommand, "pm context-pack --id pm-1 --format agent");
 });
 
 test("renderAgentHandoff emits token-compact agent sections", () => {
   const markdown = renderAgentHandoff(buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }));
   assert.match(markdown, /^# pm agent handoff/);
-  assert.match(markdown, /Focus: 1 \| Neighbors: 1 \| Blockers: 1 \| Links: 1/);
+  assert.match(markdown, /Focus: 1 \| Neighbors: 1 \| Blockers: 1 \| Links: 1 \| Recent: 2/);
   assert.match(markdown, /pm-1 blocked_by pm-2 Normalize source data \(open\)/);
   assert.match(markdown, /pm-1: Build context dashboard - resolve blocker first/);
+  assert.match(markdown, /## Recent Activity/);
+  assert.match(markdown, /pm-2: Normalize source data \(open\) - updated 2026-06-06T10:00:00Z/);
   assert.match(markdown, /`pm context-pack --id pm-1 --format agent`/);
 });

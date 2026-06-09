@@ -4,6 +4,7 @@
 
 ### Added
 
+- Add compact format alias and recent activity section ([pm-context-8vgi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-8vgi.toon))
 - Add --neighborhood-depth for transitive context neighbors ([pm-context-qbmf](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-qbmf.toon))
 
 ## 2026.06.07 - 2026-06-06
