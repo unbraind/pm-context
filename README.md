@@ -18,6 +18,7 @@ pm install github.com/unbraind/pm-context --project
 pm context-pack --id pm-1234 --include-body --output context.md
 pm context-pack --id pm-1234 --format agent
 pm context-pack --id pm-1234 --format compact --recent 8
+pm context-pack --ids pm-1234,pm-5678 --state blocked --format compact
 pm context-pack --status in_progress --tag release --format json
 pm context-pack --type Feature --include-closed --limit 20
 pm context-pack --id pm-1234 --neighborhood-depth 2
@@ -51,8 +52,11 @@ run before continuing.
 Options:
 
 - `--id <id>` repeatable item ids to focus
+- `--ids <id,id>` comma-separated focus item ids (alias for repeated `--id`)
 - `--status <status>` filter by status
+- `--state <status>` alias for `--status`
 - `--type <type>` filter by type
+- `--kind <type>` alias for `--type`
 - `--tag <tag>` filter by tag
 - `--limit <n>` maximum focus item count
 - `--format <markdown|json|agent|compact>` output format (`compact` aliases `agent`)

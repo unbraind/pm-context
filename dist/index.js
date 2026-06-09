@@ -61,6 +61,59 @@ function intOptionMin0(options, keys, fallback) {
     }
     return fallback;
 }
+function shellQuote(value) {
+    if (/^[A-Za-z0-9._/:=,-]+$/.test(value))
+        return value;
+    return `'${value.replace(/'/g, "'\\''")}'`;
+}
+export function resolveSelectionOptions(options, defaults = {}) {
+    const ids = Array.from(new Set([...asArray(options.id), ...asArray(options.ids)]));
+    const status = stringOption(options, "status", "state");
+    const type = stringOption(options, "type", "kind");
+    const tag = stringOption(options, "tag");
+    const hasExplicitSelector = ids.length > 0 || Boolean(status) || Boolean(type) || Boolean(tag);
+    if (hasExplicitSelector || !defaults.fallbackStatus) {
+        return { ids, status, type, tag, inferredStatus: false };
+    }
+    return { ids, status: defaults.fallbackStatus, type, tag, inferredStatus: true };
+}
+function idSelectorArgs(ids) {
+    const normalizedIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
+    if (normalizedIds.length === 0)
+        return [];
+    if (normalizedIds.length === 1)
+        return ["--id", shellQuote(normalizedIds[0])];
+    return ["--ids", shellQuote(normalizedIds.join(","))];
+}
+export function buildSuggestedAgentCommand(input) {
+    const args = ["pm", input.commandName];
+    if (input.selection.ids.length > 0) {
+        args.push(...idSelectorArgs(input.selection.ids));
+    }
+    else {
+        if (input.selection.status)
+            args.push("--status", shellQuote(input.selection.status));
+        if (input.selection.type)
+            args.push("--type", shellQuote(input.selection.type));
+        if (input.selection.tag)
+            args.push("--tag", shellQuote(input.selection.tag));
+    }
+    if (input.includeFormatFlag)
+        args.push("--format", "agent");
+    if (input.limit !== input.defaultLimit)
+        args.push("--limit", String(input.limit));
+    if (input.recentLimit !== input.defaultRecentLimit)
+        args.push("--recent", String(input.recentLimit));
+    if (input.includeClosed)
+        args.push("--include-closed");
+    if (!input.neighborhood) {
+        args.push("--without-neighborhood");
+    }
+    else if (input.neighborhoodDepth !== 1) {
+        args.push("--neighborhood-depth", String(input.neighborhoodDepth));
+    }
+    return args.join(" ");
+}
 function normalizeText(value) {
     return typeof value === "string" ? value.trim() : "";
 }
@@ -345,9 +398,9 @@ export function buildAgentHandoff(pack, options = {}) {
                 : "selected focus item",
     }));
     const ids = pack.items.map((item) => item.id).join(",");
-    const suggestedCommand = ids
+    const suggestedCommand = normalizeText(options.suggestedCommand) || (ids
         ? `pm context-pack --id ${ids} --format agent`
-        : "pm context-pack --status in_progress --format agent";
+        : "pm context-pack --status in_progress --format agent");
     const recentLimit = options.recentLimit ?? 5;
     const recent = [...allVisible]
         .filter((item) => !isClosedStatus(itemStatus(item)))
@@ -468,6 +521,9 @@ export function readPmItems(pmRoot) {
     }
 }
 function setupCommands(api) {
+    const contextPackDefaultLimit = 25;
+    const contextHandoffDefaultLimit = 12;
+    const defaultRecentLimit = 5;
     api.registerCommand({
         name: "context-pack",
         description: "Generate a durable pm context pack for handoffs and reviews.",
@@ -475,13 +531,17 @@ function setupCommands(api) {
         examples: [
             "pm context-pack --id pm-1234 --include-body --output context.md",
             "pm context-pack --id pm-1234 --format agent",
+            "pm context-pack --ids pm-1234,pm-5678 --state blocked --format compact",
             "pm context-pack --id pm-1234 --format compact --recent 8",
             "pm context-pack --status in_progress --tag release --format json",
         ],
         flags: [
             { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
+            { long: "--ids", value_name: "ids", description: "Comma-separated focus ids (alias for repeated --id)", type: "string" },
             { long: "--status", value_name: "status", description: "Filter focus items by status", type: "string" },
+            { long: "--state", value_name: "status", description: "Alias for --status", type: "string" },
             { long: "--type", value_name: "type", description: "Filter focus items by type", type: "string" },
+            { long: "--kind", value_name: "type", description: "Alias for --type", type: "string" },
             { long: "--tag", value_name: "tag", description: "Filter focus items by tag", type: "string" },
             { long: "--limit", value_name: "n", description: "Maximum focus item count (default: 25)", type: "string" },
             { long: "--format", value_name: "format", description: "Output format: markdown, json, agent, or compact", type: "string" },
@@ -499,22 +559,40 @@ function setupCommands(api) {
             if (format !== "markdown" && format !== "json" && format !== "agent") {
                 throw new CommandError("--format must be markdown, json, agent, or compact", EXIT_CODE.USAGE);
             }
+            const selection = resolveSelectionOptions(options);
+            const limit = intOption(options, "limit", contextPackDefaultLimit);
+            const includeBody = boolOption(options, "include-body", "includeBody");
+            const includeClosed = boolOption(options, "include-closed", "includeClosed");
+            const neighborhood = !boolOption(options, "without-neighborhood", "withoutNeighborhood");
+            const neighborhoodDepth = intOptionMin0(options, ["neighborhood-depth", "neighborhoodDepth"], 1);
+            const recentLimit = intOptionMin0(options, ["recent", "recentLimit", "recent-limit"], defaultRecentLimit);
             const pack = buildContextPack(readPmItems(ctx.pm_root), {
-                ids: asArray(options.id),
-                status: stringOption(options, "status"),
-                type: stringOption(options, "type"),
-                tag: stringOption(options, "tag"),
-                limit: intOption(options, "limit", 25),
-                includeBody: boolOption(options, "include-body", "includeBody"),
-                includeClosed: boolOption(options, "include-closed", "includeClosed"),
-                neighborhood: !boolOption(options, "without-neighborhood", "withoutNeighborhood"),
-                neighborhoodDepth: intOptionMin0(options, ["neighborhood-depth", "neighborhoodDepth"], 1),
+                ids: selection.ids,
+                status: selection.status,
+                type: selection.type,
+                tag: selection.tag,
+                limit,
+                includeBody,
+                includeClosed,
+                neighborhood,
+                neighborhoodDepth,
             });
-            const recentLimit = intOptionMin0(options, ["recent", "recentLimit", "recent-limit"], 5);
+            const suggestedCommand = buildSuggestedAgentCommand({
+                commandName: "context-pack",
+                selection,
+                limit,
+                defaultLimit: contextPackDefaultLimit,
+                recentLimit,
+                defaultRecentLimit,
+                includeClosed,
+                neighborhood,
+                neighborhoodDepth,
+                includeFormatFlag: true,
+            });
             const output = format === "json"
                 ? `${JSON.stringify(pack, null, 2)}\n`
                 : format === "agent"
-                    ? renderAgentHandoff(pack, { recentLimit })
+                    ? renderAgentHandoff(pack, { recentLimit, suggestedCommand })
                     : renderMarkdown(pack);
             const outputPath = stringOption(options, "output");
             if (outputPath) {
@@ -526,6 +604,78 @@ function setupCommands(api) {
             }
             const reportedFormat = requestedFormat === "compact" ? "compact" : format;
             return format === "json" ? pack : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
+        },
+    });
+    api.registerCommand({
+        name: "context-handoff",
+        description: "Generate an agent-ready handoff with concise defaults.",
+        intent: "produce compact, actionable handoff context for another agent",
+        examples: [
+            "pm context-handoff --id pm-1234",
+            "pm context-handoff --ids pm-1234,pm-5678 --state blocked",
+            "pm context-handoff --status blocked --recent 8",
+            "pm context-handoff --tag release --without-neighborhood",
+        ],
+        flags: [
+            { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
+            { long: "--ids", value_name: "ids", description: "Comma-separated focus ids (alias for repeated --id)", type: "string" },
+            { long: "--status", value_name: "status", description: "Filter focus items by status", type: "string" },
+            { long: "--state", value_name: "status", description: "Alias for --status", type: "string" },
+            { long: "--type", value_name: "type", description: "Filter focus items by type", type: "string" },
+            { long: "--kind", value_name: "type", description: "Alias for --type", type: "string" },
+            { long: "--tag", value_name: "tag", description: "Filter focus items by tag", type: "string" },
+            { long: "--limit", value_name: "n", description: `Maximum focus item count (default: ${contextHandoffDefaultLimit})`, type: "string" },
+            { long: "--recent", value_name: "n", description: `Recent activity items (default: ${defaultRecentLimit})`, type: "string" },
+            { long: "--output", value_name: "file", description: "Write handoff output to a file", type: "string" },
+            { long: "--include-closed", description: "Include closed/canceled items in filtered packs", type: "boolean" },
+            { long: "--without-neighborhood", description: "Omit dependency/dependent neighbors", type: "boolean" },
+            { long: "--neighborhood-depth", value_name: "n", description: `Transitive neighbor hops via dependency graph (0-${MAX_NEIGHBORHOOD_DEPTH}, default: 1; 0 = none)`, type: "string" },
+        ],
+        async run(ctx) {
+            const options = ctx.options;
+            const selection = resolveSelectionOptions(options, { fallbackStatus: "in_progress" });
+            const limit = intOption(options, "limit", contextHandoffDefaultLimit);
+            const includeClosed = boolOption(options, "include-closed", "includeClosed");
+            const neighborhood = !boolOption(options, "without-neighborhood", "withoutNeighborhood");
+            const neighborhoodDepth = intOptionMin0(options, ["neighborhood-depth", "neighborhoodDepth"], 1);
+            const recentLimit = intOptionMin0(options, ["recent", "recentLimit", "recent-limit"], defaultRecentLimit);
+            const pack = buildContextPack(readPmItems(ctx.pm_root), {
+                ids: selection.ids,
+                status: selection.status,
+                type: selection.type,
+                tag: selection.tag,
+                limit,
+                includeClosed,
+                neighborhood,
+                neighborhoodDepth,
+            });
+            const suggestedCommand = buildSuggestedAgentCommand({
+                commandName: "context-handoff",
+                selection,
+                limit,
+                defaultLimit: contextHandoffDefaultLimit,
+                recentLimit,
+                defaultRecentLimit,
+                includeClosed,
+                neighborhood,
+                neighborhoodDepth,
+            });
+            const output = renderAgentHandoff(pack, { recentLimit, suggestedCommand });
+            const outputPath = stringOption(options, "output");
+            if (outputPath) {
+                writeFileSync(outputPath, output, "utf-8");
+                console.error(`context pack written to ${outputPath}`);
+            }
+            else {
+                console.error(output.trimEnd());
+            }
+            return {
+                ok: true,
+                format: "agent",
+                selected: pack.summary.selectedItems,
+                neighbors: pack.summary.neighborItems,
+                defaultedStatus: selection.inferredStatus ? selection.status : undefined,
+            };
         },
     });
 }

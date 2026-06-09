@@ -115,6 +115,29 @@ export interface AgentHandoff {
     }>;
     suggestedCommand: string;
 }
+export interface SelectionOptions {
+    ids: string[];
+    status?: string;
+    type?: string;
+    tag?: string;
+    inferredStatus: boolean;
+}
+export interface SuggestedAgentCommandInput {
+    commandName: "context-pack" | "context-handoff";
+    selection: SelectionOptions;
+    limit: number;
+    defaultLimit: number;
+    recentLimit: number;
+    defaultRecentLimit: number;
+    includeClosed: boolean;
+    neighborhood: boolean;
+    neighborhoodDepth: number;
+    includeFormatFlag?: boolean;
+}
+export declare function resolveSelectionOptions(options: Record<string, unknown>, defaults?: {
+    fallbackStatus?: string;
+}): SelectionOptions;
+export declare function buildSuggestedAgentCommand(input: SuggestedAgentCommandInput): string;
 export declare function sortContextItems(items: PmItem[]): PmItem[];
 export declare function extractRelationships(item: PmItem): Array<{
     from: string;
@@ -125,9 +148,11 @@ export declare function buildContextPack(allItems: PmItem[], options?: ContextPa
 export declare function renderMarkdown(pack: ContextPack): string;
 export declare function buildAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
+    suggestedCommand?: string;
 }): AgentHandoff;
 export declare function renderAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
+    suggestedCommand?: string;
 }): string;
 export declare function readPmItems(pmRoot: string): PmItem[];
 declare const _default: {
