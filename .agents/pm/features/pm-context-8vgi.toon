@@ -1,0 +1,22 @@
+id: pm-context-8vgi
+title: Add compact format alias and recent activity section
+description: Add --format compact alias for agent handoff output and include a configurable recent-activity section for quick context refresh.
+type: Feature
+status: closed
+priority: 1
+tags: []
+created_at: "2026-06-09T21:24:56.250Z"
+updated_at: "2026-06-09T21:29:25.798Z"
+author: codex-5-3
+acceptance_criteria: "context-pack accepts --format compact alias; agent/compact output includes recent activity with configurable --recent limit; markdown/json output remain unchanged; tests+docs updated and release:check passes"
+resolution: Implemented compact alias and recent activity handoff enrichment
+expected_result: Agents can request lower-token compact handoffs with immediate recent-work visibility
+actual_result: "Added --format compact, --recent, recent section in agent output, and passing tests/release checks"
+files[3]{path,scope,note}:
+  index.ts,project,null
+  README.md,project,null
+  test/context-pack.test.ts,project,null
+tests[1]{command,path,scope,timeout_seconds,pm_context_mode,env_set,env_clear,shared_host_safe,assert_stdout_contains,assert_stdout_regex,assert_stderr_contains,assert_stderr_regex,assert_stdout_min_lines,assert_json_field_equals,assert_json_field_gte,note}:
+  "npm run release:check",null,project,null,null,null,null,null,null,null,null,null,null,null,null,null
+close_reason: Compact handoff alias and recent activity delivery complete
+body: ""

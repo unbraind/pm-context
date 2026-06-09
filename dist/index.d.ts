@@ -80,6 +80,7 @@ export interface AgentHandoff {
         neighbors: number;
         blockers: number;
         links: number;
+        recent: number;
     };
     focus: Array<{
         id: string;
@@ -101,6 +102,12 @@ export interface AgentHandoff {
         title: string;
         reason: string;
     }>;
+    recent: Array<{
+        id: string;
+        title: string;
+        status: string;
+        updatedAt?: string;
+    }>;
     links: Array<{
         itemId: string;
         kind: "doc" | "file";
@@ -116,8 +123,12 @@ export declare function extractRelationships(item: PmItem): Array<{
 }>;
 export declare function buildContextPack(allItems: PmItem[], options?: ContextPackOptions): ContextPack;
 export declare function renderMarkdown(pack: ContextPack): string;
-export declare function buildAgentHandoff(pack: ContextPack): AgentHandoff;
-export declare function renderAgentHandoff(pack: ContextPack): string;
+export declare function buildAgentHandoff(pack: ContextPack, options?: {
+    recentLimit?: number;
+}): AgentHandoff;
+export declare function renderAgentHandoff(pack: ContextPack, options?: {
+    recentLimit?: number;
+}): string;
 export declare function readPmItems(pmRoot: string): PmItem[];
 declare const _default: {
     name: string;

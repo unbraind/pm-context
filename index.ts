@@ -88,10 +88,12 @@ export interface AgentHandoff {
     neighbors: number;
     blockers: number;
     links: number;
+    recent: number;
   };
   focus: Array<{ id: string; title: string; status: string; type: string; priority?: number; deadline?: string }>;
   blockers: Array<{ itemId: string; blockedBy: string; kind: string; title?: string; status?: string }>;
   nextActions: Array<{ id: string; title: string; reason: string }>;
+  recent: Array<{ id: string; title: string; status: string; updatedAt?: string }>;
   links: Array<{ itemId: string; kind: "doc" | "file"; value: string }>;
   suggestedCommand: string;
 }
@@ -388,7 +390,13 @@ function statusFor(items: PmItem[], id: string): string | undefined {
   return items.find((item) => item.id === id)?.status;
 }
 
-export function buildAgentHandoff(pack: ContextPack): AgentHandoff {
+function updatedTimestamp(item: PmItem): number {
+  const raw = normalizeText(item.updated_at) || normalizeText(item.created_at);
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function buildAgentHandoff(pack: ContextPack, options: { recentLimit?: number } = {}): AgentHandoff {
   const allVisible = [...pack.items, ...pack.neighbors];
   const focusIds = new Set(pack.items.map((item) => item.id));
   const blockers = pack.relationships
@@ -417,6 +425,17 @@ export function buildAgentHandoff(pack: ContextPack): AgentHandoff {
   const suggestedCommand = ids
     ? `pm context-pack --id ${ids} --format agent`
     : "pm context-pack --status in_progress --format agent";
+  const recentLimit = options.recentLimit ?? 5;
+  const recent = [...allVisible]
+    .filter((item) => !isClosedStatus(itemStatus(item)))
+    .sort((a, b) => updatedTimestamp(b) - updatedTimestamp(a) || a.id.localeCompare(b.id))
+    .slice(0, recentLimit)
+    .map((item) => ({
+      id: item.id,
+      title: normalizeText(item.title) || "(untitled)",
+      status: itemStatus(item),
+      updatedAt: normalizeText(item.updated_at) || normalizeText(item.created_at) || undefined,
+    }));
   return {
     generatedAt: pack.generatedAt,
     counts: {
@@ -424,6 +443,7 @@ export function buildAgentHandoff(pack: ContextPack): AgentHandoff {
       neighbors: pack.summary.neighborItems,
       blockers: blockers.length,
       links: pack.links.length,
+      recent: recent.length,
     },
     focus: pack.items.map((item) => ({
       id: item.id,
@@ -435,18 +455,19 @@ export function buildAgentHandoff(pack: ContextPack): AgentHandoff {
     })),
     blockers,
     nextActions,
+    recent,
     links: pack.links.slice(0, 12),
     suggestedCommand,
   };
 }
 
-export function renderAgentHandoff(pack: ContextPack): string {
-  const handoff = buildAgentHandoff(pack);
+export function renderAgentHandoff(pack: ContextPack, options: { recentLimit?: number } = {}): string {
+  const handoff = buildAgentHandoff(pack, options);
   const lines: string[] = [
     "# pm agent handoff",
     "",
     `Generated: ${handoff.generatedAt}`,
-    `Focus: ${handoff.counts.focus} | Neighbors: ${handoff.counts.neighbors} | Blockers: ${handoff.counts.blockers} | Links: ${handoff.counts.links}`,
+    `Focus: ${handoff.counts.focus} | Neighbors: ${handoff.counts.neighbors} | Blockers: ${handoff.counts.blockers} | Links: ${handoff.counts.links} | Recent: ${handoff.counts.recent}`,
     "",
     "## Focus",
     "",
@@ -480,6 +501,15 @@ export function renderAgentHandoff(pack: ContextPack): string {
   } else {
     for (const action of handoff.nextActions) {
       lines.push(`- ${action.id}: ${markdownEscape(action.title)} - ${action.reason}`);
+    }
+  }
+  lines.push("", "## Recent Activity", "");
+  if (handoff.recent.length === 0) {
+    lines.push("_No recent open activity._");
+  } else {
+    for (const item of handoff.recent) {
+      const updated = item.updatedAt ? ` - updated ${item.updatedAt}` : "";
+      lines.push(`- ${item.id}: ${markdownEscape(item.title)} (${item.status})${updated}`);
     }
   }
   lines.push("", "## Linked Context", "");
@@ -519,6 +549,7 @@ function setupCommands(api: any): void {
     examples: [
       "pm context-pack --id pm-1234 --include-body --output context.md",
       "pm context-pack --id pm-1234 --format agent",
+      "pm context-pack --id pm-1234 --format compact --recent 8",
       "pm context-pack --status in_progress --tag release --format json",
     ],
     flags: [
@@ -527,7 +558,8 @@ function setupCommands(api: any): void {
       { long: "--type", value_name: "type", description: "Filter focus items by type", type: "string" },
       { long: "--tag", value_name: "tag", description: "Filter focus items by tag", type: "string" },
       { long: "--limit", value_name: "n", description: "Maximum focus item count (default: 25)", type: "string" },
-      { long: "--format", value_name: "format", description: "Output format: markdown, json, or agent", type: "string" },
+      { long: "--format", value_name: "format", description: "Output format: markdown, json, agent, or compact", type: "string" },
+      { long: "--recent", value_name: "n", description: "Recent activity items in agent/compact output (default: 5)", type: "string" },
       { long: "--output", value_name: "file", description: "Write context pack to a file", type: "string" },
       { long: "--include-body", description: "Include body/description text", type: "boolean" },
       { long: "--include-closed", description: "Include closed/canceled items in filtered packs", type: "boolean" },
@@ -536,9 +568,10 @@ function setupCommands(api: any): void {
     ],
     async run(ctx: any) {
       const options = ctx.options as Record<string, unknown>;
-      const format = (stringOption(options, "format") ?? "markdown").toLowerCase();
+      const requestedFormat = (stringOption(options, "format") ?? "markdown").toLowerCase();
+      const format = requestedFormat === "compact" ? "agent" : requestedFormat;
       if (format !== "markdown" && format !== "json" && format !== "agent") {
-        throw new CommandError("--format must be markdown, json, or agent", EXIT_CODE.USAGE);
+        throw new CommandError("--format must be markdown, json, agent, or compact", EXIT_CODE.USAGE);
       }
       const pack = buildContextPack(readPmItems(ctx.pm_root), {
         ids: asArray(options.id),
@@ -551,10 +584,11 @@ function setupCommands(api: any): void {
         neighborhood: !boolOption(options, "without-neighborhood", "withoutNeighborhood"),
         neighborhoodDepth: intOptionMin0(options, ["neighborhood-depth", "neighborhoodDepth"], 1),
       });
+      const recentLimit = intOptionMin0(options, ["recent", "recentLimit", "recent-limit"], 5);
       const output = format === "json"
         ? `${JSON.stringify(pack, null, 2)}\n`
         : format === "agent"
-          ? renderAgentHandoff(pack)
+          ? renderAgentHandoff(pack, { recentLimit })
           : renderMarkdown(pack);
       const outputPath = stringOption(options, "output");
       if (outputPath) {
@@ -563,7 +597,8 @@ function setupCommands(api: any): void {
       } else {
         console.error(output.trimEnd());
       }
-      return format === "json" ? pack : { ok: true, format, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
+      const reportedFormat = requestedFormat === "compact" ? "compact" : format;
+      return format === "json" ? pack : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
     },
   });
 }
