@@ -30,6 +30,7 @@ export interface PmItem {
     blockedBy?: unknown;
     [key: string]: unknown;
 }
+export declare const MAX_NEIGHBORHOOD_DEPTH = 5;
 export interface ContextPackOptions {
     ids?: string[];
     status?: string;
@@ -39,6 +40,7 @@ export interface ContextPackOptions {
     includeBody?: boolean;
     includeClosed?: boolean;
     neighborhood?: boolean;
+    neighborhoodDepth?: number;
     generatedAt?: string;
 }
 export interface ContextPack {

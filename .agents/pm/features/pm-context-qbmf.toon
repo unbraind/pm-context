@@ -1,0 +1,22 @@
+id: pm-context-qbmf
+title: Add --neighborhood-depth for transitive context neighbors
+description: ""
+type: Feature
+status: closed
+priority: 2
+tags: []
+created_at: "2026-06-09T18:07:00.747Z"
+updated_at: "2026-06-09T20:58:38.123Z"
+author: codex
+acceptance_criteria: "context-pack accepts --neighborhood-depth <n> (default 1, cap 5); depth 1 is byte-identical to prior output; depth 0 == --without-neighborhood; depth 2+ includes transitive neighbors via BFS over the dependency graph (both directions); neighbors de-duplicated; a focus item is never its own neighbor; --include-closed neighbor behavior unchanged; tests + README updated; release:check green"
+comments[1]{created_at,author,text}:
+  "2026-06-09T18:07:21.304Z",codex,"Design + implementation notes:\n\nNEIGHBORHOOD AS BFS: buildContextPack now resolves a numeric depth (default 1). Starting frontier = focus item ids. Each hop scans all relationships (extracted via extractRelationships from deps/dependencies/blocked_by/blockedBy) and expands BOTH directions: if frontier contains rel.from add rel.to, and if frontier contains rel.to add rel.from. A visited set seeded with the focus ids prevents revisiting and guarantees a focus item is never emitted as its own neighbor. Newly-reached ids each hop become the next frontier; all are accumulated into neighborIds. After traversal, focus ids are removed from neighborIds (belt-and-suspenders). Neighbors found at any hop depth are classified as neighbors, never focus.\n\nDEPTH SEMANTICS: --neighborhood-depth <n> default 1. depth 0 produces zero neighbors and is equivalent to --without-neighborhood (which forces depth 0; --without-neighborhood wins if both given). Values are clamped: <0 -> 0, >5 -> 5 (MAX_NEIGHBORHOOD_DEPTH=5) to bound traversal. Parsed via intOptionMin0 (rejects negatives/non-numeric with USAGE exit), accepts both kebab and camelCase option keys.\n\nBYTE-IDENTICAL AT DEPTH 1: The only output field touched is filters.neighborhood, now derived as (depth > 0). At default/depth-1 that is true (matching the old options.neighborhood !== false); at depth 0 / --without-neighborhood it is false (matching old behavior). No new fields added to the ContextPack output shape, so JSON and markdown packs are byte-identical at depth 1. Proven by two tests asserting JSON.stringify and renderMarkdown equality between {default} and {neighborhoodDepth:1} for a 2-hop chain fixture.\n\n--INCLUDE-CLOSED: unchanged. Closed filtering only ever applied to focus selection via matchesFilters; neighbors were and still are pulled purely from the relationship graph regardless of closed status. BFS preserves that exactly.\n\nTESTS (7 new, all green, 17 total pass / 0 fail):\n- depth 1 (explicit) JSON byte-identical to legacy default\n- renderMarkdown byte-identical at depth 1 vs default\n- depth 1 includes only direct neighbors (pm-2, not pm-4)\n- depth 2 pulls neighbor-of-a-neighbor (pm-4) that depth 1 omits\n- depth 0 == --without-neighborhood (zero neighbors, filters.neighborhood false, identical JSON)\n- cap enforced (depth 999 bounded; MAX_NEIGHBORHOOD_DEPTH==5)\n- focus item never its own neighbor (focus pm-1+pm-2 sharing an edge yields only pm-4)\n\nFixture: pm-1 -depends_on-> pm-2 -depends_on-> pm-4, plus unrelated pm-5. README documents the flag, default, cap, BFS semantics, and the depth-1-unchanged guarantee."
+files[4]{path,scope,note}:
+  CHANGELOG.md,project,null
+  index.ts,project,null
+  README.md,project,null
+  test/context-pack.test.ts,project,null
+tests[1]{command,path,scope,timeout_seconds,pm_context_mode,env_set,env_clear,shared_host_safe,assert_stdout_contains,assert_stdout_regex,assert_stderr_contains,assert_stderr_regex,assert_stdout_min_lines,assert_json_field_equals,assert_json_field_gte,note}:
+  "npm run release:check",null,project,null,null,null,null,null,null,null,null,null,null,null,null,null
+close_reason: Implemented neighborhood-depth BFS context expansion with tests and docs
+body: ""
