@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import extension, {
+  buildSuggestedAgentCommand,
   buildAgentHandoff,
   buildContextPack,
   extractRelationships,
   MAX_NEIGHBORHOOD_DEPTH,
+  resolveSelectionOptions,
   renderAgentHandoff,
   renderMarkdown,
   sortContextItems,
@@ -51,7 +53,89 @@ test("extension has required shape", () => {
 test("activate registers context-pack command", () => {
   const commands: Array<Record<string, unknown>> = [];
   extension.activate({ registerCommand(command: Record<string, unknown>) { commands.push(command); } });
-  assert.equal(commands[0]?.name, "context-pack");
+  assert.deepEqual(commands.map((command) => command.name), ["context-pack", "context-handoff"]);
+});
+
+test("activate exposes selector aliases for both commands", () => {
+  const commands: Array<Record<string, unknown>> = [];
+  extension.activate({ registerCommand(command: Record<string, unknown>) { commands.push(command); } });
+  const byName = new Map(commands.map((command) => [command.name, command]));
+  const packFlags = ((byName.get("context-pack") as { flags: Array<{ long: string }> } | undefined)?.flags ?? [])
+    .map((flag) => flag.long);
+  const handoffFlags = ((byName.get("context-handoff") as { flags: Array<{ long: string }> } | undefined)?.flags ?? [])
+    .map((flag) => flag.long);
+  for (const requiredFlag of ["--id", "--ids", "--status", "--state", "--type", "--kind"]) {
+    assert.equal(packFlags.includes(requiredFlag), true, `context-pack missing ${requiredFlag}`);
+    assert.equal(handoffFlags.includes(requiredFlag), true, `context-handoff missing ${requiredFlag}`);
+  }
+});
+
+test("resolveSelectionOptions defaults handoff selection to in_progress", () => {
+  assert.deepEqual(
+    resolveSelectionOptions({}, { fallbackStatus: "in_progress" }),
+    { ids: [], status: "in_progress", type: undefined, tag: undefined, inferredStatus: true },
+  );
+});
+
+test("resolveSelectionOptions preserves explicit selectors without fallback", () => {
+  assert.deepEqual(
+    resolveSelectionOptions({ id: ["pm-1"], status: "blocked", tag: "release" }, { fallbackStatus: "in_progress" }),
+    { ids: ["pm-1"], status: "blocked", type: undefined, tag: "release", inferredStatus: false },
+  );
+});
+
+test("resolveSelectionOptions accepts selector aliases and deduplicates ids", () => {
+  assert.deepEqual(
+    resolveSelectionOptions({ ids: "pm-1, pm-2,pm-1", state: "blocked", kind: "Feature" }),
+    { ids: ["pm-1", "pm-2"], status: "blocked", type: "Feature", tag: undefined, inferredStatus: false },
+  );
+});
+
+test("buildSuggestedAgentCommand keeps context-pack refresh concise but reproducible", () => {
+  const command = buildSuggestedAgentCommand({
+    commandName: "context-pack",
+    selection: { ids: ["pm-1", "pm-2"], status: undefined, type: undefined, tag: undefined, inferredStatus: false },
+    limit: 40,
+    defaultLimit: 25,
+    recentLimit: 8,
+    defaultRecentLimit: 5,
+    includeClosed: true,
+    neighborhood: false,
+    neighborhoodDepth: 0,
+    includeFormatFlag: true,
+  });
+  assert.equal(command, "pm context-pack --ids pm-1,pm-2 --format agent --limit 40 --recent 8 --include-closed --without-neighborhood");
+});
+
+test("buildSuggestedAgentCommand keeps single-id refresh commands unchanged", () => {
+  const command = buildSuggestedAgentCommand({
+    commandName: "context-pack",
+    selection: { ids: ["pm-1"], status: undefined, type: undefined, tag: undefined, inferredStatus: false },
+    limit: 25,
+    defaultLimit: 25,
+    recentLimit: 5,
+    defaultRecentLimit: 5,
+    includeClosed: false,
+    neighborhood: true,
+    neighborhoodDepth: 1,
+    includeFormatFlag: true,
+  });
+  assert.equal(command, "pm context-pack --id pm-1 --format agent");
+});
+
+test("buildSuggestedAgentCommand includes inferred in_progress for context-handoff", () => {
+  const command = buildSuggestedAgentCommand({
+    commandName: "context-handoff",
+    selection: { ids: [], status: "in_progress", type: undefined, tag: undefined, inferredStatus: true },
+    limit: 12,
+    defaultLimit: 12,
+    recentLimit: 5,
+    defaultRecentLimit: 5,
+    includeClosed: false,
+    neighborhood: true,
+    neighborhoodDepth: 2,
+  });
+  assert.equal(command, "pm context-handoff --status in_progress --neighborhood-depth 2");
 });
 
 test("extractRelationships normalizes supported dependency shapes", () => {
@@ -213,6 +297,14 @@ test("buildAgentHandoff extracts compact focus, blockers, next actions and refre
     updatedAt: "2026-06-06T10:00:00Z",
   }]);
   assert.equal(handoff.suggestedCommand, "pm context-pack --id pm-1 --format agent");
+});
+
+test("buildAgentHandoff honors explicit suggested refresh command", () => {
+  const handoff = buildAgentHandoff(
+    buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }),
+    { suggestedCommand: "pm context-handoff --id pm-1" },
+  );
+  assert.equal(handoff.suggestedCommand, "pm context-handoff --id pm-1");
 });
 
 test("renderAgentHandoff emits token-compact agent sections", () => {
