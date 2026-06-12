@@ -133,7 +133,7 @@ jobs:
             echo "::notice::${pkg_name}@${NPM_VERSION} already published; skipping publish step."
             exit 0
           fi
-          npm publish --access public --provenance || npm publish --access public
+          npm publish --access public --provenance --ignore-scripts || npm publish --access public --ignore-scripts
 
       - name: Verify bun install of published package
         if: steps.decide.outputs.should_release == 'true'
