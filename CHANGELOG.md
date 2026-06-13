@@ -1,12 +1,12 @@
 # Changelog
 
-## 2026.6.13 - 2026-06-13
+## Unreleased
 
 ### Other
 
-- Daily Release publish step runs prepublishOnly post-tag: align npm publish with --ignore-scripts ([pm-context-wvup](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-wvup.toon))
+- Regenerate CHANGELOG to drop the duplicate Unreleased section from pm-changelog issue 47 ([pm-context-fgmg](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-fgmg.toon))
 
-## Unreleased
+## 2026.6.13 - 2026-06-13
 
 ### Other
 
