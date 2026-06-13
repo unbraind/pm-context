@@ -1,13 +1,12 @@
 # Changelog
 
-## 2026.6.9 - 2026-06-09
-
-### Added
-
-- Add compact format alias and recent activity section ([pm-context-8vgi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-8vgi.toon))
-- Add --neighborhood-depth for transitive context neighbors ([pm-context-qbmf](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-qbmf.toon))
-
 ## Unreleased
+
+### Other
+
+- Daily Release publish step runs prepublishOnly post-tag: align npm publish with --ignore-scripts ([pm-context-wvup](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-wvup.toon))
+
+## 2026.06.09 - 2026-06-09
 
 ### Added
 
