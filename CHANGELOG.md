@@ -4,7 +4,7 @@
 
 ### Other
 
-- Regenerate CHANGELOG to drop the duplicate Unreleased section \(pm-changelog \#47\) ([pm-context-fgmg](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-fgmg.toon))
+- Regenerate CHANGELOG to drop the duplicate Unreleased section from pm-changelog issue 47 ([pm-context-fgmg](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-fgmg.toon))
 
 ## 2026.6.13 - 2026-06-13
 

@@ -1,12 +1,12 @@
 id: pm-context-fgmg
-title: Regenerate CHANGELOG to drop the duplicate Unreleased section (pm-changelog #47)
+title: Regenerate CHANGELOG to drop the duplicate Unreleased section from pm-changelog issue 47
 description: "The committed CHANGELOG carried a stale '## Unreleased' section mirroring the released ## 2026.6.13 entry — a known pm-changelog prepend-merge defect (GH #47, fixed in pm-changelog 2026.6.13-1). Regenerated canonically via changelog:full (replace mode) to remove the duplicate."
 type: Chore
 status: closed
 priority: 3
 tags: []
 created_at: "2026-06-13T20:41:23.576Z"
-updated_at: "2026-06-13T20:41:23.953Z"
+updated_at: "2026-06-13T21:05:05.466Z"
 author: claude
 resolution: "Ran changelog:full (replace mode) to drop the duplicate '## Unreleased' that mirrored ## 2026.6.13 (pm-changelog #47)."
 expected_result: No duplicate Unreleased section in CHANGELOG
