@@ -22,6 +22,9 @@ pm context-pack --ids pm-1234,pm-5678 --state blocked --format compact
 pm context-pack --status in_progress --tag release --format json
 pm context-pack --type Feature --include-closed --limit 20
 pm context-pack --id pm-1234 --neighborhood-depth 2
+pm context-pack --id pm-1234 --compress --format json
+pm context-pack --id pm-1234 --include-deps --section focus --section blockers
+pm context-pack --id pm-1234 --max-items 10
 ```
 
 The command is read-only. It shells out to the active `pm` binary for
@@ -44,6 +47,34 @@ Agent handoff packs (`--format agent` or `--format compact`) are intentionally
 compact. They focus on the current work, visible blockers, next actions, recent
 activity, linked files/docs, and the exact refresh command another agent should
 run before continuing.
+
+### Compress mode
+
+`--compress` minimizes output tokens for token-sensitive agent contexts:
+
+- JSON output is minified (no indentation)
+- Markdown and agent output have all blank lines removed
+
+### Section filtering
+
+`--section <section>` selects only specific sections of the rendered output.
+Repeat the flag for multiple sections. Available sections:
+
+- Markdown: `summary`, `focus`, `neighborhood`, `neighbors`, `links`, `deps`
+- Agent: `focus`, `blockers`, `next-actions` (alias: `actions`), `recent`
+  (alias: `activity`), `links`, `deps`, `refresh`
+
+### Dependency info
+
+`--include-deps` adds per-item dependency information (`dependsOn` and
+`dependedBy` arrays) to the context pack and handoff output. A `## Dependencies`
+section is rendered in markdown/agent output when present.
+
+### Max items
+
+`--max-items <n>` caps the total number of items (focus + neighbors) in the
+pack. Focus items take priority; neighbors are trimmed to fit the remaining
+budget.
 
 ## Command
 
@@ -72,6 +103,13 @@ Options:
   default and produces byte-identical packs to prior versions. Neighbors discovered
   at deeper hops are still classified as neighbors (never focus), de-duplicated, and a
   focus item is never listed as its own neighbor.
+- `--compress` minimize output tokens (compact JSON, no blank lines)
+- `--include-deps` include per-item dependency info in the context pack
+- `--max-items <n>` maximum total items (focus + neighbors) in the pack
+- `--section <section>` include only specific sections (repeatable):
+  `summary`, `focus`, `neighborhood`, `neighbors`, `links`, `deps`,
+  `blockers`, `next-actions` (alias: `actions`), `recent` (alias: `activity`),
+  `refresh`
 
 ## Philosophy
 

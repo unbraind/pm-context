@@ -106,6 +106,16 @@ export function buildSuggestedAgentCommand(input) {
         args.push("--recent", String(input.recentLimit));
     if (input.includeClosed)
         args.push("--include-closed");
+    if (input.includeDeps)
+        args.push("--include-deps");
+    if (input.compress)
+        args.push("--compress");
+    if (typeof input.maxItems === "number" && input.maxItems > 0)
+        args.push("--max-items", String(input.maxItems));
+    if (input.sections && input.sections.length > 0) {
+        for (const section of input.sections)
+            args.push("--section", shellQuote(section));
+    }
     if (!input.neighborhood) {
         args.push("--without-neighborhood");
     }
@@ -262,8 +272,22 @@ export function buildContextPack(allItems, options = {}) {
     }
     for (const id of selectedIds)
         neighborIds.delete(id);
-    const neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item) => Boolean(item)));
-    const packItems = limited.map((item) => options.includeBody ? item : { ...item, body: undefined, description: undefined });
+    let neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item) => Boolean(item)));
+    // --max-items caps the total item count (focus + neighbors). Focus items take
+    // priority; neighbors are trimmed to fit the remaining budget. If focus
+    // alone exceeds the cap, focus is also trimmed.
+    let focusItems = limited;
+    if (typeof options.maxItems === "number" && options.maxItems > 0) {
+        if (focusItems.length >= options.maxItems) {
+            focusItems = focusItems.slice(0, options.maxItems);
+            neighbors = [];
+        }
+        else {
+            neighbors = neighbors.slice(0, options.maxItems - focusItems.length);
+        }
+    }
+    const focusIdsFinal = new Set(focusItems.map((item) => item.id));
+    const packItems = focusItems.map((item) => options.includeBody ? item : { ...item, body: undefined, description: undefined });
     const packNeighbors = neighbors.map((item) => options.includeBody ? item : { ...item, body: undefined, description: undefined });
     const selectedAndNeighbors = [...packItems, ...packNeighbors];
     const byStatus = {};
@@ -271,6 +295,17 @@ export function buildContextPack(allItems, options = {}) {
     for (const item of packItems) {
         byStatus[itemStatus(item)] = (byStatus[itemStatus(item)] ?? 0) + 1;
         byType[itemType(item)] = (byType[itemType(item)] ?? 0) + 1;
+    }
+    // --include-deps adds per-item dependency info (depends-on and depended-by)
+    // for every visible item in the pack.
+    let deps;
+    if (options.includeDeps) {
+        const visibleIds = [...packItems, ...packNeighbors].map((item) => item.id);
+        deps = visibleIds.map((itemId) => ({
+            itemId,
+            dependsOn: allRelationships.filter((rel) => rel.from === itemId).map((rel) => rel.to),
+            dependedBy: allRelationships.filter((rel) => rel.to === itemId).map((rel) => rel.from),
+        }));
     }
     return {
         generatedAt: options.generatedAt ?? new Date().toISOString(),
@@ -281,6 +316,8 @@ export function buildContextPack(allItems, options = {}) {
             tag: options.tag,
             includeClosed: options.includeClosed === true,
             neighborhood: depth > 0,
+            includeDeps: options.includeDeps === true,
+            maxItems: options.maxItems,
         },
         summary: {
             totalItems: allItems.length,
@@ -292,7 +329,8 @@ export function buildContextPack(allItems, options = {}) {
         items: packItems,
         neighbors: packNeighbors,
         links: buildLinks(selectedAndNeighbors),
-        relationships: allRelationships.filter((rel) => selectedIds.has(rel.from) || selectedIds.has(rel.to)),
+        relationships: allRelationships.filter((rel) => focusIdsFinal.has(rel.from) || focusIdsFinal.has(rel.to)),
+        deps,
     };
 }
 function markdownEscape(value) {
@@ -322,44 +360,63 @@ function renderItemList(items, includeBody) {
     }
     return lines;
 }
-export function renderMarkdown(pack) {
+export function renderMarkdown(pack, options = {}) {
+    const sectionFilter = options.sections?.map((s) => s.toLowerCase());
+    const compress = options.compress === true;
+    const include = (name) => !sectionFilter || sectionFilter.includes(name);
     const lines = [
         "# pm context pack",
         "",
         `Generated: ${pack.generatedAt}`,
-        "",
-        "## Summary",
-        "",
-        `- Total workspace items: ${pack.summary.totalItems}`,
-        `- Focus items: ${pack.summary.selectedItems}`,
-        `- Neighbor items: ${pack.summary.neighborItems}`,
-        `- Statuses: ${Object.entries(pack.summary.byStatus).map(([k, v]) => `${k}=${v}`).join(", ") || "none"}`,
-        `- Types: ${Object.entries(pack.summary.byType).map(([k, v]) => `${k}=${v}`).join(", ") || "none"}`,
-        "",
-        "## Focus Items",
-        "",
-        ...renderItemList(pack.items, pack.items.some((item) => Boolean(item.body || item.description))),
-        "",
-        "## Dependency Neighborhood",
-        "",
     ];
-    if (pack.relationships.length === 0) {
-        lines.push("_No dependency relationships in focus._");
+    if (include("summary")) {
+        lines.push("", "## Summary", "");
+        lines.push(`- Total workspace items: ${pack.summary.totalItems}`);
+        lines.push(`- Focus items: ${pack.summary.selectedItems}`);
+        lines.push(`- Neighbor items: ${pack.summary.neighborItems}`);
+        lines.push(`- Statuses: ${Object.entries(pack.summary.byStatus).map(([k, v]) => `${k}=${v}`).join(", ") || "none"}`);
+        lines.push(`- Types: ${Object.entries(pack.summary.byType).map(([k, v]) => `${k}=${v}`).join(", ") || "none"}`);
     }
-    else {
-        for (const rel of pack.relationships)
-            lines.push(`- ${rel.from} --${rel.kind}--> ${rel.to}`);
+    if (include("focus")) {
+        lines.push("", "## Focus Items", "");
+        lines.push(...renderItemList(pack.items, pack.items.some((item) => Boolean(item.body || item.description))));
     }
-    lines.push("", "## Neighbor Items", "", ...renderItemList(pack.neighbors, false), "", "## Linked Context", "");
-    if (pack.links.length === 0) {
-        lines.push("_No docs or files linked in selected context._");
+    if (include("neighborhood")) {
+        lines.push("", "## Dependency Neighborhood", "");
+        if (pack.relationships.length === 0) {
+            lines.push("_No dependency relationships in focus._");
+        }
+        else {
+            for (const rel of pack.relationships)
+                lines.push(`- ${rel.from} --${rel.kind}--> ${rel.to}`);
+        }
     }
-    else {
-        for (const link of pack.links)
-            lines.push(`- ${link.itemId} ${link.kind}: ${link.value}`);
+    if (include("neighbors")) {
+        lines.push("", "## Neighbor Items", "");
+        lines.push(...renderItemList(pack.neighbors, false));
+    }
+    if (include("links")) {
+        lines.push("", "## Linked Context", "");
+        if (pack.links.length === 0) {
+            lines.push("_No docs or files linked in selected context._");
+        }
+        else {
+            for (const link of pack.links)
+                lines.push(`- ${link.itemId} ${link.kind}: ${link.value}`);
+        }
+    }
+    if (include("deps") && pack.deps && pack.deps.length > 0) {
+        lines.push("", "## Dependencies", "");
+        for (const dep of pack.deps) {
+            lines.push(`- ${dep.itemId}: depends_on [${dep.dependsOn.join(", ")}] | depended_by [${dep.dependedBy.join(", ")}]`);
+        }
     }
     lines.push("");
-    return `${lines.join("\n")}\n`;
+    let output = `${lines.join("\n")}\n`;
+    if (compress) {
+        output = `${output.split("\n").filter((line) => line.trim() !== "").join("\n")}\n`;
+    }
+    return output;
 }
 function titleFor(items, id) {
     return items.find((item) => item.id === id)?.title;
@@ -420,6 +477,7 @@ export function buildAgentHandoff(pack, options = {}) {
             blockers: blockers.length,
             links: pack.links.length,
             recent: recent.length,
+            deps: pack.deps?.length ?? 0,
         },
         focus: pack.items.map((item) => ({
             id: item.id,
@@ -433,75 +491,99 @@ export function buildAgentHandoff(pack, options = {}) {
         nextActions,
         recent,
         links: pack.links.slice(0, 12),
+        deps: pack.deps,
         suggestedCommand,
     };
 }
 export function renderAgentHandoff(pack, options = {}) {
     const handoff = buildAgentHandoff(pack, options);
+    const sectionFilter = options.sections?.map((s) => s.toLowerCase());
+    const compress = options.compress === true;
+    const include = (name, aliases = []) => !sectionFilter || sectionFilter.includes(name) || aliases.some((a) => sectionFilter.includes(a));
     const lines = [
         "# pm agent handoff",
         "",
         `Generated: ${handoff.generatedAt}`,
-        `Focus: ${handoff.counts.focus} | Neighbors: ${handoff.counts.neighbors} | Blockers: ${handoff.counts.blockers} | Links: ${handoff.counts.links} | Recent: ${handoff.counts.recent}`,
-        "",
-        "## Focus",
-        "",
+        `Focus: ${handoff.counts.focus} | Neighbors: ${handoff.counts.neighbors} | Blockers: ${handoff.counts.blockers} | Links: ${handoff.counts.links} | Recent: ${handoff.counts.recent}${handoff.counts.deps > 0 ? ` | Deps: ${handoff.counts.deps}` : ""}`,
     ];
-    if (handoff.focus.length === 0) {
-        lines.push("_No focus items._");
-    }
-    else {
-        for (const item of handoff.focus) {
-            const meta = [
-                item.type,
-                item.status,
-                item.priority === undefined ? "" : `p${item.priority}`,
-                item.deadline ? `due ${item.deadline}` : "",
-            ].filter(Boolean).join(" | ");
-            lines.push(`- ${item.id}: ${markdownEscape(item.title)} (${meta})`);
+    if (include("focus")) {
+        lines.push("", "## Focus", "");
+        if (handoff.focus.length === 0) {
+            lines.push("_No focus items._");
+        }
+        else {
+            for (const item of handoff.focus) {
+                const meta = [
+                    item.type,
+                    item.status,
+                    item.priority === undefined ? "" : `p${item.priority}`,
+                    item.deadline ? `due ${item.deadline}` : "",
+                ].filter(Boolean).join(" | ");
+                lines.push(`- ${item.id}: ${markdownEscape(item.title)} (${meta})`);
+            }
         }
     }
-    lines.push("", "## Blockers", "");
-    if (handoff.blockers.length === 0) {
-        lines.push("_No visible blockers._");
-    }
-    else {
-        for (const blocker of handoff.blockers) {
-            const label = blocker.title ? `${blocker.blockedBy} ${markdownEscape(blocker.title)}` : blocker.blockedBy;
-            const status = blocker.status ? ` (${blocker.status})` : "";
-            lines.push(`- ${blocker.itemId} ${blocker.kind} ${label}${status}`);
+    if (include("blockers")) {
+        lines.push("", "## Blockers", "");
+        if (handoff.blockers.length === 0) {
+            lines.push("_No visible blockers._");
+        }
+        else {
+            for (const blocker of handoff.blockers) {
+                const label = blocker.title ? `${blocker.blockedBy} ${markdownEscape(blocker.title)}` : blocker.blockedBy;
+                const status = blocker.status ? ` (${blocker.status})` : "";
+                lines.push(`- ${blocker.itemId} ${blocker.kind} ${label}${status}`);
+            }
         }
     }
-    lines.push("", "## Next Actions", "");
-    if (handoff.nextActions.length === 0) {
-        lines.push("_No open focus items._");
-    }
-    else {
-        for (const action of handoff.nextActions) {
-            lines.push(`- ${action.id}: ${markdownEscape(action.title)} - ${action.reason}`);
+    if (include("next-actions", ["actions", "nextactions"])) {
+        lines.push("", "## Next Actions", "");
+        if (handoff.nextActions.length === 0) {
+            lines.push("_No open focus items._");
+        }
+        else {
+            for (const action of handoff.nextActions) {
+                lines.push(`- ${action.id}: ${markdownEscape(action.title)} - ${action.reason}`);
+            }
         }
     }
-    lines.push("", "## Recent Activity", "");
-    if (handoff.recent.length === 0) {
-        lines.push("_No recent open activity._");
-    }
-    else {
-        for (const item of handoff.recent) {
-            const updated = item.updatedAt ? ` - updated ${item.updatedAt}` : "";
-            lines.push(`- ${item.id}: ${markdownEscape(item.title)} (${item.status})${updated}`);
+    if (include("recent", ["activity"])) {
+        lines.push("", "## Recent Activity", "");
+        if (handoff.recent.length === 0) {
+            lines.push("_No recent open activity._");
+        }
+        else {
+            for (const item of handoff.recent) {
+                const updated = item.updatedAt ? ` - updated ${item.updatedAt}` : "";
+                lines.push(`- ${item.id}: ${markdownEscape(item.title)} (${item.status})${updated}`);
+            }
         }
     }
-    lines.push("", "## Linked Context", "");
-    if (handoff.links.length === 0) {
-        lines.push("_No linked files or docs._");
-    }
-    else {
-        for (const link of handoff.links) {
-            lines.push(`- ${link.itemId} ${link.kind}: ${link.value}`);
+    if (include("links")) {
+        lines.push("", "## Linked Context", "");
+        if (handoff.links.length === 0) {
+            lines.push("_No linked files or docs._");
+        }
+        else {
+            for (const link of handoff.links) {
+                lines.push(`- ${link.itemId} ${link.kind}: ${link.value}`);
+            }
         }
     }
-    lines.push("", "## Refresh", "", `\`${handoff.suggestedCommand}\``, "");
-    return `${lines.join("\n")}\n`;
+    if (include("deps") && handoff.deps && handoff.deps.length > 0) {
+        lines.push("", "## Dependencies", "");
+        for (const dep of handoff.deps) {
+            lines.push(`- ${dep.itemId}: depends_on [${dep.dependsOn.join(", ")}] | depended_by [${dep.dependedBy.join(", ")}]`);
+        }
+    }
+    if (include("refresh")) {
+        lines.push("", "## Refresh", "", `\`${handoff.suggestedCommand}\``, "");
+    }
+    let output = `${lines.join("\n")}\n`;
+    if (compress) {
+        output = `${output.split("\n").filter((line) => line.trim() !== "").join("\n")}\n`;
+    }
+    return output;
 }
 export function readPmItems(pmRoot) {
     const result = spawnSync("pm", ["--path", pmRoot, "list-all", "--json", "--include-body"], {
@@ -534,6 +616,9 @@ function setupCommands(api) {
             "pm context-pack --ids pm-1234,pm-5678 --state blocked --format compact",
             "pm context-pack --id pm-1234 --format compact --recent 8",
             "pm context-pack --status in_progress --tag release --format json",
+            "pm context-pack --id pm-1234 --compress --format json",
+            "pm context-pack --id pm-1234 --include-deps --section focus --section blockers",
+            "pm context-pack --id pm-1234 --max-items 10",
         ],
         flags: [
             { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
@@ -551,6 +636,10 @@ function setupCommands(api) {
             { long: "--include-closed", description: "Include closed/canceled items in filtered packs", type: "boolean" },
             { long: "--without-neighborhood", description: "Omit dependency/dependent neighbors", type: "boolean" },
             { long: "--neighborhood-depth", value_name: "n", description: `Transitive neighbor hops via dependency graph (0-${MAX_NEIGHBORHOOD_DEPTH}, default: 1; 0 = none)`, type: "string" },
+            { long: "--compress", description: "Minimize output tokens (compact JSON, no blank lines)", type: "boolean" },
+            { long: "--include-deps", description: "Include per-item dependency info in the context pack", type: "boolean" },
+            { long: "--max-items", value_name: "n", description: "Maximum total items (focus + neighbors) in the pack", type: "string" },
+            { long: "--section", value_name: "section", description: "Include only specific sections (repeatable): summary, focus, neighborhood, neighbors, links, deps, blockers, next-actions, recent, refresh", type: "string" },
         ],
         async run(ctx) {
             const options = ctx.options;
@@ -566,6 +655,10 @@ function setupCommands(api) {
             const neighborhood = !boolOption(options, "without-neighborhood", "withoutNeighborhood");
             const neighborhoodDepth = intOptionMin0(options, ["neighborhood-depth", "neighborhoodDepth"], 1);
             const recentLimit = intOptionMin0(options, ["recent", "recentLimit", "recent-limit"], defaultRecentLimit);
+            const compress = boolOption(options, "compress");
+            const includeDeps = boolOption(options, "include-deps", "includeDeps");
+            const maxItems = intOptionMin0(options, ["max-items", "maxItems"], 0) || undefined;
+            const sections = [...asArray(options.section), ...asArray(options.sections)];
             const pack = buildContextPack(readPmItems(ctx.pm_root), {
                 ids: selection.ids,
                 status: selection.status,
@@ -576,6 +669,8 @@ function setupCommands(api) {
                 includeClosed,
                 neighborhood,
                 neighborhoodDepth,
+                includeDeps,
+                maxItems,
             });
             const suggestedCommand = buildSuggestedAgentCommand({
                 commandName: "context-pack",
@@ -588,12 +683,17 @@ function setupCommands(api) {
                 neighborhood,
                 neighborhoodDepth,
                 includeFormatFlag: true,
+                compress,
+                includeDeps,
+                maxItems,
+                sections: sections.length > 0 ? sections : undefined,
             });
+            const renderOpts = { recentLimit, suggestedCommand, compress, sections: sections.length > 0 ? sections : undefined };
             const output = format === "json"
-                ? `${JSON.stringify(pack, null, 2)}\n`
+                ? `${JSON.stringify(pack, null, compress ? 0 : 2)}\n`
                 : format === "agent"
-                    ? renderAgentHandoff(pack, { recentLimit, suggestedCommand })
-                    : renderMarkdown(pack);
+                    ? renderAgentHandoff(pack, renderOpts)
+                    : renderMarkdown(pack, renderOpts);
             const outputPath = stringOption(options, "output");
             if (outputPath) {
                 writeFileSync(outputPath, output, "utf-8");
@@ -615,6 +715,8 @@ function setupCommands(api) {
             "pm context-handoff --ids pm-1234,pm-5678 --state blocked",
             "pm context-handoff --status blocked --recent 8",
             "pm context-handoff --tag release --without-neighborhood",
+            "pm context-handoff --id pm-1234 --format json",
+            "pm context-handoff --id pm-1234 --compress --include-deps",
         ],
         flags: [
             { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
@@ -625,20 +727,34 @@ function setupCommands(api) {
             { long: "--kind", value_name: "type", description: "Alias for --type", type: "string" },
             { long: "--tag", value_name: "tag", description: "Filter focus items by tag", type: "string" },
             { long: "--limit", value_name: "n", description: `Maximum focus item count (default: ${contextHandoffDefaultLimit})`, type: "string" },
+            { long: "--format", value_name: "format", description: "Output format: agent, json, or compact (default: agent)", type: "string" },
             { long: "--recent", value_name: "n", description: `Recent activity items (default: ${defaultRecentLimit})`, type: "string" },
             { long: "--output", value_name: "file", description: "Write handoff output to a file", type: "string" },
             { long: "--include-closed", description: "Include closed/canceled items in filtered packs", type: "boolean" },
             { long: "--without-neighborhood", description: "Omit dependency/dependent neighbors", type: "boolean" },
             { long: "--neighborhood-depth", value_name: "n", description: `Transitive neighbor hops via dependency graph (0-${MAX_NEIGHBORHOOD_DEPTH}, default: 1; 0 = none)`, type: "string" },
+            { long: "--compress", description: "Minimize output tokens (compact JSON, no blank lines)", type: "boolean" },
+            { long: "--include-deps", description: "Include per-item dependency info in the handoff", type: "boolean" },
+            { long: "--max-items", value_name: "n", description: "Maximum total items (focus + neighbors) in the handoff", type: "string" },
+            { long: "--section", value_name: "section", description: "Include only specific sections (repeatable): focus, blockers, next-actions, recent, links, deps, refresh", type: "string" },
         ],
         async run(ctx) {
             const options = ctx.options;
+            const requestedFormat = (stringOption(options, "format") ?? "agent").toLowerCase();
+            const format = requestedFormat === "compact" ? "agent" : requestedFormat;
+            if (format !== "agent" && format !== "json") {
+                throw new CommandError("--format must be agent, json, or compact", EXIT_CODE.USAGE);
+            }
             const selection = resolveSelectionOptions(options, { fallbackStatus: "in_progress" });
             const limit = intOption(options, "limit", contextHandoffDefaultLimit);
             const includeClosed = boolOption(options, "include-closed", "includeClosed");
             const neighborhood = !boolOption(options, "without-neighborhood", "withoutNeighborhood");
             const neighborhoodDepth = intOptionMin0(options, ["neighborhood-depth", "neighborhoodDepth"], 1);
             const recentLimit = intOptionMin0(options, ["recent", "recentLimit", "recent-limit"], defaultRecentLimit);
+            const compress = boolOption(options, "compress");
+            const includeDeps = boolOption(options, "include-deps", "includeDeps");
+            const maxItems = intOptionMin0(options, ["max-items", "maxItems"], 0) || undefined;
+            const sections = [...asArray(options.section), ...asArray(options.sections)];
             const pack = buildContextPack(readPmItems(ctx.pm_root), {
                 ids: selection.ids,
                 status: selection.status,
@@ -648,6 +764,8 @@ function setupCommands(api) {
                 includeClosed,
                 neighborhood,
                 neighborhoodDepth,
+                includeDeps,
+                maxItems,
             });
             const suggestedCommand = buildSuggestedAgentCommand({
                 commandName: "context-handoff",
@@ -659,8 +777,16 @@ function setupCommands(api) {
                 includeClosed,
                 neighborhood,
                 neighborhoodDepth,
+                compress,
+                includeDeps,
+                maxItems,
+                sections: sections.length > 0 ? sections : undefined,
             });
-            const output = renderAgentHandoff(pack, { recentLimit, suggestedCommand });
+            const renderOpts = { recentLimit, suggestedCommand, compress, sections: sections.length > 0 ? sections : undefined };
+            const handoff = buildAgentHandoff(pack, { recentLimit, suggestedCommand });
+            const output = format === "json"
+                ? `${JSON.stringify(handoff, null, compress ? 0 : 2)}\n`
+                : renderAgentHandoff(pack, renderOpts);
             const outputPath = stringOption(options, "output");
             if (outputPath) {
                 writeFileSync(outputPath, output, "utf-8");
@@ -671,7 +797,7 @@ function setupCommands(api) {
             }
             return {
                 ok: true,
-                format: "agent",
+                format: format === "json" ? "json" : "agent",
                 selected: pack.summary.selectedItems,
                 neighbors: pack.summary.neighborItems,
                 defaultedStatus: selection.inferredStatus ? selection.status : undefined,

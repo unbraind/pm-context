@@ -12,6 +12,8 @@ import extension, {
   sortContextItems,
 } from "../dist/index.js";
 
+import type { ContextPackDepInfo, RenderOptions } from "../dist/index.js";
+
 const items = [
   {
     id: "pm-1",
@@ -316,4 +318,220 @@ test("renderAgentHandoff emits token-compact agent sections", () => {
   assert.match(markdown, /## Recent Activity/);
   assert.match(markdown, /pm-2: Normalize source data \(open\) - updated 2026-06-06T10:00:00Z/);
   assert.match(markdown, /`pm context-pack --id pm-1 --format agent`/);
+});
+
+// ---- New feature tests: --compress, --include-deps, --max-items, --section, --format json ----
+
+test("buildContextPack includeDeps adds per-item dependency info", () => {
+  const pack = buildContextPack(chainItems, { ids: ["pm-1"], includeDeps: true, generatedAt: "now" });
+  assert.ok(pack.deps, "deps array should exist when includeDeps is true");
+  assert.equal(pack.deps!.length, 2); // pm-1 (focus) + pm-2 (neighbor)
+  const pm1Dep = pack.deps!.find((d) => d.itemId === "pm-1");
+  assert.ok(pm1Dep, "pm-1 dep info should exist");
+  assert.deepEqual(pm1Dep!.dependsOn, ["pm-2"]);
+  assert.deepEqual(pm1Dep!.dependedBy, []);
+  const pm2Dep = pack.deps!.find((d) => d.itemId === "pm-2");
+  assert.ok(pm2Dep, "pm-2 dep info should exist");
+  assert.deepEqual(pm2Dep!.dependsOn, ["pm-4"]);
+  assert.deepEqual(pm2Dep!.dependedBy, ["pm-1"]);
+});
+
+test("buildContextPack without includeDeps omits deps", () => {
+  const pack = buildContextPack(chainItems, { ids: ["pm-1"], generatedAt: "now" });
+  assert.equal(pack.deps, undefined);
+  assert.equal(pack.filters.includeDeps, false);
+});
+
+test("buildContextPack maxItems limits total items (focus + neighbors)", () => {
+  const pack = buildContextPack(chainItems, { ids: ["pm-1"], maxItems: 1, neighborhoodDepth: 2, generatedAt: "now" });
+  assert.equal(pack.items.length, 1);
+  assert.equal(pack.neighbors.length, 0);
+  assert.equal(pack.summary.selectedItems, 1);
+  assert.equal(pack.summary.neighborItems, 0);
+  assert.equal(pack.filters.maxItems, 1);
+});
+
+test("buildContextPack maxItems allows focus + some neighbors", () => {
+  const pack = buildContextPack(chainItems, { ids: ["pm-1"], maxItems: 2, neighborhoodDepth: 2, generatedAt: "now" });
+  assert.equal(pack.items.length, 1);
+  assert.equal(pack.neighbors.length, 1);
+  // neighbors are sorted by priority then update time (newer first)
+  // pm-4 (updated 11:00) sorts before pm-2 (updated 10:00) at same priority
+  assert.deepEqual(pack.neighbors.map((item) => item.id), ["pm-4"]);
+});
+
+test("buildContextPack maxItems preserves byte-identical when not set", () => {
+  const without = JSON.stringify(buildContextPack(chainItems, { ids: ["pm-1"], generatedAt: "now" }));
+  const withUndefined = JSON.stringify(buildContextPack(chainItems, { ids: ["pm-1"], maxItems: undefined, generatedAt: "now" }));
+  assert.equal(withUndefined, without);
+});
+
+test("renderMarkdown with compress removes blank lines", () => {
+  const normal = renderMarkdown(buildContextPack(items, { ids: ["pm-1"], includeBody: true, generatedAt: "now" }));
+  const compressed = renderMarkdown(buildContextPack(items, { ids: ["pm-1"], includeBody: true, generatedAt: "now" }), { compress: true });
+  assert.equal(compressed.includes("\n\n"), false, "compressed output should have no blank lines");
+  assert.ok(normal.length > compressed.length, "compressed should be shorter");
+  assert.match(compressed, /^# pm context pack/);
+});
+
+test("renderMarkdown with sections includes only specified sections", () => {
+  const markdown = renderMarkdown(
+    buildContextPack(items, { ids: ["pm-1"], includeBody: true, generatedAt: "now" }),
+    { sections: ["summary"] },
+  );
+  assert.match(markdown, /## Summary/);
+  assert.equal(markdown.includes("## Focus Items"), false, "Focus Items section should be omitted");
+  assert.equal(markdown.includes("## Neighbor Items"), false, "Neighbor Items section should be omitted");
+});
+
+test("renderMarkdown with multiple sections", () => {
+  const markdown = renderMarkdown(
+    buildContextPack(items, { ids: ["pm-1"], includeBody: true, generatedAt: "now" }),
+    { sections: ["focus", "links"] },
+  );
+  assert.match(markdown, /## Focus Items/);
+  assert.match(markdown, /## Linked Context/);
+  assert.equal(markdown.includes("## Summary"), false);
+  assert.equal(markdown.includes("## Neighbor Items"), false);
+});
+
+test("renderMarkdown with deps section when includeDeps is true", () => {
+  const markdown = renderMarkdown(
+    buildContextPack(chainItems, { ids: ["pm-1"], includeDeps: true, generatedAt: "now" }),
+    { sections: ["deps"] },
+  );
+  assert.match(markdown, /## Dependencies/);
+  assert.match(markdown, /pm-1: depends_on \[pm-2\]/);
+  assert.equal(markdown.includes("## Summary"), false);
+});
+
+test("renderAgentHandoff with compress removes blank lines", () => {
+  const compressed = renderAgentHandoff(
+    buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }),
+    { compress: true },
+  );
+  assert.equal(compressed.includes("\n\n"), false, "compressed output should have no blank lines");
+  assert.match(compressed, /^# pm agent handoff/);
+});
+
+test("renderAgentHandoff with sections includes only specified sections", () => {
+  const markdown = renderAgentHandoff(
+    buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }),
+    { sections: ["focus", "blockers"] },
+  );
+  assert.match(markdown, /## Focus/);
+  assert.match(markdown, /## Blockers/);
+  assert.equal(markdown.includes("## Recent Activity"), false);
+  assert.equal(markdown.includes("## Refresh"), false);
+});
+
+test("renderAgentHandoff with section alias 'actions' for next-actions", () => {
+  const markdown = renderAgentHandoff(
+    buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }),
+    { sections: ["actions"] },
+  );
+  assert.match(markdown, /## Next Actions/);
+  assert.equal(markdown.includes("## Focus"), false);
+});
+
+test("renderAgentHandoff with deps section when includeDeps is true", () => {
+  const markdown = renderAgentHandoff(
+    buildContextPack(chainItems, { ids: ["pm-1"], includeDeps: true, generatedAt: "now" }),
+    { sections: ["deps"] },
+  );
+  assert.match(markdown, /## Dependencies/);
+  assert.match(markdown, /Deps: 2/);
+});
+
+test("buildAgentHandoff includes deps count and data when includeDeps is set", () => {
+  const handoff = buildAgentHandoff(
+    buildContextPack(chainItems, { ids: ["pm-1"], includeDeps: true, generatedAt: "now" }),
+  );
+  assert.equal(handoff.counts.deps, 2);
+  assert.ok(handoff.deps);
+  assert.equal(handoff.deps!.length, 2);
+});
+
+test("buildAgentHandoff deps count is 0 when not included", () => {
+  const handoff = buildAgentHandoff(
+    buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }),
+  );
+  assert.equal(handoff.counts.deps, 0);
+  assert.equal(handoff.deps, undefined);
+});
+
+test("buildSuggestedAgentCommand includes new flags when set", () => {
+  const command = buildSuggestedAgentCommand({
+    commandName: "context-pack",
+    selection: { ids: ["pm-1"], status: undefined, type: undefined, tag: undefined, inferredStatus: false },
+    limit: 25,
+    defaultLimit: 25,
+    recentLimit: 5,
+    defaultRecentLimit: 5,
+    includeClosed: false,
+    neighborhood: true,
+    neighborhoodDepth: 1,
+    includeFormatFlag: true,
+    compress: true,
+    includeDeps: true,
+    maxItems: 10,
+    sections: ["focus", "blockers"],
+  });
+  assert.equal(command, "pm context-pack --id pm-1 --format agent --include-deps --compress --max-items 10 --section focus --section blockers");
+});
+
+test("activate exposes new flags for both commands", () => {
+  const commands: Array<Record<string, unknown>> = [];
+  extension.activate({ registerCommand(command: Record<string, unknown>) { commands.push(command); } });
+  const byName = new Map(commands.map((command) => [command.name, command]));
+  const packFlags = ((byName.get("context-pack") as { flags: Array<{ long: string }> } | undefined)?.flags ?? [])
+    .map((flag) => flag.long);
+  const handoffFlags = ((byName.get("context-handoff") as { flags: Array<{ long: string }> } | undefined)?.flags ?? [])
+    .map((flag) => flag.long);
+  for (const requiredFlag of ["--compress", "--include-deps", "--max-items", "--section"]) {
+    assert.equal(packFlags.includes(requiredFlag), true, `context-pack missing ${requiredFlag}`);
+    assert.equal(handoffFlags.includes(requiredFlag), true, `context-handoff missing ${requiredFlag}`);
+  }
+  // --format should be on context-handoff now
+  assert.equal(handoffFlags.includes("--format"), true, "context-handoff should have --format");
+});
+
+test("buildContextPack filters reflect new options", () => {
+  const pack = buildContextPack(chainItems, { ids: ["pm-1"], includeDeps: true, maxItems: 5, generatedAt: "now" });
+  assert.equal(pack.filters.includeDeps, true);
+  assert.equal(pack.filters.maxItems, 5);
+});
+
+test("buildContextPack maxItems 0 means no limit in buildContextPack", () => {
+  const pack = buildContextPack(chainItems, { ids: ["pm-1"], maxItems: 0, neighborhoodDepth: 2, generatedAt: "now" });
+  assert.equal(pack.filters.maxItems, 0);
+  // maxItems 0 is treated as no cap in buildContextPack (the command layer converts 0 to undefined)
+  assert.equal(pack.items.length, 1);
+  assert.equal(pack.neighbors.length, 2);
+});
+
+test("renderMarkdown without options is byte-identical to original", () => {
+  const md = renderMarkdown(buildContextPack(items, { ids: ["pm-1"], includeBody: true, generatedAt: "now" }));
+  assert.match(md, /^# pm context pack\n/);
+  assert.match(md, /\n$/);
+  assert.ok(md.includes("\n\n"), "non-compressed output should have blank lines");
+});
+
+test("renderAgentHandoff without options is byte-identical to original", () => {
+  const md = renderAgentHandoff(buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }));
+  assert.match(md, /^# pm agent handoff\n/);
+  assert.ok(md.includes("\n\n"), "non-compressed output should have blank lines");
+});
+
+test("ContextPackDepInfo type is exported and usable", () => {
+  const dep: ContextPackDepInfo = { itemId: "test", dependsOn: ["a"], dependedBy: ["b"] };
+  assert.equal(dep.itemId, "test");
+  assert.deepEqual(dep.dependsOn, ["a"]);
+  assert.deepEqual(dep.dependedBy, ["b"]);
+});
+
+test("RenderOptions type is exported and usable", () => {
+  const opts: RenderOptions = { compress: true, sections: ["focus"] };
+  assert.equal(opts.compress, true);
+  assert.deepEqual(opts.sections, ["focus"]);
 });
