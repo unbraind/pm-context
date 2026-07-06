@@ -1,0 +1,15 @@
+id: pm-context-o5k1
+title: Refresh pm-context to latest pm CLI and changelog toolchain
+description: ""
+type: Task
+status: closed
+priority: 1
+tags: []
+created_at: "2026-07-06T00:08:33.691Z"
+updated_at: "2026-07-06T00:20:21.565Z"
+author: codex
+resolution: "Updated @unbrained/pm-cli peer/dev pins to 2026.7.5, pm-changelog to 2026.6.30, and regenerated package-lock."
+expected_result: pm-context release checks run against the latest pm CLI/changelog packages.
+actual_result: package.json and package-lock now resolve @unbrained/pm-cli 2026.7.5 and pm-changelog 2026.6.30.
+close_reason: pm-context now targets the current pm CLI peer/dev dependency and pm-changelog toolchain version.
+body: "Update pm-context peer/dev dependency metadata and lockfile to use @unbrained/pm-cli 2026.7.5 and pm-changelog 2026.6.30, then validate the release gate and changelog."
