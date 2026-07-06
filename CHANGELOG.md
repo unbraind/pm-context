@@ -8,6 +8,7 @@
 
 ### Other
 
+- Align Node engine with pm CLI runtime ([pm-context-o7on](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-o7on.toon))
 - Align pm-context changelog check with full changelog output ([pm-context-9or3](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-9or3.toon))
 - Refresh pm-context to latest pm CLI and changelog toolchain ([pm-context-o5k1](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-o5k1.toon))
 
