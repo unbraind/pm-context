@@ -1,12 +1,18 @@
 # Changelog
 
-## 2026.6.14 - 2026-06-14
+## 2026.7.6 - 2026-07-06
+
+### Fixed
+
+- Fix release CI ordering (publish-before-tag) ([pm-context-pwa5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-pwa5.toon))
 
 ### Other
 
-- Regenerate CHANGELOG to drop the duplicate Unreleased section from pm-changelog issue 47 ([pm-context-fgmg](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-fgmg.toon))
+- Align Node engine with pm CLI runtime ([pm-context-o7on](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-o7on.toon))
+- Align pm-context changelog check with full changelog output ([pm-context-9or3](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-9or3.toon))
+- Refresh pm-context to latest pm CLI and changelog toolchain ([pm-context-o5k1](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-o5k1.toon))
 
-## Unreleased
+## 2026.6.14 - 2026-06-14
 
 ### Other
 
