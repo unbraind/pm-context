@@ -112,7 +112,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json manifest.json index.ts dist CHANGELOG.md
+          git add package.json package-lock.json manifest.json index.ts CHANGELOG.md
           if ! git diff --cached --quiet; then
             git commit -m "Release pm-context ${{ steps.decide.outputs.tag }}"
           fi
@@ -149,7 +149,41 @@ jobs:
             echo "::notice::${pkg_name}@${NPM_VERSION} already published; skipping publish step."
             exit 0
           fi
-          npm publish --access public --provenance --ignore-scripts || npm publish --access public --ignore-scripts
+          publish_with_provenance() {
+            npm publish --access public --provenance --ignore-scripts
+          }
+          publish_without_provenance() {
+            echo "::warning::Falling back to publish WITHOUT --provenance after repeated npm registry failures."
+            npm publish --access public --ignore-scripts
+          }
+          attempt=0
+          max_attempts=3
+          while (( attempt < max_attempts )); do
+            attempt=$(( attempt + 1 ))
+            if publish_with_provenance; then
+              echo "Published with provenance on attempt ${attempt}."
+              exit 0
+            fi
+            if npm view "${pkg_name}@${NPM_VERSION}" version --json >/dev/null 2>&1; then
+              echo "::notice::Version landed despite reported error; treating as success."
+              exit 0
+            fi
+            if (( attempt < max_attempts )); then
+              echo "Publish attempt ${attempt}/${max_attempts} failed; sleeping 30s before retry..."
+              sleep 30
+            fi
+          done
+          echo "::warning::All ${max_attempts} provenance publish attempts failed; trying once without provenance."
+          if publish_without_provenance; then
+            echo "Published without provenance."
+            exit 0
+          fi
+          if npm view "${pkg_name}@${NPM_VERSION}" version --json >/dev/null 2>&1; then
+            echo "::notice::Version landed during fallback; treating as success."
+            exit 0
+          fi
+          echo "::error::Publish failed after retries and provenance fallback."
+          exit 1
 
       # Push tag + main AFTER a successful publish so a failed publish does not
       # leave the repo tagged/skipped. The release ref (fast-forward of

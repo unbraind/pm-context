@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Full pm ecosystem production pass for pm-context ([pm-context-mssk](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-mssk.toon))
+
+### Fixed
+
+- Adversarial review pass 2026-07-10 ([pm-context-i9z0](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-i9z0.toon))
+
+### Other
+
+- Full-cycle hardening wave: pm-context ([pm-context-eie5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-eie5.toon))
+- Harden release bun-verify so registry-mirror lag cannot block the GitHub release ([pm-context-p5bz](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-p5bz.toon))
+
 ## 2026.7.6 - 2026-07-06
 
 ### Fixed

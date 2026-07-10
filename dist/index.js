@@ -14,6 +14,8 @@ export class CommandError extends Error {
     }
 }
 export const MAX_NEIGHBORHOOD_DEPTH = 5;
+export const MARKDOWN_SECTIONS = ["summary", "focus", "neighborhood", "neighbors", "links", "deps"];
+export const AGENT_SECTIONS = ["focus", "blockers", "next-actions", "actions", "nextactions", "recent", "activity", "links", "deps", "refresh"];
 function asArray(value) {
     if (Array.isArray(value))
         return value.flatMap(asArray);
@@ -48,6 +50,20 @@ function intOption(options, key, fallback) {
     }
     return parsed;
 }
+export function validateSections(format, values) {
+    const sections = Array.from(new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean)));
+    if (sections.length === 0)
+        return sections;
+    if (format === "json") {
+        throw new CommandError("--section is only supported with markdown, agent, or compact output", EXIT_CODE.USAGE);
+    }
+    const allowed = new Set(format === "markdown" ? MARKDOWN_SECTIONS : AGENT_SECTIONS);
+    const unsupported = sections.filter((section) => !allowed.has(section));
+    if (unsupported.length > 0) {
+        throw new CommandError(`--section ${unsupported.map((section) => `'${section}'`).join(", ")} is not available in ${format} output; valid sections: ${[...allowed].join(", ")}`, EXIT_CODE.USAGE);
+    }
+    return sections;
+}
 function intOptionMin0(options, keys, fallback) {
     for (const key of keys) {
         const raw = options[key];
@@ -60,14 +76,6 @@ function intOptionMin0(options, keys, fallback) {
         return parsed;
     }
     return fallback;
-}
-export function validateSections(sections, allowed) {
-    const normalized = sections.map((section) => section.toLowerCase());
-    const invalid = normalized.filter((section) => !allowed.includes(section));
-    if (invalid.length > 0) {
-        throw new CommandError(`--section must be one of: ${allowed.join(", ")} (received: ${Array.from(new Set(invalid)).join(", ")})`, EXIT_CODE.USAGE);
-    }
-    return normalized;
 }
 function shellQuote(value) {
     if (/^[A-Za-z0-9._/:=,-]+$/.test(value))
@@ -262,7 +270,7 @@ export function buildContextPack(allItems, options = {}) {
     // focus items. Each hop expands the frontier by one degree of separation. The
     // visited set is seeded with focus ids so a focus item is never a neighbor.
     const neighborIds = new Set();
-    const neighborDepth = new Map();
+    const neighborDepths = new Map();
     const visited = new Set(selectedIds);
     let frontier = new Set(selectedIds);
     for (let hop = 0; hop < depth && frontier.size > 0; hop += 1) {
@@ -276,14 +284,14 @@ export function buildContextPack(allItems, options = {}) {
         for (const id of next) {
             visited.add(id);
             neighborIds.add(id);
-            neighborDepth.set(id, hop + 1);
+            neighborDepths.set(id, hop + 1);
         }
         frontier = next;
     }
     for (const id of selectedIds)
         neighborIds.delete(id);
     let neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item) => Boolean(item)))
-        .sort((a, b) => (neighborDepth.get(a.id) ?? 0) - (neighborDepth.get(b.id) ?? 0));
+        .sort((a, b) => (neighborDepths.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (neighborDepths.get(b.id) ?? Number.MAX_SAFE_INTEGER));
     // --max-items caps the total item count (focus + neighbors). Focus items take
     // priority; neighbors are trimmed to fit the remaining budget. If focus
     // alone exceeds the cap, focus is also trimmed.
@@ -311,18 +319,24 @@ export function buildContextPack(allItems, options = {}) {
     // for every visible item in the pack.
     let deps;
     if (options.includeDeps) {
+        const visibleIds = [...packItems, ...packNeighbors].map((item) => item.id);
         const dependsOn = new Map();
         const dependedBy = new Map();
         for (const rel of allRelationships) {
-            dependsOn.set(rel.from, [...(dependsOn.get(rel.from) ?? []), rel.to]);
-            dependedBy.set(rel.to, [...(dependedBy.get(rel.to) ?? []), rel.from]);
+            const outgoing = dependsOn.get(rel.from) ?? new Set();
+            outgoing.add(rel.to);
+            dependsOn.set(rel.from, outgoing);
+            const incoming = dependedBy.get(rel.to) ?? new Set();
+            incoming.add(rel.from);
+            dependedBy.set(rel.to, incoming);
         }
-        const visibleIds = [...packItems, ...packNeighbors].map((item) => item.id);
-        deps = visibleIds.map((itemId) => ({
+        deps = visibleIds
+            .map((itemId) => ({
             itemId,
-            dependsOn: dependsOn.get(itemId) ?? [],
-            dependedBy: dependedBy.get(itemId) ?? [],
-        }));
+            dependsOn: [...(dependsOn.get(itemId) ?? [])],
+            dependedBy: [...(dependedBy.get(itemId) ?? [])],
+        }))
+            .filter((dep) => dep.dependsOn.length > 0 || dep.dependedBy.length > 0);
     }
     return {
         generatedAt: options.generatedAt ?? new Date().toISOString(),
@@ -422,10 +436,15 @@ export function renderMarkdown(pack, options = {}) {
                 lines.push(`- ${link.itemId} ${link.kind}: ${link.value}`);
         }
     }
-    if (include("deps") && pack.deps && pack.deps.length > 0) {
+    if (include("deps") && pack.deps) {
         lines.push("", "## Dependencies", "");
-        for (const dep of pack.deps) {
-            lines.push(`- ${dep.itemId}: depends_on [${dep.dependsOn.join(", ")}] | depended_by [${dep.dependedBy.join(", ")}]`);
+        if (pack.deps.length === 0) {
+            lines.push("_No dependency relationships found._");
+        }
+        else {
+            for (const dep of pack.deps) {
+                lines.push(`- ${dep.itemId}: depends_on [${dep.dependsOn.join(", ")}] | depended_by [${dep.dependedBy.join(", ")}]`);
+            }
         }
     }
     lines.push("");
@@ -587,10 +606,15 @@ export function renderAgentHandoff(pack, options = {}) {
             }
         }
     }
-    if (include("deps") && handoff.deps && handoff.deps.length > 0) {
+    if (include("deps") && handoff.deps) {
         lines.push("", "## Dependencies", "");
-        for (const dep of handoff.deps) {
-            lines.push(`- ${dep.itemId}: depends_on [${dep.dependsOn.join(", ")}] | depended_by [${dep.dependedBy.join(", ")}]`);
+        if (handoff.deps.length === 0) {
+            lines.push("_No dependency relationships found._");
+        }
+        else {
+            for (const dep of handoff.deps) {
+                lines.push(`- ${dep.itemId}: depends_on [${dep.dependsOn.join(", ")}] | depended_by [${dep.dependedBy.join(", ")}]`);
+            }
         }
     }
     if (include("refresh")) {
@@ -634,7 +658,7 @@ function setupCommands(api) {
             "pm context-pack --id pm-1234 --format compact --recent 8",
             "pm context-pack --status in_progress --tag release --format json",
             "pm context-pack --id pm-1234 --compress --format json",
-            "pm context-pack --id pm-1234 --include-deps --section focus --section blockers",
+            "pm context-pack --id pm-1234 --format agent --include-deps --section focus --section blockers",
             "pm context-pack --id pm-1234 --max-items 10",
         ],
         flags: [
@@ -656,7 +680,7 @@ function setupCommands(api) {
             { long: "--compress", description: "Minimize output tokens (compact JSON, no blank lines)", type: "boolean" },
             { long: "--include-deps", description: "Include per-item dependency info in the context pack", type: "boolean" },
             { long: "--max-items", value_name: "n", description: "Maximum total items (focus + neighbors) in the pack", type: "string" },
-            { long: "--section", value_name: "section", description: "Include only specific sections (repeatable): summary, focus, neighborhood, neighbors, links, deps, blockers, next-actions, recent, refresh", type: "string" },
+            { long: "--section", value_name: "section", description: "Include sections (repeatable). Markdown: summary, focus, neighborhood, neighbors, links, deps. Agent/compact: focus, blockers, next-actions, recent, links, deps, refresh", type: "string" },
         ],
         async run(ctx) {
             const options = ctx.options;
@@ -675,16 +699,7 @@ function setupCommands(api) {
             const compress = boolOption(options, "compress");
             const includeDeps = boolOption(options, "include-deps", "includeDeps");
             const maxItems = intOptionMin0(options, ["max-items", "maxItems"], 0) || undefined;
-            const requestedSections = [...asArray(options.section), ...asArray(options.sections)];
-            const allowedSections = format === "markdown"
-                ? ["summary", "focus", "neighborhood", "neighbors", "links", "deps"]
-                : format === "agent"
-                    ? ["focus", "blockers", "next-actions", "actions", "recent", "activity", "links", "deps", "refresh"]
-                    : [];
-            if (format === "json" && requestedSections.length > 0) {
-                throw new CommandError("--section is only supported with markdown, agent, or compact output", EXIT_CODE.USAGE);
-            }
-            const sections = validateSections(requestedSections, allowedSections);
+            const sections = validateSections(format, [...asArray(options.section), ...asArray(options.sections)]);
             const pack = buildContextPack(readPmItems(ctx.pm_root), {
                 ids: selection.ids,
                 status: selection.status,
@@ -780,7 +795,7 @@ function setupCommands(api) {
             const compress = boolOption(options, "compress");
             const includeDeps = boolOption(options, "include-deps", "includeDeps");
             const maxItems = intOptionMin0(options, ["max-items", "maxItems"], 0) || undefined;
-            const sections = validateSections([...asArray(options.section), ...asArray(options.sections)], ["focus", "blockers", "next-actions", "actions", "recent", "activity", "links", "deps", "refresh"]);
+            const sections = validateSections(format, [...asArray(options.section), ...asArray(options.sections)]);
             const pack = buildContextPack(readPmItems(ctx.pm_root), {
                 ids: selection.ids,
                 status: selection.status,

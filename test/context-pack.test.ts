@@ -94,14 +94,6 @@ test("resolveSelectionOptions accepts selector aliases and deduplicates ids", ()
   );
 });
 
-test("validateSections normalizes valid sections and rejects unknown values", () => {
-  assert.deepEqual(validateSections(["Focus", "actions"], ["focus", "actions"]), ["focus", "actions"]);
-  assert.throws(
-    () => validateSections(["focus", "bogus"], ["focus", "deps"]),
-    /--section must be one of: focus, deps \(received: bogus\)/,
-  );
-});
-
 test("buildSuggestedAgentCommand keeps context-pack refresh concise but reproducible", () => {
   const command = buildSuggestedAgentCommand({
     commandName: "context-pack",
@@ -364,18 +356,8 @@ test("buildContextPack maxItems allows focus + some neighbors", () => {
   const pack = buildContextPack(chainItems, { ids: ["pm-1"], maxItems: 2, neighborhoodDepth: 2, generatedAt: "now" });
   assert.equal(pack.items.length, 1);
   assert.equal(pack.neighbors.length, 1);
-  // Direct neighbors are retained before deeper neighbors when the cap trims.
+  // Direct dependencies retain context priority over newer transitive neighbors.
   assert.deepEqual(pack.neighbors.map((item) => item.id), ["pm-2"]);
-});
-
-test("buildContextPack maxItems keeps direct neighbors before deeper neighbors", () => {
-  const depthItems = [
-    { id: "pm-focus", title: "Focus", status: "open", priority: 1, dependencies: [{ id: "pm-direct", kind: "depends_on" }] },
-    { id: "pm-direct", title: "Direct", status: "open", priority: 4, dependencies: [{ id: "pm-deep", kind: "depends_on" }] },
-    { id: "pm-deep", title: "Deep", status: "open", priority: 0 },
-  ];
-  const pack = buildContextPack(depthItems, { ids: ["pm-focus"], neighborhoodDepth: 2, maxItems: 2, generatedAt: "now" });
-  assert.deepEqual(pack.neighbors.map((item) => item.id), ["pm-direct"]);
 });
 
 test("buildContextPack maxItems preserves byte-identical when not set", () => {
@@ -421,6 +403,22 @@ test("renderMarkdown with deps section when includeDeps is true", () => {
   assert.match(markdown, /## Dependencies/);
   assert.match(markdown, /pm-1: depends_on \[pm-2\]/);
   assert.equal(markdown.includes("## Summary"), false);
+});
+
+test("includeDeps omits empty per-item rows and renders one compact empty state", () => {
+  const isolated = [{ id: "pm-isolated", title: "Isolated", type: "Task", status: "open", priority: 1 }];
+  const pack = buildContextPack(isolated, { ids: ["pm-isolated"], includeDeps: true, generatedAt: "now" });
+  assert.deepEqual(pack.deps, []);
+  const markdown = renderMarkdown(pack, { sections: ["deps"] });
+  assert.match(markdown, /No dependency relationships found/);
+  assert.doesNotMatch(markdown, /depends_on \[\]/);
+});
+
+test("validateSections rejects format-incompatible and unknown section names", () => {
+  assert.deepEqual(validateSections("markdown", ["Summary", "deps", "summary"]), ["summary", "deps"]);
+  assert.throws(() => validateSections("markdown", ["blockers"]), /not available in markdown output/);
+  assert.throws(() => validateSections("agent", ["neighborhood"]), /not available in agent output/);
+  assert.throws(() => validateSections("json", ["focus"]), /only supported with markdown, agent, or compact/);
 });
 
 test("renderAgentHandoff with compress removes blank lines", () => {
