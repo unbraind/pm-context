@@ -6,6 +6,10 @@
 
 - Full pm ecosystem production pass for pm-context ([pm-context-mssk](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-mssk.toon))
 
+### Changed
+
+- Refactor section validation, dedup deps, and refresh toolchain ([pm-context-m0ib](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-m0ib.toon))
+
 ### Fixed
 
 - Adversarial review pass 2026-07-10 ([pm-context-i9z0](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-i9z0.toon))

@@ -2,12 +2,14 @@ id: pm-context-m0ib
 title: "Refactor section validation, dedup deps, and refresh toolchain"
 description: ""
 type: Task
-status: in_progress
+status: closed
 priority: 1
 tags[3]: "area:deps","area:toolchain","area:validation"
 created_at: "2026-07-10T19:43:37.528Z"
-updated_at: "2026-07-10T19:43:43.879Z"
+updated_at: "2026-07-10T21:24:34.984Z"
+closed_at: "2026-07-10T21:24:34.983Z"
 author: codex
 acceptance_criteria: "validateSections is format-aware; dependency dedup uses Sets; release:check green; Greptile review clean; PR merged to main"
 why_now: Section validation needed format-awareness; dep dedup had array duplicates; toolchain needs refresh
+close_reason: "Shipped via merged PR #19. Format-aware section validation rejects --section for json with specific errors; dependency tracking deduplicated with a Set. Verified: json-with-section rejected, markdown-with-section works, JSON valid via global flag. 50/50 tests, all bots green."
 body: ""
