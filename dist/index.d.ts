@@ -42,6 +42,17 @@ export interface ContextPackOptions {
     neighborhood?: boolean;
     neighborhoodDepth?: number;
     generatedAt?: string;
+    includeDeps?: boolean;
+    maxItems?: number;
+}
+export interface ContextPackDepInfo {
+    itemId: string;
+    dependsOn: string[];
+    dependedBy: string[];
+}
+export interface RenderOptions {
+    sections?: string[];
+    compress?: boolean;
 }
 export interface ContextPack {
     generatedAt: string;
@@ -52,6 +63,8 @@ export interface ContextPack {
         tag?: string;
         includeClosed: boolean;
         neighborhood: boolean;
+        includeDeps: boolean;
+        maxItems?: number;
     };
     summary: {
         totalItems: number;
@@ -72,6 +85,7 @@ export interface ContextPack {
         to: string;
         kind: string;
     }>;
+    deps?: ContextPackDepInfo[];
 }
 export interface AgentHandoff {
     generatedAt: string;
@@ -81,6 +95,7 @@ export interface AgentHandoff {
         blockers: number;
         links: number;
         recent: number;
+        deps: number;
     };
     focus: Array<{
         id: string;
@@ -113,6 +128,7 @@ export interface AgentHandoff {
         kind: "doc" | "file";
         value: string;
     }>;
+    deps?: ContextPackDepInfo[];
     suggestedCommand: string;
 }
 export interface SelectionOptions {
@@ -133,7 +149,12 @@ export interface SuggestedAgentCommandInput {
     neighborhood: boolean;
     neighborhoodDepth: number;
     includeFormatFlag?: boolean;
+    compress?: boolean;
+    includeDeps?: boolean;
+    maxItems?: number;
+    sections?: string[];
 }
+export declare function validateSections(sections: string[], allowed: readonly string[]): string[];
 export declare function resolveSelectionOptions(options: Record<string, unknown>, defaults?: {
     fallbackStatus?: string;
 }): SelectionOptions;
@@ -145,7 +166,7 @@ export declare function extractRelationships(item: PmItem): Array<{
     kind: string;
 }>;
 export declare function buildContextPack(allItems: PmItem[], options?: ContextPackOptions): ContextPack;
-export declare function renderMarkdown(pack: ContextPack): string;
+export declare function renderMarkdown(pack: ContextPack, options?: RenderOptions): string;
 export declare function buildAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
     suggestedCommand?: string;
@@ -153,6 +174,8 @@ export declare function buildAgentHandoff(pack: ContextPack, options?: {
 export declare function renderAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
     suggestedCommand?: string;
+    sections?: string[];
+    compress?: boolean;
 }): string;
 export declare function readPmItems(pmRoot: string): PmItem[];
 declare const _default: {
