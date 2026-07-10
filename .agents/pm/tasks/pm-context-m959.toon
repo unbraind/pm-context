@@ -6,10 +6,26 @@ status: in_progress
 priority: 1
 tags[4]: agent-audit,context-management,ecosystem,release-readiness
 created_at: "2026-07-06T15:33:32.312Z"
-updated_at: "2026-07-10T11:00:46.465Z"
-assignee: codex
+updated_at: "2026-07-10T19:00:18.143Z"
+assignee: codex-reporting
 author: codex
-acceptance_criteria: Package uses current pm CLI/SDK and pm-changelog; release/check scripts pass; pm items capture decisions; no tracked secrets/private data are introduced; GitHub PR/release state is reviewed.
-comments[1]{created_at,author,text}:
-  "2026-07-10T11:00:46.464Z",codex,"PR #18 independent clean verification: npm ci, build, and final test suite passed 50/50 (0 failed, skipped, or todo). Throwaway tracker installed the package; pm --help returned within 20s. Exercised --compress, --include-deps, --max-items, repeatable --section, and context-handoff --format json against linked real items. Default markdown matched origin/main byte-for-byte after removing only Generated timestamp. Found and fixed invalid/format-incompatible --section acceptance, direct-neighbor displacement under --max-items, and O(V×R) dependency indexing in 4e96bbf. Malformed inputs now exit 2 with clean errors and no stack traces. Handled all 6 unreplied bot review comments (6 votes/replies) and requested re-review."
+acceptance_criteria: Inventory GitHub reports and existing PR; validate all commands and documented output modes with real PM data; build/typecheck/test/pack/install/activate; inspect tarball; audit tracked files and full history; verify daily change-gated npm+Bun+GitHub release using pm-changelog; run Greptile; close all bot feedback and checks; merge and return main.
+outcome: "Current SDK/changelog dependencies, production-grade command UX, exhaustive real-workspace evidence, privacy-safe package/history, and a fully reviewed green merged PR."
+why_now: "This package produces agent-facing project context; correctness, compactness, privacy, and release integrity are required before public distribution."
+risk: high
+confidence: medium
+comments[2]{created_at,author,text}:
+  "2026-07-09T21:36:10.115Z",codex-reporting,2026-07-09 codex-reporting resumed the existing nonduplicate readiness item. Unrelated local work is preserved; external Slack delivery will use only a local mock webhook.
+  "2026-07-10T18:58:20.653Z",context-specialist,"2026-07-10 context-specialist: Fixed release.yml publish step (added 3-attempt provenance retry+fallback matching fleet standard). Updated peerDep to >=2026.7.10, manifest compat to >=2026.7.10. Untracked dist/ from git, standardized .gitignore. typecheck+build+test(50 pass)+pack(21.1KB)+changelog all green. npm@2026.7.10 published, CI+release green. No secrets in history."
+notes[2]{created_at,author,text}:
+  "2026-07-09T21:36:10.115Z",codex-reporting,"Evidence will be appended as each dependency, command, artifact, security/history, Greptile, CI, review, and merge gate completes."
+  "2026-07-10T18:58:20.955Z",context-specialist,"Decision: Previous agent's work (section validation, depth-sorted neighbors, optimized deps computation, empty-deps rendering) is production-ready. Reinstalled extension from current source to fix stale installed copy."
+learnings[1]{created_at,author,text}:
+  "2026-07-10T18:58:21.412Z",context-specialist,"Upstream pm CLI UX bug: repeated --section/--id flags don't accumulate; only last value kept. Use comma-separated values as workaround. Installed extension copies in .agents/pm/extensions/ can become stale; reinstall with 'pm install . --project' after source changes."
+files[3]{path,scope,note}:
+  .github/workflows/release.yml,project,hardened publish step with 3-attempt provenance retry
+  .gitignore,project,"standardized: added dist/ and .agents/pm/extensions/"
+  package.json,project,peerDep bumped to >=2026.7.10
+tests[1]{command,path,scope,timeout_seconds}:
+  "npm run release:check",package.json,project,120
 body: "Track the July 6, 2026 fleet pass: align package metadata with latest pm CLI/SDK and pm-changelog, verify daily release automation, run build/test/audit/package checks with real workspace data where practical, inspect GitHub state, and record privacy/history findings without changing pm-cli itself."

@@ -2,21 +2,25 @@ id: pm-context-mssk
 title: Full pm ecosystem production pass for pm-context
 description: ""
 type: Feature
-status: in_progress
+status: closed
 priority: 1
 tags[3]: ecosystem,ecosystem-pass-2026-06-10,production
 created_at: "2026-06-09T22:38:02.987Z"
-updated_at: "2026-06-09T23:25:33.429Z"
-assignee: codex-5-3-sweep
+updated_at: "2026-07-10T18:59:04.800Z"
+closed_at: "2026-07-10T18:59:04.798Z"
 author: codex-5-3-sweep
 comments[1]{created_at,author,text}:
   "2026-06-09T22:55:00.959Z",codex-5-3-sweep,Implemented selector alias UX (--ids/--state/--kind) plus compact suggested refresh commands that emit one --ids flag for multi-id scopes; validated with npm test.
 files[2]{path,scope,note}:
   index.ts,project,add agent-first context-handoff command and refresh builder
   test/context-pack.test.ts,project,add coverage for handoff defaults and command generation
-tests[2]{command,path,scope,timeout_seconds,pm_context_mode,env_set,env_clear,shared_host_safe,assert_stdout_contains,assert_stdout_regex,assert_stderr_contains,assert_stderr_regex,assert_stdout_min_lines,assert_json_field_equals,assert_json_field_gte,note}:
-  "npm run release:check",null,project,3600,null,null,null,null,null,null,null,null,null,null,null,null
-  PM_PATH=.agents/pm PM_GLOBAL_PATH=.agents/pm npm test,null,project,null,null,null,null,null,null,null,null,null,null,null,null,null
+tests[2]:
+  - command: "npm run release:check"
+    scope: project
+    timeout_seconds: 3600
+  - command: PM_PATH=.agents/pm PM_GLOBAL_PATH=.agents/pm npm test
+    scope: project
 docs[1]{path,scope,note}:
   README.md,project,document intuitive selector aliases for context commands
+close_reason: "Ecosystem production pass complete: production-ready with green CI, npm published at 2026.7.10."
 body: ""

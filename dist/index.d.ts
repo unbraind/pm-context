@@ -31,6 +31,8 @@ export interface PmItem {
     [key: string]: unknown;
 }
 export declare const MAX_NEIGHBORHOOD_DEPTH = 5;
+export declare const MARKDOWN_SECTIONS: readonly ["summary", "focus", "neighborhood", "neighbors", "links", "deps"];
+export declare const AGENT_SECTIONS: readonly ["focus", "blockers", "next-actions", "actions", "nextactions", "recent", "activity", "links", "deps", "refresh"];
 export interface ContextPackOptions {
     ids?: string[];
     status?: string;
@@ -154,7 +156,7 @@ export interface SuggestedAgentCommandInput {
     maxItems?: number;
     sections?: string[];
 }
-export declare function validateSections(sections: string[], allowed: readonly string[]): string[];
+export declare function validateSections(format: "markdown" | "agent" | "json", values: string[]): string[];
 export declare function resolveSelectionOptions(options: Record<string, unknown>, defaults?: {
     fallbackStatus?: string;
 }): SelectionOptions;

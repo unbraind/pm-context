@@ -1,0 +1,14 @@
+id: pm-context-i9z0
+title: Adversarial review pass 2026-07-10
+description: "Adversarial diff review of pm-context. Findings: (1) BLOCKER FIXED: release.yml had 'git add ... dist' which exits 1 under set -euo pipefail when dist is gitignored — removed dist from git add paths. (2) INFO: Section validation, depth-sorted neighbors, deps optimization added. (3) INFO: Publish retry logic with provenance fallback added. All checks pass: typecheck, build, 50 tests, audit 0 vulns, pack:dry-run, changelog:check."
+type: Chore
+status: closed
+priority: 2
+tags[4]: adversarial,audit,dist-removal-fix,review
+created_at: "2026-07-10T19:21:15.325Z"
+updated_at: "2026-07-10T19:21:15.325Z"
+closed_at: "2026-07-10T19:21:15.325Z"
+author: pi-adversarial-review
+acceptance_criteria: "All diffs reviewed; release workflow dist reference fixed; release:check suite passes."
+close_reason: "BLOCKER fixed: removed dist from release.yml git add. All checks green."
+body: ""
