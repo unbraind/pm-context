@@ -10,6 +10,7 @@ import extension, {
   renderAgentHandoff,
   renderMarkdown,
   sortContextItems,
+  validateSections,
 } from "../dist/index.js";
 
 import type { ContextPackDepInfo, RenderOptions } from "../dist/index.js";
@@ -90,6 +91,14 @@ test("resolveSelectionOptions accepts selector aliases and deduplicates ids", ()
   assert.deepEqual(
     resolveSelectionOptions({ ids: "pm-1, pm-2,pm-1", state: "blocked", kind: "Feature" }),
     { ids: ["pm-1", "pm-2"], status: "blocked", type: "Feature", tag: undefined, inferredStatus: false },
+  );
+});
+
+test("validateSections normalizes valid sections and rejects unknown values", () => {
+  assert.deepEqual(validateSections(["Focus", "actions"], ["focus", "actions"]), ["focus", "actions"]);
+  assert.throws(
+    () => validateSections(["focus", "bogus"], ["focus", "deps"]),
+    /--section must be one of: focus, deps \(received: bogus\)/,
   );
 });
 
@@ -355,9 +364,18 @@ test("buildContextPack maxItems allows focus + some neighbors", () => {
   const pack = buildContextPack(chainItems, { ids: ["pm-1"], maxItems: 2, neighborhoodDepth: 2, generatedAt: "now" });
   assert.equal(pack.items.length, 1);
   assert.equal(pack.neighbors.length, 1);
-  // neighbors are sorted by priority then update time (newer first)
-  // pm-4 (updated 11:00) sorts before pm-2 (updated 10:00) at same priority
-  assert.deepEqual(pack.neighbors.map((item) => item.id), ["pm-4"]);
+  // Direct neighbors are retained before deeper neighbors when the cap trims.
+  assert.deepEqual(pack.neighbors.map((item) => item.id), ["pm-2"]);
+});
+
+test("buildContextPack maxItems keeps direct neighbors before deeper neighbors", () => {
+  const depthItems = [
+    { id: "pm-focus", title: "Focus", status: "open", priority: 1, dependencies: [{ id: "pm-direct", kind: "depends_on" }] },
+    { id: "pm-direct", title: "Direct", status: "open", priority: 4, dependencies: [{ id: "pm-deep", kind: "depends_on" }] },
+    { id: "pm-deep", title: "Deep", status: "open", priority: 0 },
+  ];
+  const pack = buildContextPack(depthItems, { ids: ["pm-focus"], neighborhoodDepth: 2, maxItems: 2, generatedAt: "now" });
+  assert.deepEqual(pack.neighbors.map((item) => item.id), ["pm-direct"]);
 });
 
 test("buildContextPack maxItems preserves byte-identical when not set", () => {

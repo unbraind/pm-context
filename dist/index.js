@@ -61,6 +61,14 @@ function intOptionMin0(options, keys, fallback) {
     }
     return fallback;
 }
+export function validateSections(sections, allowed) {
+    const normalized = sections.map((section) => section.toLowerCase());
+    const invalid = normalized.filter((section) => !allowed.includes(section));
+    if (invalid.length > 0) {
+        throw new CommandError(`--section must be one of: ${allowed.join(", ")} (received: ${Array.from(new Set(invalid)).join(", ")})`, EXIT_CODE.USAGE);
+    }
+    return normalized;
+}
 function shellQuote(value) {
     if (/^[A-Za-z0-9._/:=,-]+$/.test(value))
         return value;
@@ -254,6 +262,7 @@ export function buildContextPack(allItems, options = {}) {
     // focus items. Each hop expands the frontier by one degree of separation. The
     // visited set is seeded with focus ids so a focus item is never a neighbor.
     const neighborIds = new Set();
+    const neighborDepth = new Map();
     const visited = new Set(selectedIds);
     let frontier = new Set(selectedIds);
     for (let hop = 0; hop < depth && frontier.size > 0; hop += 1) {
@@ -267,12 +276,14 @@ export function buildContextPack(allItems, options = {}) {
         for (const id of next) {
             visited.add(id);
             neighborIds.add(id);
+            neighborDepth.set(id, hop + 1);
         }
         frontier = next;
     }
     for (const id of selectedIds)
         neighborIds.delete(id);
-    let neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item) => Boolean(item)));
+    let neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item) => Boolean(item)))
+        .sort((a, b) => (neighborDepth.get(a.id) ?? 0) - (neighborDepth.get(b.id) ?? 0));
     // --max-items caps the total item count (focus + neighbors). Focus items take
     // priority; neighbors are trimmed to fit the remaining budget. If focus
     // alone exceeds the cap, focus is also trimmed.
@@ -300,11 +311,17 @@ export function buildContextPack(allItems, options = {}) {
     // for every visible item in the pack.
     let deps;
     if (options.includeDeps) {
+        const dependsOn = new Map();
+        const dependedBy = new Map();
+        for (const rel of allRelationships) {
+            dependsOn.set(rel.from, [...(dependsOn.get(rel.from) ?? []), rel.to]);
+            dependedBy.set(rel.to, [...(dependedBy.get(rel.to) ?? []), rel.from]);
+        }
         const visibleIds = [...packItems, ...packNeighbors].map((item) => item.id);
         deps = visibleIds.map((itemId) => ({
             itemId,
-            dependsOn: allRelationships.filter((rel) => rel.from === itemId).map((rel) => rel.to),
-            dependedBy: allRelationships.filter((rel) => rel.to === itemId).map((rel) => rel.from),
+            dependsOn: dependsOn.get(itemId) ?? [],
+            dependedBy: dependedBy.get(itemId) ?? [],
         }));
     }
     return {
@@ -658,7 +675,16 @@ function setupCommands(api) {
             const compress = boolOption(options, "compress");
             const includeDeps = boolOption(options, "include-deps", "includeDeps");
             const maxItems = intOptionMin0(options, ["max-items", "maxItems"], 0) || undefined;
-            const sections = [...asArray(options.section), ...asArray(options.sections)];
+            const requestedSections = [...asArray(options.section), ...asArray(options.sections)];
+            const allowedSections = format === "markdown"
+                ? ["summary", "focus", "neighborhood", "neighbors", "links", "deps"]
+                : format === "agent"
+                    ? ["focus", "blockers", "next-actions", "actions", "recent", "activity", "links", "deps", "refresh"]
+                    : [];
+            if (format === "json" && requestedSections.length > 0) {
+                throw new CommandError("--section is only supported with markdown, agent, or compact output", EXIT_CODE.USAGE);
+            }
+            const sections = validateSections(requestedSections, allowedSections);
             const pack = buildContextPack(readPmItems(ctx.pm_root), {
                 ids: selection.ids,
                 status: selection.status,
@@ -754,7 +780,7 @@ function setupCommands(api) {
             const compress = boolOption(options, "compress");
             const includeDeps = boolOption(options, "include-deps", "includeDeps");
             const maxItems = intOptionMin0(options, ["max-items", "maxItems"], 0) || undefined;
-            const sections = [...asArray(options.section), ...asArray(options.sections)];
+            const sections = validateSections([...asArray(options.section), ...asArray(options.sections)], ["focus", "blockers", "next-actions", "actions", "recent", "activity", "links", "deps", "refresh"]);
             const pack = buildContextPack(readPmItems(ctx.pm_root), {
                 ids: selection.ids,
                 status: selection.status,

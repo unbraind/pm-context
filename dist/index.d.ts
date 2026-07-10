@@ -154,6 +154,7 @@ export interface SuggestedAgentCommandInput {
     maxItems?: number;
     sections?: string[];
 }
+export declare function validateSections(sections: string[], allowed: readonly string[]): string[];
 export declare function resolveSelectionOptions(options: Record<string, unknown>, defaults?: {
     fallbackStatus?: string;
 }): SelectionOptions;
