@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.7.14 - 2026-07-14
+
+### Fixed
+
+- context-pack and context-handoff write rendered output to stderr instead of stdout ([pm-context-ubca](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-ubca.toon))
+
 ## 2026.7.10-1 - 2026-07-10
 
 ### Added
