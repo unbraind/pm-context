@@ -2,11 +2,13 @@ id: pm-context-ubca
 title: context-pack and context-handoff write rendered output to stderr instead of stdout
 description: "Both context-pack and context-handoff write the rendered pack/handoff (markdown/agent/JSON) to STDERR via console.error(output.trimEnd()) and return a small status object that pm renders as TOON on STDOUT. So `pm context-pack --id <id> --format json 2>/dev/null` prints the TOON status (generatedAt: ...) on stdout while the real JSON is on stderr, breaking `| jq` and the parse-stdout convention. Fix: mirror pm-brief's renderedCommandResult pattern — return a rendered-command-result marker object and register toon/json renderer overrides that unwrap and print the rendered content to stdout. Add the 'renderers' capability to manifest.json."
 type: Issue
-status: open
+status: closed
 priority: 2
 tags: []
 created_at: "2026-07-14T07:00:10.850Z"
-updated_at: "2026-07-14T07:00:10.850Z"
+updated_at: "2026-07-14T07:43:54.319Z"
+closed_at: "2026-07-14T07:43:53.986Z"
 author: pi-glm52
 acceptance_criteria: "(a) --format json => valid JSON on stdout (parses with jq), (b) --format markdown/agent => rendered text on stdout, (c) --output <file> still writes the file correctly, (d) exit codes unchanged (USAGE=2 for bad format, 0 on success), (e) stderr empty for stdout-rendering invocations"
-body: ""
+close_reason: fixed
+body: Fixed in PR #24 (merged to main as 300c76f). Rendered pack/handoff content now goes to STDOUT via a scoped renderer-override pattern mirroring pm-brief; added renderers capability to manifest.json + package.json; hardened readPmItems against unresolvable pm binary. Verified all formats + --output + exit codes.
