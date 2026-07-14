@@ -62,6 +62,7 @@
     "install": "pm install github.com/unbraind/pm-context --project",
     "capabilities": [
       "commands",
+      "renderers",
       "schema"
     ]
   },
