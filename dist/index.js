@@ -20,7 +20,7 @@ function renderedCommandResult(output) {
     return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
 }
 function renderCommandResult(context) {
-    const result = context.result;
+    const result = context?.result;
     return result?.pmContextRendered === true && typeof result.output === "string" ? result.output : null;
 }
 function asArray(value) {

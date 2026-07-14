@@ -136,8 +136,8 @@ function renderedCommandResult(output: string): RenderedCommandResult {
   return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
 }
 
-function renderCommandResult(context: { result?: unknown }): string | null {
-  const result = context.result as Partial<RenderedCommandResult> | null | undefined;
+function renderCommandResult(context: { result?: unknown } | null | undefined): string | null {
+  const result = context?.result as Partial<RenderedCommandResult> | null | undefined;
   return result?.pmContextRendered === true && typeof result.output === "string" ? result.output : null;
 }
 
