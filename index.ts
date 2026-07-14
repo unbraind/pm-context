@@ -777,8 +777,12 @@ export function readPmItems(pmRoot: string): PmItem[] {
     encoding: "utf-8",
     maxBuffer: 64 * 1024 * 1024,
   });
+  if (result.error) {
+    throw new CommandError(`Could not run pm list-all --json --include-body: ${result.error.message}`);
+  }
   if (result.status !== 0) {
-    throw new CommandError(result.stderr.trim() || "`pm list-all --json --include-body` failed");
+    const stderr = typeof result.stderr === "string" ? result.stderr.trim() : "";
+    throw new CommandError(stderr || "`pm list-all --json --include-body` failed");
   }
   try {
     const parsed = JSON.parse(result.stdout);
