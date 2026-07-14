@@ -127,6 +127,20 @@ export interface SelectionOptions {
   inferredStatus: boolean;
 }
 
+interface RenderedCommandResult {
+  pmContextRendered: true;
+  output: string;
+}
+
+function renderedCommandResult(output: string): RenderedCommandResult {
+  return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
+}
+
+function renderCommandResult(context: { result?: unknown }): string | null {
+  const result = context.result as Partial<RenderedCommandResult> | null | undefined;
+  return result?.pmContextRendered === true && typeof result.output === "string" ? result.output : null;
+}
+
 export interface SuggestedAgentCommandInput {
   commandName: "context-pack" | "context-handoff";
   selection: SelectionOptions;
@@ -870,12 +884,10 @@ function setupCommands(api: any): void {
       const outputPath = stringOption(options, "output");
       if (outputPath) {
         writeFileSync(outputPath, output, "utf-8");
-        console.error(`context pack written to ${outputPath}`);
-      } else {
-        console.error(output.trimEnd());
+        const reportedFormat = requestedFormat === "compact" ? "compact" : format;
+        return format === "json" ? pack : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
       }
-      const reportedFormat = requestedFormat === "compact" ? "compact" : format;
-      return format === "json" ? pack : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
+      return renderedCommandResult(output);
     },
   });
 
@@ -963,17 +975,15 @@ function setupCommands(api: any): void {
       const outputPath = stringOption(options, "output");
       if (outputPath) {
         writeFileSync(outputPath, output, "utf-8");
-        console.error(`context pack written to ${outputPath}`);
-      } else {
-        console.error(output.trimEnd());
+        return {
+          ok: true,
+          format: format === "json" ? "json" : "agent",
+          selected: pack.summary.selectedItems,
+          neighbors: pack.summary.neighborItems,
+          defaultedStatus: selection.inferredStatus ? selection.status : undefined,
+        };
       }
-      return {
-        ok: true,
-        format: format === "json" ? "json" : "agent",
-        selected: pack.summary.selectedItems,
-        neighbors: pack.summary.neighborItems,
-        defaultedStatus: selection.inferredStatus ? selection.status : undefined,
-      };
+      return renderedCommandResult(output);
     },
   });
 }
@@ -984,5 +994,9 @@ export default defineExtension({
   description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
   activate(api: any) {
     setupCommands(api);
+    if (typeof api.registerRenderer === "function") {
+      api.registerRenderer("toon", renderCommandResult);
+      api.registerRenderer("json", renderCommandResult);
+    }
   },
 });

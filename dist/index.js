@@ -16,6 +16,13 @@ export class CommandError extends Error {
 export const MAX_NEIGHBORHOOD_DEPTH = 5;
 export const MARKDOWN_SECTIONS = ["summary", "focus", "neighborhood", "neighbors", "links", "deps"];
 export const AGENT_SECTIONS = ["focus", "blockers", "next-actions", "actions", "nextactions", "recent", "activity", "links", "deps", "refresh"];
+function renderedCommandResult(output) {
+    return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
+}
+function renderCommandResult(context) {
+    const result = context.result;
+    return result?.pmContextRendered === true && typeof result.output === "string" ? result.output : null;
+}
 function asArray(value) {
     if (Array.isArray(value))
         return value.flatMap(asArray);
@@ -738,13 +745,10 @@ function setupCommands(api) {
             const outputPath = stringOption(options, "output");
             if (outputPath) {
                 writeFileSync(outputPath, output, "utf-8");
-                console.error(`context pack written to ${outputPath}`);
+                const reportedFormat = requestedFormat === "compact" ? "compact" : format;
+                return format === "json" ? pack : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
             }
-            else {
-                console.error(output.trimEnd());
-            }
-            const reportedFormat = requestedFormat === "compact" ? "compact" : format;
-            return format === "json" ? pack : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
+            return renderedCommandResult(output);
         },
     });
     api.registerCommand({
@@ -831,27 +835,28 @@ function setupCommands(api) {
             const outputPath = stringOption(options, "output");
             if (outputPath) {
                 writeFileSync(outputPath, output, "utf-8");
-                console.error(`context pack written to ${outputPath}`);
+                return {
+                    ok: true,
+                    format: format === "json" ? "json" : "agent",
+                    selected: pack.summary.selectedItems,
+                    neighbors: pack.summary.neighborItems,
+                    defaultedStatus: selection.inferredStatus ? selection.status : undefined,
+                };
             }
-            else {
-                console.error(output.trimEnd());
-            }
-            return {
-                ok: true,
-                format: format === "json" ? "json" : "agent",
-                selected: pack.summary.selectedItems,
-                neighbors: pack.summary.neighborItems,
-                defaultedStatus: selection.inferredStatus ? selection.status : undefined,
-            };
+            return renderedCommandResult(output);
         },
     });
 }
 export default defineExtension({
     name: "pm-context",
-    version: "2026.7.10",
+    version: "2026.7.13",
     description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
     activate(api) {
         setupCommands(api);
+        if (typeof api.registerRenderer === "function") {
+            api.registerRenderer("toon", renderCommandResult);
+            api.registerRenderer("json", renderCommandResult);
+        }
     },
 });
 //# sourceMappingURL=index.js.map
