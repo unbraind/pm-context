@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Adopt pm field-aware merge driver for multi-agent branch-merge safety ([pm-context-4apx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-4apx.toon))
+
 ## 2026.7.14 - 2026-07-14
 
 ### Fixed
