@@ -13,7 +13,39 @@ import extension, {
   validateSections,
 } from "../dist/index.js";
 
+import { activateExtensionForTest } from "@unbrained/pm-cli/sdk/testing";
+
 import type { ContextPackDepInfo, RenderOptions } from "../dist/index.js";
+
+/** Manifest capabilities the harness must grant for registration to be permitted. */
+const CAPABILITIES = ["commands", "renderers", "schema"] as const;
+
+/**
+ * Activate the extension through the SDK's own host harness.
+ *
+ * Using the real harness rather than a hand-written `api` double means these
+ * assertions run against the same registration path the CLI uses — including
+ * manifest capability governance, which a stub cannot enforce — so a contract
+ * change surfaces here instead of passing against a permissive fake.
+ */
+async function activateForTest() {
+  const activation = await activateExtensionForTest(extension, { name: "pm-context", capabilities: CAPABILITIES });
+  assert.deepEqual(activation.failed, [], "activation must not fail");
+  return activation;
+}
+
+/** Registered command names, in registration order. */
+async function registeredCommands(): Promise<string[]> {
+  return (await activateForTest()).registrations.commands.map((command) => command.command);
+}
+
+/** Long flag names registered for one command. */
+async function registeredFlags(command: string): Promise<string[]> {
+  const activation = await activateForTest();
+  const entry = activation.registrations.flags.find((flags) => flags.target_command === command);
+  assert.ok(entry, `no flags registered for ${command}`);
+  return entry.flags.flatMap((flag) => (flag.long === undefined ? [] : [flag.long]));
+}
 
 const items = [
   {
@@ -53,20 +85,13 @@ test("extension has required shape", () => {
   assert.equal(typeof extension.activate, "function");
 });
 
-test("activate registers context-pack command", () => {
-  const commands: Array<Record<string, unknown>> = [];
-  extension.activate({ registerCommand(command: Record<string, unknown>) { commands.push(command); } });
-  assert.deepEqual(commands.map((command) => command.name), ["context-pack", "context-handoff"]);
+test("activate registers context-pack command", async () => {
+  assert.deepEqual(await registeredCommands(), ["context-pack", "context-handoff", "context-usage"]);
 });
 
-test("activate exposes selector aliases for both commands", () => {
-  const commands: Array<Record<string, unknown>> = [];
-  extension.activate({ registerCommand(command: Record<string, unknown>) { commands.push(command); } });
-  const byName = new Map(commands.map((command) => [command.name, command]));
-  const packFlags = ((byName.get("context-pack") as { flags: Array<{ long: string }> } | undefined)?.flags ?? [])
-    .map((flag) => flag.long);
-  const handoffFlags = ((byName.get("context-handoff") as { flags: Array<{ long: string }> } | undefined)?.flags ?? [])
-    .map((flag) => flag.long);
+test("activate exposes selector aliases for both commands", async () => {
+  const packFlags = await registeredFlags("context-pack");
+  const handoffFlags = await registeredFlags("context-handoff");
   for (const requiredFlag of ["--id", "--ids", "--status", "--state", "--type", "--kind"]) {
     assert.equal(packFlags.includes(requiredFlag), true, `context-pack missing ${requiredFlag}`);
     assert.equal(handoffFlags.includes(requiredFlag), true, `context-handoff missing ${requiredFlag}`);
@@ -496,14 +521,9 @@ test("buildSuggestedAgentCommand includes new flags when set", () => {
   assert.equal(command, "pm context-pack --id pm-1 --format agent --include-deps --compress --max-items 10 --section focus --section blockers");
 });
 
-test("activate exposes new flags for both commands", () => {
-  const commands: Array<Record<string, unknown>> = [];
-  extension.activate({ registerCommand(command: Record<string, unknown>) { commands.push(command); } });
-  const byName = new Map(commands.map((command) => [command.name, command]));
-  const packFlags = ((byName.get("context-pack") as { flags: Array<{ long: string }> } | undefined)?.flags ?? [])
-    .map((flag) => flag.long);
-  const handoffFlags = ((byName.get("context-handoff") as { flags: Array<{ long: string }> } | undefined)?.flags ?? [])
-    .map((flag) => flag.long);
+test("activate exposes new flags for both commands", async () => {
+  const packFlags = await registeredFlags("context-pack");
+  const handoffFlags = await registeredFlags("context-handoff");
   for (const requiredFlag of ["--compress", "--include-deps", "--max-items", "--section"]) {
     assert.equal(packFlags.includes(requiredFlag), true, `context-pack missing ${requiredFlag}`);
     assert.equal(handoffFlags.includes(requiredFlag), true, `context-handoff missing ${requiredFlag}`);

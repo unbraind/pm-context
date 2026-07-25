@@ -1,5 +1,6 @@
 node_modules/
-dist/
+# dist/ is intentionally committed: `pm install github.com/unbraind/pm-context`
+# copies the repo as-is and never runs a build, so the entry file must be in git.
 dist-test/
 *.tgz
 RELEASE_NOTES.md
@@ -12,3 +13,4 @@ RELEASE_NOTES.md
 .env
 .env.*
 !.env.example
+coverage/
