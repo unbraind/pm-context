@@ -31,7 +31,7 @@
   },
   "validation": {
     "sprint_release_format": "warn",
-    "parent_reference": "strict_error",
+    "parent_reference": "warn",
     "metadata_profile": "core",
     "metadata_required_fields": [],
     "lifecycle_stale_blocker_reason_patterns": [
@@ -58,7 +58,13 @@
     "estimate_defaults_by_type": {}
   },
   "governance": {
-    "preset": "minimal",
+    "preset": "custom",
+    "ownership_enforcement": "none",
+    "create_mode_default": "progressive",
+    "close_validation_default": "off",
+    "parent_reference": "warn",
+    "metadata_profile": "core",
+    "force_required_for_stale_lock": false,
     "duplicate_detection_mode": "advisory",
     "duplicate_detection_threshold": 0.8,
     "duplicate_detection_limit": 3
