@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Enable governance duplicate-detection advisory mode and adopt pm-cli 2026.7.25 ([pm-context-x5qt](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-x5qt.toon))
+
 ## 2026.7.23 - 2026-07-23
 
 ### Fixed
