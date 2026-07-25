@@ -853,7 +853,7 @@ function setupCommands(api) {
 }
 export default defineExtension({
     name: "pm-context",
-    version: "2026.7.13",
+    version: "2026.7.25",
     description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
     activate(api) {
         setupCommands(api);
