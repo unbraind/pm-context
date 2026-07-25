@@ -44,6 +44,21 @@ export const LEDGER_RELATIVE_PATH = join("runtime", "context-usage.jsonl");
  * explicitly — preferable to admitting it and skewing conversion silently.
  */
 const SERVE_SURFACES = ["context", "next"];
+/**
+ * Whether a timestamp is in canonical `Date.prototype.toISOString` form.
+ *
+ * Every window filter, report bound, "latest" wins, and conversion check in this
+ * module compares `at` values as strings. That is only sound for a fixed-width
+ * representation: `"2026-07-01T00:00:00.500Z"` sorts *before*
+ * `"2026-07-01T00:00:00Z"` lexically, because `.` precedes `Z`, even though it
+ * is the later instant. Requiring the canonical form — which is what pm writes —
+ * makes string order equal chronological order, so any other spelling is
+ * reported as malformed instead of silently skewing the metrics.
+ */
+function isCanonicalTimestamp(value) {
+    const parsed = Date.parse(value);
+    return !Number.isNaN(parsed) && new Date(parsed).toISOString() === value;
+}
 /** Default number of per-item rows rendered before the report truncates. */
 export const DEFAULT_REPORT_LIMIT = 20;
 /**
@@ -91,7 +106,7 @@ export function parseLedgerLine(line) {
     if (typeof parsed !== "object" || parsed === null)
         return null;
     const row = parsed;
-    if (typeof row.at !== "string" || typeof row.author !== "string")
+    if (typeof row.at !== "string" || !isCanonicalTimestamp(row.at) || typeof row.author !== "string")
         return null;
     if (row.kind === "touch") {
         if (typeof row.item_id !== "string" || typeof row.intent !== "string")
@@ -183,6 +198,7 @@ export function buildUsageReport(events, options = {}) {
             id,
             serves: 0,
             conversions: 0,
+            ranked: 0,
             touches: 0,
             best_rank: null,
             last_served_at: null,
@@ -218,13 +234,16 @@ export function buildUsageReport(events, options = {}) {
         surfaces.add(event.surface);
         for (const row of event.rows) {
             const entry = entryFor(row.id);
-            entry.serves += 1;
+            entry.ranked += 1;
             if (entry.best_rank === null || row.rank < entry.best_rank)
                 entry.best_rank = row.rank;
+            // Only an included row was actually shown, so only it can be served, wasted, or converted.
+            if (!row.included)
+                continue;
+            entry.serves += 1;
             if (entry.last_served_at === null || event.at > entry.last_served_at)
                 entry.last_served_at = event.at;
-            if (row.included)
-                judgments.push({ id: row.id, rank: row.rank, at: event.at, author: event.author });
+            judgments.push({ id: row.id, rank: row.rank, at: event.at, author: event.author });
         }
     }
     let converted = 0;
@@ -286,10 +305,11 @@ export function renderUsageReport(report) {
     lines.push("");
     lines.push("## Waste (served, never touched)", "", report.waste.length > 0 ? report.waste.map((id) => `- ${id}`).join("\n") : "_none_", "", "## Misses (touched, never served)", "", report.misses.length > 0 ? report.misses.map((id) => `- ${id}`).join("\n") : "_none_", "");
     if (report.items.length > 0) {
-        lines.push("## Items", "", "| id | serves | conversions | touches | best rank | last served | last touched | intents |", "| --- | ---: | ---: | ---: | ---: | --- | --- | --- |");
+        lines.push("## Items", "", "| id | serves | ranked | conversions | touches | best rank | last served | last touched | intents |", "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |");
         for (const entry of report.items) {
-            lines.push(`| ${entry.id} | ${entry.serves} | ${entry.conversions} | ${entry.touches} | ${entry.best_rank ?? "-"} | ` +
-                `${entry.last_served_at ?? "-"} | ${entry.last_touched_at ?? "-"} | ${entry.intents.join(", ") || "-"} |`);
+            lines.push(`| ${entry.id} | ${entry.serves} | ${entry.ranked} | ${entry.conversions} | ${entry.touches} | ` +
+                `${entry.best_rank ?? "-"} | ${entry.last_served_at ?? "-"} | ${entry.last_touched_at ?? "-"} | ` +
+                `${entry.intents.join(", ") || "-"} |`);
         }
         lines.push("");
     }

@@ -123,9 +123,15 @@ pm maintains an append-only ledger at `<pm_root>/runtime/context-usage.jsonl`
 ledger itself, so an agent cannot ask *what was I shown, and did I use it?*
 This command answers that:
 
-- **conversion** — share of served-and-included items followed by a same-author touch
+- **conversion** — share of served items followed by a same-author touch
 - **waste** — served but never touched afterwards: context you paid tokens for and did not use
 - **misses** — touched but never served: work the ranking failed to surface
+
+An item counts as *served* only when pm marked it `included` — it actually made
+the pack. The per-item `ranked` column counts every appearance, so
+`ranked - serves` is how often the item lost to the token budget rather than to
+the ranking: tune the budget, not the query. An item that was only ever ranked
+and cut is never reported as waste, because the agent never saw it.
 
 ```bash
 pm context-usage                          # markdown brief

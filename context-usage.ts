@@ -48,6 +48,22 @@ export const LEDGER_RELATIVE_PATH = join("runtime", "context-usage.jsonl");
  */
 const SERVE_SURFACES: readonly ContextRelevanceSurface[] = ["context", "next"];
 
+/**
+ * Whether a timestamp is in canonical `Date.prototype.toISOString` form.
+ *
+ * Every window filter, report bound, "latest" wins, and conversion check in this
+ * module compares `at` values as strings. That is only sound for a fixed-width
+ * representation: `"2026-07-01T00:00:00.500Z"` sorts *before*
+ * `"2026-07-01T00:00:00Z"` lexically, because `.` precedes `Z`, even though it
+ * is the later instant. Requiring the canonical form — which is what pm writes —
+ * makes string order equal chronological order, so any other spelling is
+ * reported as malformed instead of silently skewing the metrics.
+ */
+function isCanonicalTimestamp(value: string): boolean {
+  const parsed = Date.parse(value);
+  return !Number.isNaN(parsed) && new Date(parsed).toISOString() === value;
+}
+
 /** Default number of per-item rows rendered before the report truncates. */
 export const DEFAULT_REPORT_LIMIT = 20;
 
@@ -55,8 +71,20 @@ export const DEFAULT_REPORT_LIMIT = 20;
 export interface ContextUsageItemReport {
   /** Item identifier as recorded by the ledger. */
   id: string;
-  /** Number of serve rows that included this item, after filtering. */
+  /**
+   * Serve rows that actually put this item in the pack (`included: true`).
+   *
+   * Only these count as "shown", so only these can be wasted. An item pm ranked
+   * but cut from the pack was never in front of the agent.
+   */
   serves: number;
+  /**
+   * Serve rows that ranked this item at all, whether or not it made the pack.
+   *
+   * `ranked - serves` is the number of times the item lost to the token budget,
+   * which is the signal for tuning that budget rather than the ranking.
+   */
+  ranked: number;
   /** Serve rows for this item followed by a same-author touch. */
   conversions: number;
   /** Total touch rows for this item, whether or not a serve preceded them. */
@@ -166,7 +194,7 @@ export function parseLedgerLine(line: string): ContextUsageEvent | null {
   }
   if (typeof parsed !== "object" || parsed === null) return null;
   const row = parsed as Record<string, unknown>;
-  if (typeof row.at !== "string" || typeof row.author !== "string") return null;
+  if (typeof row.at !== "string" || !isCanonicalTimestamp(row.at) || typeof row.author !== "string") return null;
   if (row.kind === "touch") {
     if (typeof row.item_id !== "string" || typeof row.intent !== "string") return null;
     return { kind: "touch", at: row.at, author: row.author, item_id: row.item_id, intent: row.intent };
@@ -250,6 +278,7 @@ export function buildUsageReport(
       id,
       serves: 0,
       conversions: 0,
+      ranked: 0,
       touches: 0,
       best_rank: null,
       last_served_at: null,
@@ -280,10 +309,13 @@ export function buildUsageReport(
     surfaces.add(event.surface);
     for (const row of event.rows) {
       const entry = entryFor(row.id);
-      entry.serves += 1;
+      entry.ranked += 1;
       if (entry.best_rank === null || row.rank < entry.best_rank) entry.best_rank = row.rank;
+      // Only an included row was actually shown, so only it can be served, wasted, or converted.
+      if (!row.included) continue;
+      entry.serves += 1;
       if (entry.last_served_at === null || event.at > entry.last_served_at) entry.last_served_at = event.at;
-      if (row.included) judgments.push({ id: row.id, rank: row.rank, at: event.at, author: event.author });
+      judgments.push({ id: row.id, rank: row.rank, at: event.at, author: event.author });
     }
   }
 
@@ -371,13 +403,14 @@ export function renderUsageReport(report: ContextUsageReport): string {
     lines.push(
       "## Items",
       "",
-      "| id | serves | conversions | touches | best rank | last served | last touched | intents |",
-      "| --- | ---: | ---: | ---: | ---: | --- | --- | --- |",
+      "| id | serves | ranked | conversions | touches | best rank | last served | last touched | intents |",
+      "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
     );
     for (const entry of report.items) {
       lines.push(
-        `| ${entry.id} | ${entry.serves} | ${entry.conversions} | ${entry.touches} | ${entry.best_rank ?? "-"} | ` +
-        `${entry.last_served_at ?? "-"} | ${entry.last_touched_at ?? "-"} | ${entry.intents.join(", ") || "-"} |`,
+        `| ${entry.id} | ${entry.serves} | ${entry.ranked} | ${entry.conversions} | ${entry.touches} | ` +
+        `${entry.best_rank ?? "-"} | ${entry.last_served_at ?? "-"} | ${entry.last_touched_at ?? "-"} | ` +
+        `${entry.intents.join(", ") || "-"} |`,
       );
     }
     lines.push("");

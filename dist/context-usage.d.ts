@@ -7,8 +7,20 @@ export declare const DEFAULT_REPORT_LIMIT = 20;
 export interface ContextUsageItemReport {
     /** Item identifier as recorded by the ledger. */
     id: string;
-    /** Number of serve rows that included this item, after filtering. */
+    /**
+     * Serve rows that actually put this item in the pack (`included: true`).
+     *
+     * Only these count as "shown", so only these can be wasted. An item pm ranked
+     * but cut from the pack was never in front of the agent.
+     */
     serves: number;
+    /**
+     * Serve rows that ranked this item at all, whether or not it made the pack.
+     *
+     * `ranked - serves` is the number of times the item lost to the token budget,
+     * which is the signal for tuning that budget rather than the ranking.
+     */
+    ranked: number;
     /** Serve rows for this item followed by a same-author touch. */
     conversions: number;
     /** Total touch rows for this item, whether or not a serve preceded them. */
