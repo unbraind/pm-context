@@ -1,3 +1,4 @@
+import type { ExtensionApi } from "@unbrained/pm-cli/sdk";
 export declare const EXIT_CODE: {
     readonly GENERIC_FAILURE: 1;
     readonly USAGE: 2;
@@ -184,7 +185,7 @@ declare const _default: {
     name: string;
     version: string;
     description: string;
-    activate(api: any): void;
+    activate(api: ExtensionApi): void;
 };
 export default _default;
 //# sourceMappingURL=index.d.ts.map

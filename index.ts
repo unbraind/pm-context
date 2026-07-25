@@ -1,7 +1,22 @@
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import type { defineExtension as defineExtensionType } from "@unbrained/pm-cli/sdk";
+import type {
+  CommandHandlerContext,
+  ExtensionApi,
+  defineExtension as defineExtensionType,
+} from "@unbrained/pm-cli/sdk";
+import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSince } from "./context-usage.js";
 
+/**
+ * Runtime stand-in for the SDK's `defineExtension`.
+ *
+ * `defineExtension` is a documented zero-cost identity function, but an
+ * installed extension cannot resolve `@unbrained/pm-cli` at runtime, so the
+ * real export is import-type-only and this shim supplies the value. The `any`
+ * casts are confined to this one line and are load-bearing: the shim must
+ * satisfy the imported signature without the module it comes from being
+ * present. Tracked upstream as pm-cli#717.
+ */
 const defineExtension: typeof defineExtensionType = ((extension: any) => extension) as any;
 
 export const EXIT_CODE = {
@@ -793,7 +808,7 @@ export function readPmItems(pmRoot: string): PmItem[] {
   }
 }
 
-function setupCommands(api: any): void {
+function setupCommands(api: ExtensionApi): void {
   const contextPackDefaultLimit = 25;
   const contextHandoffDefaultLimit = 12;
   const defaultRecentLimit = 5;
@@ -832,7 +847,7 @@ function setupCommands(api: any): void {
       { long: "--max-items", value_name: "n", description: "Maximum total items (focus + neighbors) in the pack", type: "string" },
       { long: "--section", value_name: "section", description: "Include sections (repeatable). Markdown: summary, focus, neighborhood, neighbors, links, deps. Agent/compact: focus, blockers, next-actions, recent, links, deps, refresh", type: "string" },
     ],
-    async run(ctx: any) {
+    async run(ctx: CommandHandlerContext) {
       const options = ctx.options as Record<string, unknown>;
       const requestedFormat = (stringOption(options, "format") ?? "markdown").toLowerCase();
       const format = requestedFormat === "compact" ? "agent" : requestedFormat;
@@ -927,7 +942,7 @@ function setupCommands(api: any): void {
       { long: "--max-items", value_name: "n", description: "Maximum total items (focus + neighbors) in the handoff", type: "string" },
       { long: "--section", value_name: "section", description: "Include only specific sections (repeatable): focus, blockers, next-actions, recent, links, deps, refresh", type: "string" },
     ],
-    async run(ctx: any) {
+    async run(ctx: CommandHandlerContext) {
       const options = ctx.options as Record<string, unknown>;
       const requestedFormat = (stringOption(options, "format") ?? "agent").toLowerCase();
       const format = requestedFormat === "compact" ? "agent" : requestedFormat;
@@ -990,13 +1005,59 @@ function setupCommands(api: any): void {
       return renderedCommandResult(output);
     },
   });
+
+  api.registerCommand({
+    name: "context-usage",
+    description: "Report which items pm context/next served and which of those were actually touched.",
+    intent: "measure whether served context is being used",
+    examples: [
+      "pm context-usage",
+      "pm context-usage --format json",
+      "pm context-usage --surface next --since 7d",
+      "pm context-usage --author agent-a --limit 50",
+    ],
+    flags: [
+      { long: "--author", value_name: "author", description: "Restrict to one recording author", type: "string" },
+      { long: "--surface", value_name: "surface", description: "Restrict serve events to one surface: context or next", type: "string" },
+      { long: "--since", value_name: "when", description: "Drop events at or before this point (ISO timestamp, or a day offset such as 7d)", type: "string" },
+      { long: "--limit", value_name: "n", description: `Maximum per-item rows (default: ${DEFAULT_REPORT_LIMIT})`, type: "string" },
+      { long: "--format", value_name: "format", description: "Output format: markdown or json (default: markdown)", type: "string" },
+    ],
+    async run(ctx: CommandHandlerContext) {
+      const options = ctx.options ?? {};
+      const requestedFormat = stringOption(options, "format")?.toLowerCase();
+      if (requestedFormat && requestedFormat !== "markdown" && requestedFormat !== "json") {
+        throw new CommandError("--format must be markdown or json", EXIT_CODE.USAGE);
+      }
+      const surface = stringOption(options, "surface")?.toLowerCase();
+      if (surface && surface !== "context" && surface !== "next") {
+        throw new CommandError("--surface must be context or next", EXIT_CODE.USAGE);
+      }
+      const rawSince = stringOption(options, "since");
+      const since = rawSince === undefined ? undefined : resolveSince(rawSince);
+      if (rawSince !== undefined && since === null) {
+        throw new CommandError(`--since '${rawSince}' is not an ISO timestamp or a day offset such as 7d`, EXIT_CODE.USAGE);
+      }
+      const report = reportContextUsage(ctx.pm_root, {
+        author: stringOption(options, "author"),
+        surface,
+        since: since ?? undefined,
+        limit: intOption(options, "limit", DEFAULT_REPORT_LIMIT),
+      });
+      // pm's global --json owns that flag name, so a command-level alias would be
+      // silently shadowed and never populate ctx.options. Read the global instead,
+      // so `pm context-usage --json` returns the raw report as an agent expects.
+      const wantsJson = requestedFormat === "json" || ctx.global?.json === true;
+      return wantsJson ? report : renderedCommandResult(renderUsageReport(report));
+    },
+  });
 }
 
 export default defineExtension({
   name: "pm-context",
   version: "2026.7.25",
   description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
-  activate(api: any) {
+  activate(api: ExtensionApi) {
     setupCommands(api);
     if (typeof api.registerRenderer === "function") {
       api.registerRenderer("toon", renderCommandResult);

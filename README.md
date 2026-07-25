@@ -111,11 +111,55 @@ Options:
   `blockers`, `next-actions` (alias: `actions`), `recent` (alias: `activity`),
   `refresh`
 
+`pm context-usage`
+
+Reports which items `pm context` and `pm next` served, and which of those were
+actually touched afterwards — the feedback half of "project management = context
+management".
+
+pm maintains an append-only ledger at `<pm_root>/runtime/context-usage.jsonl`
+(a `serve` row per ranking, a `touch` row per mutation) and folds it into the
+`usage_affinity` signal of its built-in relevance model. Nothing surfaces the
+ledger itself, so an agent cannot ask *what was I shown, and did I use it?*
+This command answers that:
+
+- **conversion** — share of served items followed by a same-author touch
+- **waste** — served but never touched afterwards: context you paid tokens for and did not use
+- **misses** — touched but never served: work the ranking failed to surface
+
+An item counts as *served* only when pm marked it `included` — it actually made
+the pack. The per-item `ranked` column counts every appearance, so
+`ranked - serves` is how often the item lost to the token budget rather than to
+the ranking: tune the budget, not the query. An item that was only ever ranked
+and cut is never reported as waste, because the agent never saw it.
+
+```bash
+pm context-usage                          # markdown brief
+pm context-usage --json                   # raw report
+pm context-usage --surface next --since 7d
+pm context-usage --author agent-a --limit 50
+```
+
+Options:
+
+- `--author <author>` restrict to one recording author
+- `--surface <context|next>` restrict serve events to one surface
+- `--since <when>` drop events at or before an ISO timestamp or a day offset (`7d`, `-7d`, `7`)
+- `--limit <n>` maximum per-item rows (default `20`)
+- `--format <markdown|json>` output format (default `markdown`); pm's global `--json` also selects JSON
+
+The command is strictly read-only. The ledger is pm's file, with pm's schema and
+pm's pruning, and it deliberately reports only what the ledger states directly —
+it does **not** compute a competing affinity score, because pm owns the decay
+model and a second implementation could silently disagree with the ranking it
+purports to explain.
+
 ## Philosophy
 
 Project management is context management. `pm-context` makes that concrete by
 turning pm's source-of-truth items into portable context that can be reviewed,
-sent to another agent, or attached to a pull request.
+sent to another agent, or attached to a pull request — and, with
+`pm context-usage`, by measuring whether that context was worth sending.
 
 ## Multi-agent merge safety
 
