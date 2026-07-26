@@ -2,6 +2,12 @@
 
 ## 2026.7.26 - 2026-07-26
 
+### Removed
+
+- Adopt pm-cli 2026.7.26 typed authoring contracts and remove the any-cast defineExtension shim ([pm-context-q67i](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-q67i.toon))
+
+## 2026.7.26 - 2026-07-26
+
 ### Other
 
 - Enable governance duplicate-detection advisory mode and adopt pm-cli 2026.7.25 ([pm-context-x5qt](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-x5qt.toon))
