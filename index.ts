@@ -1,9 +1,9 @@
+import type { ExtensionModule } from "@unbrained/pm-cli/sdk/authoring";
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import type {
   CommandHandlerContext,
   ExtensionApi,
-  defineExtension as defineExtensionType,
 } from "@unbrained/pm-cli/sdk";
 import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSince } from "./context-usage.js";
 
@@ -17,7 +17,6 @@ import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSin
  * satisfy the imported signature without the module it comes from being
  * present. Tracked upstream as pm-cli#717.
  */
-const defineExtension: typeof defineExtensionType = ((extension: any) => extension) as any;
 
 export const EXIT_CODE = {
   GENERIC_FAILURE: 1,
@@ -1052,6 +1051,16 @@ function setupCommands(api: ExtensionApi): void {
     },
   });
 }
+
+/**
+ * Local stand-in for the SDK's `defineExtension` identity helper.
+ *
+ * Declared here rather than imported so this package keeps a type-only
+ * dependency on `@unbrained/pm-cli` and adds no runtime module edge. The
+ * generic constraint is the SDK's own, so the extension object is contract-
+ * checked against {@link ExtensionModule} exactly as the imported helper would.
+ */
+const defineExtension = <TModule extends ExtensionModule>(module: TModule): TModule => module;
 
 export default defineExtension({
   name: "pm-context",

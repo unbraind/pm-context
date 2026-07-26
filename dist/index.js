@@ -11,7 +11,6 @@ import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSin
  * satisfy the imported signature without the module it comes from being
  * present. Tracked upstream as pm-cli#717.
  */
-const defineExtension = ((extension) => extension);
 export const EXIT_CODE = {
     GENERIC_FAILURE: 1,
     USAGE: 2,
@@ -907,6 +906,15 @@ function setupCommands(api) {
         },
     });
 }
+/**
+ * Local stand-in for the SDK's `defineExtension` identity helper.
+ *
+ * Declared here rather than imported so this package keeps a type-only
+ * dependency on `@unbrained/pm-cli` and adds no runtime module edge. The
+ * generic constraint is the SDK's own, so the extension object is contract-
+ * checked against {@link ExtensionModule} exactly as the imported helper would.
+ */
+const defineExtension = (module) => module;
 export default defineExtension({
     name: "pm-context",
     version: "2026.7.25",

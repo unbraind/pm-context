@@ -1,4 +1,14 @@
 import type { ExtensionApi } from "@unbrained/pm-cli/sdk";
+/**
+ * Runtime stand-in for the SDK's `defineExtension`.
+ *
+ * `defineExtension` is a documented zero-cost identity function, but an
+ * installed extension cannot resolve `@unbrained/pm-cli` at runtime, so the
+ * real export is import-type-only and this shim supplies the value. The `any`
+ * casts are confined to this one line and are load-bearing: the shim must
+ * satisfy the imported signature without the module it comes from being
+ * present. Tracked upstream as pm-cli#717.
+ */
 export declare const EXIT_CODE: {
     readonly GENERIC_FAILURE: 1;
     readonly USAGE: 2;
