@@ -316,7 +316,7 @@ export function buildUsageReport(
       entry.touches += 1;
       if (entry.last_touched_at === null || event.at > entry.last_touched_at) entry.last_touched_at = event.at;
       if (!entry.intents.includes(event.intent)) entry.intents.push(event.intent);
-      const key = `${event.author} ${event.item_id}`;
+      const key = `${event.author}\u0000${event.item_id}`;
       const times = touchTimesByAuthor.get(key);
       if (times) times.push(event.at);
       else touchTimesByAuthor.set(key, [event.at]);
@@ -338,7 +338,7 @@ export function buildUsageReport(
 
   let converted = 0;
   for (const judgment of judgments) {
-    const times = touchTimesByAuthor.get(`${judgment.author} ${judgment.id}`);
+    const times = touchTimesByAuthor.get(`${judgment.author}\u0000${judgment.id}`);
     if (!times?.some((at) => at > judgment.at)) continue;
     converted += 1;
     entryFor(judgment.id).conversions += 1;

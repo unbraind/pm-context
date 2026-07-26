@@ -217,9 +217,9 @@ export declare function renderAgentHandoff(pack: ContextPack, options?: {
  * Replaces the previous `spawnSync("pm", ["list-all", "--json", "--include-body"])`
  * shell-out with the typed {@link list} action from `@unbrained/pm-cli/sdk/core`.
  * `list-all` is the SDK alias for `list` with `excludeTerminal: false`; passing
- * `full: true` + `includeBody: true` + `noTruncate: true` reproduces the exact
- * full-metadata-with-body projection the shell-out parsed, so the downstream
- * pack shape is byte-identical (verified against real workspaces).
+ * `full: true` + `includeBody: true` reproduces the full-metadata-with-body
+ * projection the shell-out parsed, including the CLI's default truncation
+ * semantics, so the downstream pack shape remains compatible.
  */
 export declare function readPmItems(pmRoot: string): Promise<PmItem[]>;
 /** Rank options forwarded to the SDK relevance engine. */
@@ -262,8 +262,9 @@ export declare function createSdkRanker(allItems: readonly PmItem[], options: Sd
  * Build a {@link ContextPackOptions.packer} closure backed by
  * {@link packContextCandidates}. Each `--max-items` slot maps to a token budget;
  * focus items are required anchors, neighbors compete by relevance rank for the
- * remaining budget. The packer selects under that token budget with pm's
- * projection-degradation optimizer instead of a hard count slice.
+ * remaining budget. The packer first selects under that token budget with pm's
+ * projection-degradation optimizer, then enforces the command's explicit item
+ * ceiling while preserving the SDK-selected focus-first order.
  */
 export declare function createSdkPacker(rankedFocus: readonly PmItem[], rankedNeighbors: readonly PmItem[]): (focus: PmItem[], neighbors: PmItem[], maxItems: number) => {
     focus: PmItem[];

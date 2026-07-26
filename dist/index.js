@@ -659,14 +659,14 @@ export function renderAgentHandoff(pack, options = {}) {
  * Replaces the previous `spawnSync("pm", ["list-all", "--json", "--include-body"])`
  * shell-out with the typed {@link list} action from `@unbrained/pm-cli/sdk/core`.
  * `list-all` is the SDK alias for `list` with `excludeTerminal: false`; passing
- * `full: true` + `includeBody: true` + `noTruncate: true` reproduces the exact
- * full-metadata-with-body projection the shell-out parsed, so the downstream
- * pack shape is byte-identical (verified against real workspaces).
+ * `full: true` + `includeBody: true` reproduces the full-metadata-with-body
+ * projection the shell-out parsed, including the CLI's default truncation
+ * semantics, so the downstream pack shape remains compatible.
  */
 export async function readPmItems(pmRoot) {
     let result;
     try {
-        result = await pmList({ full: true, includeBody: true, noTruncate: true, excludeTerminal: false }, { pmRoot });
+        result = await pmList({ full: true, includeBody: true, excludeTerminal: false }, { pmRoot });
     }
     catch (err) {
         throw new CommandError(`Could not read pm items via SDK list: ${err instanceof Error ? err.message : String(err)}`);
@@ -784,8 +784,9 @@ function estimateProjectionCosts(item) {
  * Build a {@link ContextPackOptions.packer} closure backed by
  * {@link packContextCandidates}. Each `--max-items` slot maps to a token budget;
  * focus items are required anchors, neighbors compete by relevance rank for the
- * remaining budget. The packer selects under that token budget with pm's
- * projection-degradation optimizer instead of a hard count slice.
+ * remaining budget. The packer first selects under that token budget with pm's
+ * projection-degradation optimizer, then enforces the command's explicit item
+ * ceiling while preserving the SDK-selected focus-first order.
  */
 export function createSdkPacker(rankedFocus, rankedNeighbors) {
     const focusRank = new Map(rankedFocus.map((item, index) => [item.id, index + 1]));
@@ -813,9 +814,11 @@ export function createSdkPacker(rankedFocus, rankedNeighbors) {
         ];
         const packed = packContextCandidates(candidates, { tokenBudget, profile: "context" });
         const included = new Set(packed.included.map((candidate) => candidate.id));
+        const packedFocus = focus.filter((item) => included.has(item.id)).slice(0, maxItems);
+        const remainingSlots = Math.max(0, maxItems - packedFocus.length);
         return {
-            focus: focus.filter((item) => included.has(item.id)),
-            neighbors: neighbors.filter((item) => included.has(item.id)),
+            focus: packedFocus,
+            neighbors: neighbors.filter((item) => included.has(item.id)).slice(0, remainingSlots),
         };
     };
 }
@@ -909,26 +912,14 @@ async function resolveSdkRankOptions(ctx, _items) {
     return { statusRegistry, now, author, usageAffinity };
 }
 /**
- * Apply the same id/status/type/tag + closed filter and limit that
- * {@link buildContextPack} uses to select focus items, without neighborhood or
- * packing. Used by `--explain` to score exactly the items that would be packed.
- */
-function selectFocusItems(items, selection) {
-    const ids = Array.from(new Set((selection.ids ?? []).map((id) => id.trim()).filter(Boolean)));
-    const byId = new Map(items.map((item) => [item.id, item]));
-    const selected = ids.length > 0
-        ? ids.map((id) => byId.get(id)).filter((item) => Boolean(item))
-        : items.filter((item) => matchesFilters(item, { includeClosed: selection.includeClosed, status: selection.status, type: selection.type, tag: selection.tag }));
-    return sortContextItems(selected).slice(0, selection.limit ?? 25);
-}
-/**
  * Record a context-serving event to pm's own context-usage ledger.
  *
- * This closes the feedback loop: the pack's focus items become `serve` rows in
- * the same `runtime/context-usage.jsonl` pm's `usage_affinity` signal reads, so
- * a later `pm context-usage --author <agent>` can report whether the served
- * context was actually touched. Skipped silently when no author is resolvable,
- * since the ledger is per-author.
+ * This closes the feedback loop: every emitted focus and neighborhood item
+ * becomes an included `serve` row in the same `runtime/context-usage.jsonl`
+ * pm's `usage_affinity` signal reads, so a later
+ * `pm context-usage --author <agent>` can report whether the served context was
+ * actually touched. Skipped silently when no author is resolvable, since the
+ * ledger is per-author.
  */
 async function recordPackServing(ctx, focus, neighbors) {
     const author = stringOption(ctx.options ?? {}, "author") ?? ctx.global?.author;
@@ -936,7 +927,7 @@ async function recordPackServing(ctx, focus, neighbors) {
         return;
     const rows = [
         ...focus.map((item, index) => ({ id: item.id, rank: index + 1, included: true })),
-        ...neighbors.map((item, index) => ({ id: item.id, rank: focus.length + index + 1, included: false })),
+        ...neighbors.map((item, index) => ({ id: item.id, rank: focus.length + index + 1, included: true })),
     ];
     if (rows.length === 0)
         return;
@@ -1015,19 +1006,6 @@ function setupCommands(api) {
             const sections = validateSections(format, [...asArray(options.section), ...asArray(options.sections)]);
             const items = await readPmItems(ctx.pm_root);
             const rankOptions = await resolveSdkRankOptions(ctx, items);
-            if (explain) {
-                const focusItems = selectFocusItems(items, { ids: selection.ids, status: selection.status, type: selection.type, tag: selection.tag, includeClosed, limit });
-                const explainReport = buildContextExplain(focusItems, rankOptions);
-                const output = format === "json"
-                    ? `${JSON.stringify(explainReport, null, compress ? 0 : 2)}\n`
-                    : renderContextExplain(explainReport, { compress });
-                const outputPath = stringOption(options, "output");
-                if (outputPath) {
-                    writeFileSync(outputPath, output, "utf-8");
-                    return { ok: true, format: format === "json" ? "json" : "markdown", explained: explainReport.entries.length };
-                }
-                return renderedCommandResult(output);
-            }
             const ranker = createSdkRanker(items, rankOptions);
             // Pre-rank the full corpus so the token-budgeted packer has relevance ranks
             // for both focus and neighbor candidates before buildContextPack trims.
@@ -1048,6 +1026,18 @@ function setupCommands(api) {
                 ranker,
                 packer,
             });
+            if (explain) {
+                const explainReport = buildContextExplain([...pack.items, ...pack.neighbors], rankOptions);
+                const output = format === "json"
+                    ? `${JSON.stringify(explainReport, null, compress ? 0 : 2)}\n`
+                    : renderContextExplain(explainReport, { compress });
+                const outputPath = stringOption(options, "output");
+                if (outputPath) {
+                    writeFileSync(outputPath, output, "utf-8");
+                    return { ok: true, format: format === "json" ? "json" : "markdown", explained: explainReport.entries.length };
+                }
+                return renderedCommandResult(output);
+            }
             await recordPackServing(ctx, pack.items, pack.neighbors);
             const suggestedCommand = buildSuggestedAgentCommand({
                 commandName: "context-pack",

@@ -1,0 +1,31 @@
+id: pm-context-3s5f
+title: Raise pm-context source coverage to enforced 100/100/100/100
+description: "Close every genuine source coverage gap in index.ts and context-usage.ts with fast behavior-driven tests, then make 100 percent statements, branches, functions, and lines an unskippable release gate. Current honest c8 baseline is 89.34/81.14/90.62/89.34."
+type: Issue
+status: open
+priority: 1
+tags[4]: coverage,quality-gate,release-readiness,tdd
+created_at: "2026-07-26T14:29:15.160Z"
+updated_at: "2026-07-26T14:29:15.160Z"
+assignee: codex
+author: codex
+estimated_minutes: 360
+acceptance_criteria: "c8 reports 100 percent statements, branches, functions, and lines for all source modules; release:check enforces all four thresholds; integration tests use real throwaway pm trackers and the SDK host harness; mutation or equivalent anti-cheat evidence demonstrates assertions detect regressions; tests remain deterministic and fast"
+severity: high
+environment: pm-context 2026.7.26 on Node 22 plus TypeScript 7 and c8 12
+repro_steps: Run NPM_CONFIG_USERCONFIG=/dev/null npx c8 --all --include=dist/index.js --include=dist/context-usage.js --reporter=text node --test dist-test/*.js and inspect the aggregate row
+expected_result: All maintained source is behaviorally exercised and the release gate rejects any metric below 100 percent.
+actual_result: "Baseline: 89.34 percent statements, 81.14 branches, 90.62 functions, and 89.34 lines; package.json does not yet enforce coverage thresholds."
+affected_version: 2026.7.26
+component: testing
+customer_impact: Uncovered command and rendering branches can regress without blocking release.
+notes[1]{created_at,author,text}:
+  "2026-07-26T14:29:15.160Z",codex,Created separately from pm-context-lk82 so review correctness can ship without falsely claiming the mandated 100 percent coverage target is already met.
+files[2]{path,scope,note}:
+  index.ts,project,primary uncovered command and rendering branches
+  context-usage.ts,project,remaining uncovered error branches
+tests[1]{command,scope,timeout_seconds,note}:
+  NPM_CONFIG_USERCONFIG=/dev/null npx c8 --all --include=dist/index.js --include=dist/context-usage.js --reporter=text node --test dist-test/*.js,project,60,current honest coverage baseline
+docs[1]{path,scope,note}:
+  README.md,project,document enforced coverage gate when complete
+body: "Coverage must exercise public behavior and real SDK-host dispatch where applicable. Do not ignore source paths, lower thresholds, use vacuous assertions, or duplicate tests merely to satisfy counters. Baseline was measured against both generated runtime modules after the SDK context review fixes."

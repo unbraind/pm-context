@@ -27,9 +27,11 @@ pm context-pack --id pm-1234 --include-deps --section focus --section blockers
 pm context-pack --id pm-1234 --max-items 10
 ```
 
-The command is read-only. It shells out to the active `pm` binary for
-workspace data, so generated packs reflect the installed CLI and package
-runtime rather than a stale parser.
+The command reads workspace data in-process through the typed pm SDK, so packs
+use the installed CLI's canonical query and relevance engines rather than a
+second parser. Normal pack and handoff runs record one best-effort context-usage
+serving event for the emitted items when an author is available; `--explain`
+does not write to the usage ledger.
 
 ## Output
 
@@ -106,6 +108,8 @@ Options:
 - `--compress` minimize output tokens (compact JSON, no blank lines)
 - `--include-deps` include per-item dependency info in the context pack
 - `--max-items <n>` maximum total items (focus + neighbors) in the pack
+- `--explain` explain the exact focus and neighborhood items that the normal
+  selection and packing path would emit, without recording a serving event
 - `--section <section>` include only specific sections (repeatable):
   `summary`, `focus`, `neighborhood`, `neighbors`, `links`, `deps`,
   `blockers`, `next-actions` (alias: `actions`), `recent` (alias: `activity`),
