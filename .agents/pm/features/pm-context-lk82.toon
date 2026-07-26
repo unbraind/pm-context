@@ -6,18 +6,19 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-07-26T11:59:46.130Z"
-updated_at: "2026-07-26T14:35:14.074Z"
+updated_at: "2026-07-26T14:40:58.466Z"
 closed_at: "2026-07-26T12:18:15.732Z"
 author: pi-agent
 resolution: "Review findings corrected: explain now uses the exact packed focus and neighborhood membership, all emitted ledger rows are included, and SDK list preserves legacy truncation semantics."
 expected_result: "The in-process SDK path preserves previous query behavior, explains only items the normal pack emits after neighborhood and budget selection, and records every visible item as served."
 actual_result: "A real SDK-host integration test now proves neighborhood inclusion, max-items exclusion, explain non-mutation, and included serving rows; 78 of 78 tests pass."
-notes[5]{created_at,author,text}:
+notes[6]{created_at,author,text}:
   "2026-07-26T11:59:50.739Z",pi-agent,"Confirmed @unbrained/pm-cli/sdk/core list({full,includeBody,noTruncate,excludeTerminal:false},{pmRoot}) returns byte-identical items to spawnSync pm list-all --json --include-body (24/24 ids match, item JSON equal). Replacing readPmItems shell-out with in-process SDK call."
   "2026-07-26T12:18:01.328Z",claude,"Verified by orchestrator (claude): typecheck OK, 77/77 tests pass, build OK. Functional proof in a throwaway workspace — installed the built extension and ran 'pm context-pack --status in_progress --explain', which returned real per-signal scores from the SDK relevance model (model=default-weighted-v1; signals structural, recency, graph_proximity, claim_focus, priority_pressure, risk_pressure, deadline_pressure, knowledge_density, author_affinity). Fixed one residual typecheck error the agent did not reach: local PmItem.parent was 'string | undefined' but the SDK ListResultItem.parent is 'string | null | undefined'; widened the local type to match rather than casting."
   "2026-07-26T14:28:44.566Z",codex,"CodeRabbit review findings were reproduced and fixed. Upstream pm-cli TOON round-trip defect discovered during pm validate is tracked at https://github.com/unbraind/pm-cli/issues/747; the package does not work around or rewrite core storage."
   "2026-07-26T14:33:47.372Z",codex,"Strict source hygiene also replaced two literal NUL bytes in context-usage.ts with the behavior-identical TypeScript unicode escape, so tooling treats the source as text."
   "2026-07-26T14:35:14.059Z",codex,"Final contract audit preserved SDK token-budget optimization while adding a deterministic post-pack count ceiling, so --max-items can never emit more items than documented. The real tracker integration proves max-items=1 emits and explains exactly one item."
+  "2026-07-26T14:40:58.448Z",codex,DeepScan post-push analysis reported two unused sdk/query imports. Removed CONTEXT_RELEVANCE_SIGNAL_NAMES and PackedContextCandidate; no runtime behavior changed.
 files[3]{path,scope,note}:
   index.ts,project,SDK query ranking packing explain and serving integration
   README.md,project,in-process SDK and serving side-effect contract

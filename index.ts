@@ -14,14 +14,12 @@ import {
   defaultScoreContextCandidates,
   packContextCandidates,
   recordContextUsageServing,
-  CONTEXT_RELEVANCE_SIGNAL_NAMES,
 } from "@unbrained/pm-cli/sdk/query";
 import type {
   ContextPackingCandidate,
   ContextProjectionCosts,
   ContextRelevanceReport,
   ContextUsageServingRow,
-  PackedContextCandidate,
 } from "@unbrained/pm-cli/sdk/query";
 import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSince } from "./context-usage.js";
 import { readContextUsageAffinity } from "@unbrained/pm-cli/sdk/query";
