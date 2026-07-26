@@ -1,13 +1,14 @@
-import type { ExtensionApi } from "@unbrained/pm-cli/sdk";
+import type { ExtensionApi, RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
+import type { ContextRelevanceReport } from "@unbrained/pm-cli/sdk/query";
 /**
  * Runtime stand-in for the SDK's `defineExtension`.
  *
- * `defineExtension` is a documented zero-cost identity function, but an
- * installed extension cannot resolve `@unbrained/pm-cli` at runtime, so the
- * real export is import-type-only and this shim supplies the value. The `any`
- * casts are confined to this one line and are load-bearing: the shim must
- * satisfy the imported signature without the module it comes from being
- * present. Tracked upstream as pm-cli#717.
+ * `defineExtension` is a documented zero-cost identity function. This package
+ * now resolves `@unbrained/pm-cli` at runtime (it is a peer dependency the pm
+ * host provides) for the `sdk/core` and `sdk/query` engines, but the authoring
+ * helper itself has no runtime behavior, so a local identity shim avoids a
+ * needless value import while still contract-checking the module against
+ * {@link ExtensionModule}.
  */
 export declare const EXIT_CODE: {
     readonly GENERIC_FAILURE: 1;
@@ -26,7 +27,8 @@ export interface PmItem {
     tags?: string[];
     body?: string;
     description?: string;
-    parent?: string;
+    /** Null (not absent) when the SDK reports an explicitly unset parent. */
+    parent?: string | null;
     assignee?: string;
     sprint?: string;
     release?: string;
@@ -57,6 +59,25 @@ export interface ContextPackOptions {
     generatedAt?: string;
     includeDeps?: boolean;
     maxItems?: number;
+    /**
+     * Override the focus-item ranking. Defaults to {@link sortContextItems} (the
+     * deterministic priority-then-recency order used by the pure assembly path).
+     * The command path supplies the SDK relevance ranker built from
+     * {@link defaultScoreContextCandidates} so real packs honor pm's weighted
+     * context-relevance model instead of the hand-rolled sort.
+     */
+    ranker?: (items: PmItem[]) => PmItem[];
+    /**
+     * Override the total-item budgeting applied when `maxItems` is set. Defaults
+     * to the count-based trim (focus first, neighbors trimmed to fit). The
+     * command path supplies a {@link packContextCandidates}-backed packer so a
+     * token budget selects items with pm's projection-degradation packer rather
+     * than a hard count slice.
+     */
+    packer?: (focus: PmItem[], neighbors: PmItem[], maxItems: number) => {
+        focus: PmItem[];
+        neighbors: PmItem[];
+    };
 }
 export interface ContextPackDepInfo {
     itemId: string;
@@ -190,7 +211,97 @@ export declare function renderAgentHandoff(pack: ContextPack, options?: {
     sections?: string[];
     compress?: boolean;
 }): string;
-export declare function readPmItems(pmRoot: string): PmItem[];
+/**
+ * Read every pm item (full metadata + body) in-process through the SDK.
+ *
+ * Replaces the previous `spawnSync("pm", ["list-all", "--json", "--include-body"])`
+ * shell-out with the typed {@link list} action from `@unbrained/pm-cli/sdk/core`.
+ * `list-all` is the SDK alias for `list` with `excludeTerminal: false`; passing
+ * `full: true` + `includeBody: true` reproduces the full-metadata-with-body
+ * projection the shell-out parsed, including the CLI's default truncation
+ * semantics, so the downstream pack shape remains compatible.
+ */
+export declare function readPmItems(pmRoot: string): Promise<PmItem[]>;
+/** Rank options forwarded to the SDK relevance engine. */
+export interface SdkRankOptions {
+    /** Workspace lifecycle registry, including custom in-progress aliases. */
+    statusRegistry: RuntimeStatusRegistry;
+    /** Stable clock used for deadline/recency pressure. */
+    now: string;
+    /** Optional caller identity used for assignment affinity. */
+    author?: string;
+    /** Optional decayed served-then-used affinity by item id. */
+    usageAffinity?: Readonly<Record<string, number>>;
+}
+/**
+ * Rank items with pm's deterministic weighted relevance model.
+ *
+ * Wraps {@link buildItemContextRelevanceCandidates} +
+ * {@link defaultScoreContextCandidates} so the command path uses the same
+ * relevance signals (`priority_pressure`, `recency`, `claim_focus`, …) as
+ * `pm context` / `pm next` instead of the hand-rolled priority-then-recency
+ * sort. Returns the items in ranked order and exposes the full report via
+ * {@link scoreContextItems} for `--explain`.
+ */
+export declare function rankContextItems(items: readonly PmItem[], options: SdkRankOptions): PmItem[];
+/**
+ * Score items with the SDK relevance model and return the full report.
+ *
+ * The report's `ranked[].contributions` map each item's score back to the
+ * individual signals that produced it — the data behind `pm context-pack
+ * --explain`.
+ */
+export declare function scoreContextItems(items: readonly PmItem[], options: SdkRankOptions): ContextRelevanceReport<PmItem>;
+/**
+ * Build a {@link ContextPackOptions.ranker} closure backed by the SDK relevance
+ * model. The closure ranks whatever focus subset {@link buildContextPack} hands
+ * it after id/status/type/tag filtering, preserving the SDK's weighted order.
+ */
+export declare function createSdkRanker(allItems: readonly PmItem[], options: SdkRankOptions): (items: PmItem[]) => PmItem[];
+/**
+ * Build a {@link ContextPackOptions.packer} closure backed by
+ * {@link packContextCandidates}. Each `--max-items` slot maps to a token budget;
+ * focus items are required anchors, neighbors compete by relevance rank for the
+ * remaining budget. The packer first selects under that token budget with pm's
+ * projection-degradation optimizer, then enforces the command's explicit item
+ * ceiling while preserving the SDK-selected focus-first order.
+ */
+export declare function createSdkPacker(rankedFocus: readonly PmItem[], rankedNeighbors: readonly PmItem[]): (focus: PmItem[], neighbors: PmItem[], maxItems: number) => {
+    focus: PmItem[];
+    neighbors: PmItem[];
+};
+/** One ranked focus item with its per-signal relevance contributions. */
+export interface ContextExplainEntry {
+    id: string;
+    rank: number;
+    score: number;
+    contributions: Record<string, number>;
+}
+/** Relevance explanation report surfaced by `pm context-pack --explain`. */
+export interface ContextExplainReport {
+    generatedAt: string;
+    model: string;
+    /** Population over which ranks and normalized scores were computed. */
+    ranking_scope: "emitted_pack";
+    available_signals: readonly string[];
+    entries: ContextExplainEntry[];
+}
+/**
+ * Build the `--explain` report from the SDK relevance model for the emitted
+ * pack. Ranks and normalized scores are relative to this supplied population,
+ * not the complete workspace corpus.
+ */
+export declare function buildContextExplain(items: readonly PmItem[], options: SdkRankOptions): ContextExplainReport;
+/**
+ * Render a {@link ContextExplainReport} as an agent-readable Markdown brief.
+ *
+ * Each focus item is listed with its relevance rank, normalized score, and the
+ * per-signal contributions that produced it (sorted most-contributing first), so
+ * an agent can judge whether the pack is trustworthy before acting on it.
+ */
+export declare function renderContextExplain(report: ContextExplainReport, options?: {
+    compress?: boolean;
+}): string;
 declare const _default: {
     name: string;
     version: string;

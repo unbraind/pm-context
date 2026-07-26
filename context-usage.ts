@@ -99,6 +99,17 @@ export interface ContextUsageItemReport {
   intents: string[];
 }
 
+/** Decay-aware served-then-touched affinity for one author, sourced from the
+ * SDK context-usage store (`readContextUsageAffinity`) rather than recomputed here. */
+export interface ContextUsageAffinitySummary {
+  /** Normalized affinity by item id. */
+  affinity: Record<string, number>;
+  /** Number of eligible served-then-touched judgments. */
+  positive_judgments: number;
+  /** Number of retained serving events inspected. */
+  serving_events: number;
+}
+
 /** Complete read-only view of the ledger for one filter selection. */
 export interface ContextUsageReport {
   /** Whether the ledger file exists; false means pm has not served or mutated yet. */
@@ -131,6 +142,12 @@ export interface ContextUsageReport {
    * `usage_affinity`, which additionally applies recency decay.
    */
   conversion_rate: number | null;
+  /**
+   * Optional decay-aware affinity for the selected author, supplied by the SDK
+   * context-usage store when `--author` is set. Absent for unfiltered reports
+   * and for the pure {@link reportContextUsage} path.
+   */
+  affinity?: ContextUsageAffinitySummary;
 }
 
 /** Filters narrowing which ledger rows a report is derived from. */
@@ -299,7 +316,7 @@ export function buildUsageReport(
       entry.touches += 1;
       if (entry.last_touched_at === null || event.at > entry.last_touched_at) entry.last_touched_at = event.at;
       if (!entry.intents.includes(event.intent)) entry.intents.push(event.intent);
-      const key = `${event.author} ${event.item_id}`;
+      const key = `${event.author}\u0000${event.item_id}`;
       const times = touchTimesByAuthor.get(key);
       if (times) times.push(event.at);
       else touchTimesByAuthor.set(key, [event.at]);
@@ -321,7 +338,7 @@ export function buildUsageReport(
 
   let converted = 0;
   for (const judgment of judgments) {
-    const times = touchTimesByAuthor.get(`${judgment.author} ${judgment.id}`);
+    const times = touchTimesByAuthor.get(`${judgment.author}\u0000${judgment.id}`);
     if (!times?.some((at) => at > judgment.at)) continue;
     converted += 1;
     entryFor(judgment.id).conversions += 1;
@@ -414,6 +431,23 @@ export function renderUsageReport(report: ContextUsageReport): string {
       );
     }
     lines.push("");
+  }
+  if (report.affinity) {
+    const entries = Object.entries(report.affinity.affinity)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    lines.push(
+      "## Author affinity (SDK decayed)",
+      "",
+      `- positive judgments: ${report.affinity.positive_judgments}`,
+      `- serving events: ${report.affinity.serving_events}`,
+      "",
+    );
+    if (entries.length === 0) {
+      lines.push("_no decayed affinity yet._", "");
+    } else {
+      for (const [id, value] of entries) lines.push(`- ${id}: ${value.toFixed(3)}`);
+      lines.push("");
+    }
   }
   return lines.join("\n");
 }

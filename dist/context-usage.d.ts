@@ -34,6 +34,16 @@ export interface ContextUsageItemReport {
     /** Distinct touch intents observed, sorted, e.g. `["close", "create"]`. */
     intents: string[];
 }
+/** Decay-aware served-then-touched affinity for one author, sourced from the
+ * SDK context-usage store (`readContextUsageAffinity`) rather than recomputed here. */
+export interface ContextUsageAffinitySummary {
+    /** Normalized affinity by item id. */
+    affinity: Record<string, number>;
+    /** Number of eligible served-then-touched judgments. */
+    positive_judgments: number;
+    /** Number of retained serving events inspected. */
+    serving_events: number;
+}
 /** Complete read-only view of the ledger for one filter selection. */
 export interface ContextUsageReport {
     /** Whether the ledger file exists; false means pm has not served or mutated yet. */
@@ -66,6 +76,12 @@ export interface ContextUsageReport {
      * `usage_affinity`, which additionally applies recency decay.
      */
     conversion_rate: number | null;
+    /**
+     * Optional decay-aware affinity for the selected author, supplied by the SDK
+     * context-usage store when `--author` is set. Absent for unfiltered reports
+     * and for the pure {@link reportContextUsage} path.
+     */
+    affinity?: ContextUsageAffinitySummary;
 }
 /** Filters narrowing which ledger rows a report is derived from. */
 export interface ContextUsageReportOptions {

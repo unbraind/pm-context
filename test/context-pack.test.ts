@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import extension, {
   buildSuggestedAgentCommand,
@@ -13,7 +16,9 @@ import extension, {
   validateSections,
 } from "../dist/index.js";
 
-import { activateExtensionForTest } from "@unbrained/pm-cli/sdk/testing";
+import { init } from "@unbrained/pm-cli/sdk";
+import { create } from "@unbrained/pm-cli/sdk/core";
+import { activateExtensionForTest, createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 
 import type { ContextPackDepInfo, RenderOptions } from "../dist/index.js";
 
@@ -530,6 +535,118 @@ test("activate exposes new flags for both commands", async () => {
   }
   // --format should be on context-handoff now
   assert.equal(handoffFlags.includes("--format"), true, "context-handoff should have --format");
+});
+
+test("context-pack explains the exact emitted pack and records every visible item as included", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
+  try {
+    const initialized = await init("ctx", { defaults: true, author: "integration-test", agentGuidance: "skip" }, { cwd: root });
+    const neighbors = [];
+    for (let index = 1; index <= 3; index += 1) {
+      neighbors.push(await create(
+        {
+          title: `Dependency neighbor ${index}`,
+          id: `neighbor-${index}`,
+          status: "open",
+          author: "integration-test",
+        },
+        { cwd: root },
+      ));
+    }
+    const focus = await create(
+      {
+        title: "Packed focus",
+        id: "focus",
+        status: "in_progress",
+        dep: neighbors.map((neighbor) => `id=${neighbor.item.id},kind=blocked_by`),
+        author: "integration-test",
+      },
+      { cwd: root },
+    );
+    const runner = await createExtensionTestHarness(extension, {
+      name: "pm-context",
+      capabilities: CAPABILITIES,
+    });
+    const explainRun = await runner.runCommand({
+      command: "context-pack",
+      pmRoot: initialized.path,
+      options: { id: focus.item.id, explain: true, format: "json", author: "integration-test" },
+      global: { json: false },
+    });
+    const explainOutput = (explainRun as { result: { output: string } }).result.output;
+    const explained = JSON.parse(explainOutput) as {
+      ranking_scope?: string;
+      entries: Array<{ id: string }>;
+    };
+    assert.equal(explained.ranking_scope, "emitted_pack");
+    assert.deepEqual(
+      new Set(explained.entries.map((entry) => entry.id)),
+      new Set([focus.item.id, ...neighbors.map((neighbor) => neighbor.item.id)]),
+      "explain must include the focus and dependency neighbor emitted by the normal pack",
+    );
+    assert.equal(
+      existsSync(join(initialized.path, "runtime", "context-usage.jsonl")),
+      false,
+      "explain must not record a serving event",
+    );
+    const budgetedExplainRun = await runner.runCommand({
+      command: "context-pack",
+      pmRoot: initialized.path,
+      options: {
+        id: focus.item.id,
+        explain: true,
+        format: "json",
+        author: "integration-test",
+        maxItems: "1",
+      },
+      global: { json: false },
+    });
+    const budgetedExplainOutput = (budgetedExplainRun as { result: { output: string } }).result.output;
+    const budgetedExplained = JSON.parse(budgetedExplainOutput) as { entries: Array<{ id: string }> };
+    const budgetedPackRun = await runner.runCommand({
+      command: "context-pack",
+      pmRoot: initialized.path,
+      // Intentionally omit author: this parity probe must not append a serving
+      // event before the final ledger assertions below.
+      options: { id: focus.item.id, format: "json", maxItems: "1" },
+      global: { json: false },
+    });
+    const budgetedPackOutput = (budgetedPackRun as { result: { output: string } }).result.output;
+    const budgetedPack = JSON.parse(budgetedPackOutput) as {
+      items: Array<{ id: string }>;
+      neighbors: Array<{ id: string }>;
+    };
+    const budgetedPackIds = [...budgetedPack.items, ...budgetedPack.neighbors].map((item) => item.id);
+    assert.deepEqual(
+      new Set(budgetedExplained.entries.map((entry) => entry.id)),
+      new Set(budgetedPackIds),
+      "explain must match the normal packer's exact max-items membership",
+    );
+    assert.equal(budgetedPackIds.length, 1, "the SDK token optimizer must still honor the explicit max-items ceiling");
+
+    await runner.runCommand({
+      command: "context-pack",
+      pmRoot: initialized.path,
+      options: { id: focus.item.id, format: "json", author: "integration-test" },
+      global: { json: false },
+    });
+    const ledgerLines = readFileSync(join(initialized.path, "runtime", "context-usage.jsonl"), "utf-8")
+      .trim()
+      .split("\n");
+    const serving = JSON.parse(ledgerLines.at(-1) ?? "{}") as {
+      rows?: Array<{ id: string; rank: number; included: boolean }>;
+    };
+    assert.ok(serving.rows, "normal pack must append a serving event");
+    assert.deepEqual(
+      new Set(serving.rows.map((row) => row.id)),
+      new Set([focus.item.id, ...neighbors.map((neighbor) => neighbor.item.id)]),
+      "serving rows must cover every emitted focus and neighborhood item",
+    );
+    assert.equal(serving.rows.every((row) => row.included), true, "every emitted serving row must be marked included");
+    assert.deepEqual(serving.rows.map((row) => row.rank), serving.rows.map((_, index) => index + 1));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("buildContextPack filters reflect new options", () => {

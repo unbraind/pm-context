@@ -222,7 +222,7 @@ export function buildUsageReport(events, options = {}) {
                 entry.last_touched_at = event.at;
             if (!entry.intents.includes(event.intent))
                 entry.intents.push(event.intent);
-            const key = `${event.author} ${event.item_id}`;
+            const key = `${event.author}\u0000${event.item_id}`;
             const times = touchTimesByAuthor.get(key);
             if (times)
                 times.push(event.at);
@@ -248,7 +248,7 @@ export function buildUsageReport(events, options = {}) {
     }
     let converted = 0;
     for (const judgment of judgments) {
-        const times = touchTimesByAuthor.get(`${judgment.author} ${judgment.id}`);
+        const times = touchTimesByAuthor.get(`${judgment.author}\u0000${judgment.id}`);
         if (!times?.some((at) => at > judgment.at))
             continue;
         converted += 1;
@@ -312,6 +312,19 @@ export function renderUsageReport(report) {
                 `${entry.intents.join(", ") || "-"} |`);
         }
         lines.push("");
+    }
+    if (report.affinity) {
+        const entries = Object.entries(report.affinity.affinity)
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+        lines.push("## Author affinity (SDK decayed)", "", `- positive judgments: ${report.affinity.positive_judgments}`, `- serving events: ${report.affinity.serving_events}`, "");
+        if (entries.length === 0) {
+            lines.push("_no decayed affinity yet._", "");
+        }
+        else {
+            for (const [id, value] of entries)
+                lines.push(`- ${id}: ${value.toFixed(3)}`);
+            lines.push("");
+        }
     }
     return lines.join("\n");
 }
