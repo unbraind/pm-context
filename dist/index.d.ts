@@ -281,11 +281,15 @@ export interface ContextExplainEntry {
 export interface ContextExplainReport {
     generatedAt: string;
     model: string;
+    /** Population over which ranks and normalized scores were computed. */
+    ranking_scope: "emitted_pack";
     available_signals: readonly string[];
     entries: ContextExplainEntry[];
 }
 /**
- * Build the `--explain` report from the SDK relevance model for a set of items.
+ * Build the `--explain` report from the SDK relevance model for the emitted
+ * pack. Ranks and normalized scores are relative to this supplied population,
+ * not the complete workspace corpus.
  */
 export declare function buildContextExplain(items: readonly PmItem[], options: SdkRankOptions): ContextExplainReport;
 /**

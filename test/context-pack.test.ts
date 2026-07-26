@@ -574,7 +574,11 @@ test("context-pack explains the exact emitted pack and records every visible ite
       global: { json: false },
     });
     const explainOutput = (explainRun as { result: { output: string } }).result.output;
-    const explained = JSON.parse(explainOutput) as { entries: Array<{ id: string }> };
+    const explained = JSON.parse(explainOutput) as {
+      ranking_scope?: string;
+      entries: Array<{ id: string }>;
+    };
+    assert.equal(explained.ranking_scope, "emitted_pack");
     assert.deepEqual(
       new Set(explained.entries.map((entry) => entry.id)),
       new Set([focus.item.id, ...neighbors.map((neighbor) => neighbor.item.id)]),
@@ -602,6 +606,8 @@ test("context-pack explains the exact emitted pack and records every visible ite
     const budgetedPackRun = await runner.runCommand({
       command: "context-pack",
       pmRoot: initialized.path,
+      // Intentionally omit author: this parity probe must not append a serving
+      // event before the final ledger assertions below.
       options: { id: focus.item.id, format: "json", maxItems: "1" },
       global: { json: false },
     });

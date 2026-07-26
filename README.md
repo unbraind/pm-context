@@ -75,8 +75,10 @@ section is rendered in markdown/agent output when present.
 ### Max items
 
 `--max-items <n>` caps the total number of items (focus + neighbors) in the
-pack. Focus items take priority; neighbors are trimmed to fit the remaining
-budget.
+pack. The SDK packer first selects candidates under a token budget with
+projection degradation, preserving required focus items and relevance-ranked
+neighbors; `--max-items` is then enforced as an additional hard item-count
+ceiling.
 
 ## Command
 
@@ -109,7 +111,8 @@ Options:
 - `--include-deps` include per-item dependency info in the context pack
 - `--max-items <n>` maximum total items (focus + neighbors) in the pack
 - `--explain` explain the exact focus and neighborhood items that the normal
-  selection and packing path would emit, without recording a serving event
+  selection and packing path would emit, without recording a serving event;
+  reported ranks and scores are relative to that emitted pack, not the workspace
 - `--section <section>` include only specific sections (repeatable):
   `summary`, `focus`, `neighborhood`, `neighbors`, `links`, `deps`,
   `blockers`, `next-actions` (alias: `actions`), `recent` (alias: `activity`),

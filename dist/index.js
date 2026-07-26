@@ -733,6 +733,7 @@ export function rankContextItems(items, options) {
  */
 export function scoreContextItems(items, options) {
     const now = options.now;
+    const byId = new Map(items.map((item) => [item.id, item]));
     const candidates = buildItemContextRelevanceCandidates(items.map((item) => toItemMetadata(item, now)), {
         statusRegistry: options.statusRegistry,
         now,
@@ -743,11 +744,11 @@ export function scoreContextItems(items, options) {
     // `scoreContextCandidates`. The command path runs in-process and does not need
     // the governed `context_relevance` service override, so the synchronous default
     // keeps pack generation deterministic and side-effect free.
-    return defaultScoreContextCandidates(candidates.map((candidate) => ({ id: candidate.id, item: byIdOrFail(items, candidate.id), signals: candidate.signals })));
+    return defaultScoreContextCandidates(candidates.map((candidate) => ({ id: candidate.id, item: byIdOrFail(byId, candidate.id), signals: candidate.signals })));
 }
 /** Look up an item by id or throw a descriptive error (keeps callers honest). */
-function byIdOrFail(items, id) {
-    const item = items.find((candidate) => candidate.id === id);
+function byIdOrFail(byId, id) {
+    const item = byId.get(id);
     if (!item)
         throw new CommandError(`relevance candidate ${id} not found among items`);
     return item;
@@ -823,13 +824,16 @@ export function createSdkPacker(rankedFocus, rankedNeighbors) {
     };
 }
 /**
- * Build the `--explain` report from the SDK relevance model for a set of items.
+ * Build the `--explain` report from the SDK relevance model for the emitted
+ * pack. Ranks and normalized scores are relative to this supplied population,
+ * not the complete workspace corpus.
  */
 export function buildContextExplain(items, options) {
     const report = scoreContextItems(items, options);
     return {
         generatedAt: options.now,
         model: report.model,
+        ranking_scope: "emitted_pack",
         available_signals: report.available_signals,
         entries: report.ranked.map((ranked) => ({
             id: ranked.id,
@@ -852,6 +856,7 @@ export function renderContextExplain(report, options = {}) {
         "",
         `Generated: ${report.generatedAt}`,
         `Model: ${report.model}`,
+        "Ranking scope: emitted pack (not workspace-wide)",
         `Signals: ${report.available_signals.join(", ")}`,
         "",
         "## Relevance",
@@ -885,7 +890,7 @@ export function renderContextExplain(report, options = {}) {
  * served-then-used affinity from the SDK context-usage store so the relevance
  * model's `usage_affinity` signal reflects real agent feedback.
  */
-async function resolveSdkRankOptions(ctx, _items) {
+async function resolveSdkRankOptions(ctx) {
     const now = new Date().toISOString();
     let statusRegistry;
     try {
@@ -983,7 +988,7 @@ function setupCommands(api) {
             { long: "--include-deps", description: "Include per-item dependency info in the context pack", type: "boolean" },
             { long: "--max-items", value_name: "n", description: "Maximum total items (focus + neighbors) in the pack", type: "string" },
             { long: "--section", value_name: "section", description: "Include sections (repeatable). Markdown: summary, focus, neighborhood, neighbors, links, deps. Agent/compact: focus, blockers, next-actions, recent, links, deps, refresh", type: "string" },
-            { long: "--explain", description: "Explain why each focus item was selected using pm's per-signal relevance model instead of emitting a pack", type: "boolean" },
+            { long: "--explain", description: "Explain emitted items with ranks/scores relative to the packed subset instead of emitting a pack", type: "boolean" },
         ],
         async run(ctx) {
             const options = ctx.options;
@@ -1005,12 +1010,15 @@ function setupCommands(api) {
             const explain = boolOption(options, "explain");
             const sections = validateSections(format, [...asArray(options.section), ...asArray(options.sections)]);
             const items = await readPmItems(ctx.pm_root);
-            const rankOptions = await resolveSdkRankOptions(ctx, items);
+            const rankOptions = await resolveSdkRankOptions(ctx);
             const ranker = createSdkRanker(items, rankOptions);
             // Pre-rank the full corpus so the token-budgeted packer has relevance ranks
             // for both focus and neighbor candidates before buildContextPack trims.
-            const rankedAll = rankContextItems(items, rankOptions);
-            const packer = maxItems ? createSdkPacker(rankedAll, rankedAll) : undefined;
+            let packer;
+            if (maxItems) {
+                const rankedAll = rankContextItems(items, rankOptions);
+                packer = createSdkPacker(rankedAll, rankedAll);
+            }
             const pack = buildContextPack(items, {
                 ids: selection.ids,
                 status: selection.status,
@@ -1120,10 +1128,13 @@ function setupCommands(api) {
             const maxItems = intOptionMin0(options, ["max-items", "maxItems"], 0) || undefined;
             const sections = validateSections(format, [...asArray(options.section), ...asArray(options.sections)]);
             const items = await readPmItems(ctx.pm_root);
-            const rankOptions = await resolveSdkRankOptions(ctx, items);
+            const rankOptions = await resolveSdkRankOptions(ctx);
             const ranker = createSdkRanker(items, rankOptions);
-            const rankedAll = rankContextItems(items, rankOptions);
-            const packer = maxItems ? createSdkPacker(rankedAll, rankedAll) : undefined;
+            let packer;
+            if (maxItems) {
+                const rankedAll = rankContextItems(items, rankOptions);
+                packer = createSdkPacker(rankedAll, rankedAll);
+            }
             const pack = buildContextPack(items, {
                 ids: selection.ids,
                 status: selection.status,

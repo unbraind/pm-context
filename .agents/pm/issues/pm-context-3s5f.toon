@@ -1,12 +1,12 @@
 id: pm-context-3s5f
 title: Raise pm-context source coverage to enforced 100/100/100/100
-description: "Close every genuine source coverage gap in index.ts and context-usage.ts with fast behavior-driven tests, then make 100 percent statements, branches, functions, and lines an unskippable release gate. Current honest c8 baseline is 89.34/81.14/90.62/89.34."
+description: "Close every genuine source coverage gap in index.ts and context-usage.ts with fast behavior-driven tests, then make 100 percent statements, branches, functions, and lines an unskippable release gate. Current honest c8 baseline is 91.78/81.93/95.31/91.78."
 type: Issue
 status: open
 priority: 1
 tags[4]: coverage,quality-gate,release-readiness,tdd
 created_at: "2026-07-26T14:29:15.160Z"
-updated_at: "2026-07-26T14:29:15.160Z"
+updated_at: "2026-07-26T15:10:43.869Z"
 assignee: codex
 author: codex
 estimated_minutes: 360
@@ -15,12 +15,13 @@ severity: high
 environment: pm-context 2026.7.26 on Node 22 plus TypeScript 7 and c8 12
 repro_steps: Run NPM_CONFIG_USERCONFIG=/dev/null npx c8 --all --include=dist/index.js --include=dist/context-usage.js --reporter=text node --test dist-test/*.js and inspect the aggregate row
 expected_result: All maintained source is behaviorally exercised and the release gate rejects any metric below 100 percent.
-actual_result: "Baseline: 89.34 percent statements, 81.14 branches, 90.62 functions, and 89.34 lines; package.json does not yet enforce coverage thresholds."
+actual_result: "Baseline after the SDK context review fixes: 91.78 percent statements, 81.93 branches, 95.31 functions, and 91.78 lines; package.json does not yet enforce coverage thresholds."
 affected_version: 2026.7.26
 component: testing
 customer_impact: Uncovered command and rendering branches can regress without blocking release.
-notes[1]{created_at,author,text}:
+notes[2]{created_at,author,text}:
   "2026-07-26T14:29:15.160Z",codex,Created separately from pm-context-lk82 so review correctness can ship without falsely claiming the mandated 100 percent coverage target is already met.
+  "2026-07-26T15:10:43.852Z",codex,"Remeasured after final CodeRabbit remediation with c8 12 over both generated runtime modules: 91.78 statements,81.93 branches,95.31 functions,and 91.78 lines. The open 100/100/100/100 gap remains explicit and is not represented as complete."
 files[2]{path,scope,note}:
   index.ts,project,primary uncovered command and rendering branches
   context-usage.ts,project,remaining uncovered error branches
