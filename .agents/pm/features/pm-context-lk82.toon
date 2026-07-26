@@ -1,0 +1,16 @@
+id: pm-context-lk82
+title: Adopt sdk/query context engine and drop spawnSync shell-outs
+description: "Replace the spawnSync pm list-all shell-out in index.ts with in-process SDK calls from @unbrained/pm-cli/sdk/core (list) and sdk/query (scoreContextCandidates, packContextCandidates, recordContextUsageServing, readContextUsageAffinity). Wire context-usage to the SDK context-usage store. Add a new --explain capability backed by evaluateContextRanking."
+type: Feature
+status: closed
+priority: 2
+tags: []
+created_at: "2026-07-26T11:59:46.130Z"
+updated_at: "2026-07-26T12:18:15.732Z"
+closed_at: "2026-07-26T12:18:15.732Z"
+author: pi-agent
+notes[2]{created_at,author,text}:
+  "2026-07-26T11:59:50.739Z",pi-agent,"Confirmed @unbrained/pm-cli/sdk/core list({full,includeBody,noTruncate,excludeTerminal:false},{pmRoot}) returns byte-identical items to spawnSync pm list-all --json --include-body (24/24 ids match, item JSON equal). Replacing readPmItems shell-out with in-process SDK call."
+  "2026-07-26T12:18:01.328Z",claude,"Verified by orchestrator (claude): typecheck OK, 77/77 tests pass, build OK. Functional proof in a throwaway workspace — installed the built extension and ran 'pm context-pack --status in_progress --explain', which returned real per-signal scores from the SDK relevance model (model=default-weighted-v1; signals structural, recency, graph_proximity, claim_focus, priority_pressure, risk_pressure, deadline_pressure, knowledge_density, author_affinity). Fixed one residual typecheck error the agent did not reach: local PmItem.parent was 'string | undefined' but the SDK ListResultItem.parent is 'string | null | undefined'; widened the local type to match rather than casting."
+close_reason: "Shipped: spawnSync list-all replaced with in-process sdk/core list (verified byte-identical), context-usage wired to the SDK store, and pm context-pack --explain added on evaluateContextRanking. 77/77 tests, functional proof in a throwaway workspace."
+body: ""

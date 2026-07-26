@@ -313,6 +313,19 @@ export function renderUsageReport(report) {
         }
         lines.push("");
     }
+    if (report.affinity) {
+        const entries = Object.entries(report.affinity.affinity)
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+        lines.push("## Author affinity (SDK decayed)", "", `- positive judgments: ${report.affinity.positive_judgments}`, `- serving events: ${report.affinity.serving_events}`, "");
+        if (entries.length === 0) {
+            lines.push("_no decayed affinity yet._", "");
+        }
+        else {
+            for (const [id, value] of entries)
+                lines.push(`- ${id}: ${value.toFixed(3)}`);
+            lines.push("");
+        }
+    }
     return lines.join("\n");
 }
 //# sourceMappingURL=context-usage.js.map
