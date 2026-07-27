@@ -1417,7 +1417,6 @@ function setupCommands(api: ExtensionApi): void {
       "pm context-usage --author agent-a --limit 50",
     ],
     flags: [
-      { long: "--author", value_name: "author", description: "Restrict to one recording author", type: "string" },
       { long: "--surface", value_name: "surface", description: "Restrict serve events to one surface: context or next", type: "string" },
       { long: "--since", value_name: "when", description: "Drop events at or before this point (ISO timestamp, or a day offset such as 7d)", type: "string" },
       { long: "--limit", value_name: "n", description: `Maximum per-item rows (default: ${DEFAULT_REPORT_LIMIT})`, type: "string" },
@@ -1438,8 +1437,11 @@ function setupCommands(api: ExtensionApi): void {
       if (rawSince !== undefined && since === null) {
         throw new CommandError(`--since '${rawSince}' is not an ISO timestamp or a day offset such as 7d`, EXIT_CODE.USAGE);
       }
+      // `--author` is a host-owned global flag: extensions must not redeclare it
+      // (the host rejects the registration) and must read it from ctx.global.
+      const author = ctx.global?.author as string | undefined;
       const report = reportContextUsage(ctx.pm_root, {
-        author: stringOption(options, "author"),
+        author,
         surface,
         since: since ?? undefined,
         limit: intOption(options, "limit", DEFAULT_REPORT_LIMIT),
@@ -1450,7 +1452,6 @@ function setupCommands(api: ExtensionApi): void {
       // which items its prior touches reinforced — without this module re-implementing
       // pm's decay model. The event-based waste/misses/conversion report stays because
       // the SDK does not expose the raw ledger event stream (see SDK_PROBLEMS).
-      const author = stringOption(options, "author");
       let affinity: { affinity: Record<string, number>; positive_judgments: number; serving_events: number } | undefined;
       if (author) {
         try {
@@ -1483,7 +1484,7 @@ const defineExtension = <TModule extends ExtensionModule>(module: TModule): TMod
 
 export default defineExtension({
   name: "pm-context",
-  version: "2026.7.26",
+  version: "2026.7.27",
   description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
   activate(api: ExtensionApi) {
     setupCommands(api);
