@@ -1414,9 +1414,10 @@ function setupCommands(api: ExtensionApi): void {
       "pm context-usage",
       "pm context-usage --format json",
       "pm context-usage --surface next --since 7d",
-      "pm context-usage --author agent-a --limit 50",
+      "pm context-usage --by agent-a --limit 50",
     ],
     flags: [
+      { long: "--by", value_name: "author", description: "Restrict to one recording author", type: "string" },
       { long: "--surface", value_name: "surface", description: "Restrict serve events to one surface: context or next", type: "string" },
       { long: "--since", value_name: "when", description: "Drop events at or before this point (ISO timestamp, or a day offset such as 7d)", type: "string" },
       { long: "--limit", value_name: "n", description: `Maximum per-item rows (default: ${DEFAULT_REPORT_LIMIT})`, type: "string" },
@@ -1437,9 +1438,12 @@ function setupCommands(api: ExtensionApi): void {
       if (rawSince !== undefined && since === null) {
         throw new CommandError(`--since '${rawSince}' is not an ISO timestamp or a day offset such as 7d`, EXIT_CODE.USAGE);
       }
-      // `--author` is a host-owned global flag: extensions must not redeclare it
-      // (the host rejects the registration) and must read it from ctx.global.
-      const author = ctx.global?.author as string | undefined;
+      // This is a *filter* over recorded ledger events ("whose usage to report"),
+      // which is a different concept from pm's host-owned global `--author`
+      // ("override mutation author for this invocation"). Reusing the global
+      // would silently narrow every report to the invoking agent, so this keeps
+      // a distinct `--by`.
+      const author = stringOption(options, "by");
       const report = reportContextUsage(ctx.pm_root, {
         author,
         surface,
