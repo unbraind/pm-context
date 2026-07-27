@@ -103,6 +103,32 @@ test("activate exposes selector aliases for both commands", async () => {
   }
 });
 
+test("no command redeclares a host-owned global flag", async () => {
+  // Guards the whole surface, not just the one command that regressed:
+  // registering any of these makes the host reject the command outright, and
+  // the value must be read from ctx.global instead.
+  const hostOwned = new Set([
+    "--json",
+    "--quiet",
+    "--path",
+    "--lean",
+    "--id-only",
+    "--author",
+    "--no-changed-fields",
+    "--full-changed-fields",
+    "--pm-path",
+  ]);
+  const activation = await activateForTest();
+  for (const registration of activation.registrations.flags) {
+    for (const flag of registration.flags) {
+      assert.ok(
+        flag.long === undefined || !hostOwned.has(flag.long),
+        `${registration.target_command} must not redeclare host-owned global flag ${flag.long}`,
+      );
+    }
+  }
+});
+
 test("resolveSelectionOptions defaults handoff selection to in_progress", () => {
   assert.deepEqual(
     resolveSelectionOptions({}, { fallbackStatus: "in_progress" }),
