@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- context-usage redeclared host-owned --author global, failing registration on pm-cli 2026.7.27 ([pm-context-s8q4](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-s8q4.toon))
+
+### Other
+
+- Adopt --respect-item-release in changelog scripts and bump pm-changelog to 2026.7.24 ([pm-context-pf4e](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-pf4e.toon))
+- Ecosystem release readiness pass 2026-07-06 ([pm-context-m959](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-m959.toon))
+
 ## 2026.7.28 - 2026-07-28
 
 ### Other
