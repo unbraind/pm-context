@@ -4,7 +4,8 @@
     "allowJs": false,
     "declaration": false,
     "declarationMap": false,
-    "noEmit": true
+    "noEmit": true,
+    "rootDir": "."
   },
   "include": [
     "test/**/*.ts",
