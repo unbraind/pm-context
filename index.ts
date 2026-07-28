@@ -21,7 +21,7 @@ import type {
   ContextRelevanceReport,
   ContextUsageServingRow,
 } from "@unbrained/pm-cli/sdk/query";
-import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSince } from "./context-usage.js";
+import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSince } from "./context-usage.ts";
 import { readContextUsageAffinity } from "@unbrained/pm-cli/sdk/query";
 
 /**
