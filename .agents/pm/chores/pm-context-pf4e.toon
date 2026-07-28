@@ -6,10 +6,11 @@ status: closed
 priority: 2
 tags[3]: changelog,fleet-consistency,release-hygiene
 created_at: "2026-07-24T21:30:18.007Z"
-updated_at: "2026-07-28T11:14:19.704Z"
+updated_at: "2026-07-28T11:22:32.156Z"
 closed_at: "2026-07-28T11:14:19.703Z"
 author: claude
 acceptance_criteria: "changelog, changelog:full, changelog:check and release:notes all pass --respect-item-release; pm-changelog devDependency is ^2026.7.24; npm run changelog:check is green; CHANGELOG.md content is unchanged by the flag for this repo (no item declares a release yet)"
+release: 2026.7.25
 notes[1]{created_at,author,text}:
   "2026-07-24T21:30:18.650Z",claude,"Verified in this repo: pm-changelog 2026.7.24 installed; npm run changelog:full regenerated CHANGELOG.md with the flag active and produced a ZERO-line diff, confirming the flag is a safe no-op until an item declares a release; npm run changelog:check exits 0."
 close_reason: "Shipped and verified 2026-07-28: all four changelog scripts in package.json pass --respect-item-release and pm-changelog is pinned at 2026.7.24 or later. Closing so the tracker stops advertising completed work as in flight."

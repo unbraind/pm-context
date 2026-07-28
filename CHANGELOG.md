@@ -1,16 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Fixed
-
-- context-usage redeclared host-owned --author global, failing registration on pm-cli 2026.7.27 ([pm-context-s8q4](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-s8q4.toon))
-
-### Other
-
-- Adopt --respect-item-release in changelog scripts and bump pm-changelog to 2026.7.24 ([pm-context-pf4e](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-pf4e.toon))
-- Ecosystem release readiness pass 2026-07-06 ([pm-context-m959](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-m959.toon))
-
 ## 2026.7.28 - 2026-07-28
 
 ### Other
@@ -22,6 +11,10 @@
 ### Added
 
 - Adopt sdk/query context engine and drop spawnSync shell-outs ([pm-context-lk82](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-lk82.toon))
+
+### Fixed
+
+- context-usage redeclared host-owned --author global, failing registration on pm-cli 2026.7.27 ([pm-context-s8q4](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-s8q4.toon))
 
 ### Removed
 
@@ -36,6 +29,12 @@
 ### Other
 
 - Enable governance duplicate-detection advisory mode and adopt pm-cli 2026.7.25 ([pm-context-x5qt](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-x5qt.toon))
+
+## 2026.7.25 - 2026-07-25
+
+### Other
+
+- Adopt --respect-item-release in changelog scripts and bump pm-changelog to 2026.7.24 ([pm-context-pf4e](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-pf4e.toon))
 
 ## 2026.7.23 - 2026-07-23
 
@@ -71,6 +70,12 @@
 
 - Full-cycle hardening wave: pm-context ([pm-context-eie5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-eie5.toon))
 - Harden release bun-verify so registry-mirror lag cannot block the GitHub release ([pm-context-p5bz](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-p5bz.toon))
+
+## 2026.7.10 - 2026-07-10
+
+### Other
+
+- Ecosystem release readiness pass 2026-07-06 ([pm-context-m959](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-m959.toon))
 
 ## 2026.7.6 - 2026-07-06
 
