@@ -6,6 +6,10 @@
 
 - Enforce a real coverage gate by running tests against TypeScript sources ([pm-context-wd30](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-wd30.toon))
 
+### Other
+
+- Adopt pm-cli 2026.7.29 ([pm-context-docu](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-docu.toon))
+
 ## 2026.7.28 - 2026-07-28
 
 ### Other
