@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
-import extension from "../dist/index.js";
+import extension from "../index.ts";
 import {
   DEFAULT_REPORT_LIMIT,
   LEDGER_RELATIVE_PATH,
@@ -14,7 +14,7 @@ import {
   renderUsageReport,
   reportContextUsage,
   resolveSince,
-} from "../dist/context-usage.js";
+} from "../context-usage.ts";
 
 import type { ContextUsageEvent } from "@unbrained/pm-cli/sdk";
 

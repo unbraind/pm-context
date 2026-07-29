@@ -14,13 +14,13 @@ import extension, {
   renderMarkdown,
   sortContextItems,
   validateSections,
-} from "../dist/index.js";
+} from "../index.ts";
 
 import { init } from "@unbrained/pm-cli/sdk";
 import { create } from "@unbrained/pm-cli/sdk/core";
 import { activateExtensionForTest, createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 
-import type { ContextPackDepInfo, RenderOptions } from "../dist/index.js";
+import type { ContextPackDepInfo, RenderOptions } from "../index.ts";
 
 /** Manifest capabilities the harness must grant for registration to be permitted. */
 const CAPABILITIES = ["commands", "renderers", "schema"] as const;
