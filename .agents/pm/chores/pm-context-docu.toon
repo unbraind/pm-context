@@ -1,0 +1,16 @@
+id: pm-context-docu
+title: Adopt pm-cli 2026.7.29
+description: "Bump @unbrained/pm-cli devDependency to 2026.7.29 and peerDependency to >=2026.7.29. Audit for removed --all flag usage, audit for newly-fixed upstream workarounds (GH-651/672/676/785/792/794), run all quality gates, regenerate changelog."
+type: Chore
+status: closed
+priority: 2
+tags: []
+created_at: "2026-07-29T04:35:59.336Z"
+updated_at: "2026-07-29T04:37:03.295Z"
+closed_at: "2026-07-29T04:37:03.267Z"
+completed_at: "2026-07-29T04:37:03.267Z"
+author: pi-agent
+comments[1]{created_at,author,text}:
+  "2026-07-29T04:36:45.279Z",pi-agent,"Audit results: --all flag: no hits. GH-651 (signed window): no hits - resolveSince() does local date math, not pm activity --from. GH-672 (context low_level): no hits - blocked references are for pack filtering, not pm context low_level rows. GH-676 (list --tag CSV): no hits. GH-785/792 (health runtime/extension dirs): no hits - runtime/ references are for context-usage.jsonl ledger, not the gitignored runtime/ dir. No pm health or --warn-only usage. GH-794 (output_format override): no hits. No workarounds removed."
+close_reason: "Bumped @unbrained/pm-cli devDependency to ^2026.7.29 and peerDependency to >=2026.7.29. Audited for removed --all flag: no hits. Audited for GH-651/672/676/785/792/794 workarounds: none applicable, none removed. All quality gates green: 79 tests pass, coverage lines 91.76%, branches 81.82%, functions 96.55% (thresholds met). Changelog check and audit:prod clean."
+body: ""
