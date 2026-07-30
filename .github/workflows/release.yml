@@ -112,7 +112,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json manifest.json index.ts CHANGELOG.md
+          paths=(package.json package-lock.json manifest.json index.ts CHANGELOG.md)
+          git ls-files --error-unmatch dist > /dev/null 2>&1 && paths+=(dist)
+          git add "${paths[@]}"
           if ! git diff --cached --quiet; then
             git commit -m "Release pm-context ${{ steps.decide.outputs.tag }}"
           fi
