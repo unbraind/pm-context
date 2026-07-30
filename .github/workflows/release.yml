@@ -119,7 +119,14 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json manifest.json index.ts CHANGELOG.md
+          # dist/ is tracked here because this package is installed by copying the
+          # repository, which never runs a build — so the release commit has to
+          # carry the rebuilt output or the committed copy stays at the previous
+          # version forever. Staged conditionally so the step is still correct in a
+          # checkout that does not track it.
+          paths=(package.json package-lock.json manifest.json index.ts CHANGELOG.md)
+          git ls-files --error-unmatch 'dist/' > /dev/null 2>&1 && paths+=('dist/')
+          git add "${paths[@]}"
           if ! git diff --cached --quiet; then
             git commit -m "Release pm-context ${{ steps.decide.outputs.tag }}"
           fi
