@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.7.31 - 2026-07-31
+
+### Fixed
+
+- Release commits discard the rebuilt dist, so the git-install path serves the previous version ([pm-context-bbsp](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-bbsp.toon))
+
 ## 2026.7.29 - 2026-07-29
 
 ### Added
