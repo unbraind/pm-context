@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Resolve pm-changelog to the release that derives release dates in UTC ([pm-context-6rua](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-6rua.toon))
+
 ## 2026.7.31 - 2026-07-31
 
 ### Fixed
