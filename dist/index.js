@@ -32,9 +32,17 @@ export const AGENT_SECTIONS = ["focus", "blockers", "next-actions", "actions", "
 function renderedCommandResult(output) {
     return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
 }
+/** Determine whether an unknown command result carries valid pre-rendered pm-context output. */
+function isRenderedCommandResult(value) {
+    return (typeof value === "object" &&
+        value !== null &&
+        "pmContextRendered" in value &&
+        value.pmContextRendered === true &&
+        "output" in value &&
+        typeof value.output === "string");
+}
 function renderCommandResult(context) {
-    const result = context?.result;
-    return result?.pmContextRendered === true && typeof result.output === "string" ? result.output : null;
+    return isRenderedCommandResult(context?.result) ? context.result.output : null;
 }
 function asArray(value) {
     if (Array.isArray(value))
@@ -1270,8 +1278,12 @@ export default defineExtension({
     activate(api) {
         setupCommands(api);
         if (typeof api.registerRenderer === "function") {
-            api.registerRenderer("toon", renderCommandResult);
-            api.registerRenderer("json", renderCommandResult);
+            const rendererOwnership = {
+                commands: ["context-pack", "context-handoff", "context-usage"],
+                resultDiscriminator: isRenderedCommandResult,
+            };
+            api.registerRenderer("toon", renderCommandResult, rendererOwnership);
+            api.registerRenderer("json", renderCommandResult, rendererOwnership);
         }
     },
 });

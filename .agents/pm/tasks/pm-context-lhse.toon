@@ -1,0 +1,15 @@
+id: pm-context-lhse
+title: Declare renderer ownership so the host enforces scoping the package only applied at runtime
+description: "The renderer overrides self-scoped by checking a private result marker and returning null, which is correct but invisible to the host. Passing the ownership argument makes commands and result ownership enforced before the callback runs."
+type: Task
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-08-04T21:36:10.393Z"
+updated_at: "2026-08-04T21:36:34.115Z"
+author: pi-agent
+acceptance_criteria: Both renderer registrations pass a shared ownership object naming the package's own commands and its result discriminator; a test proves the renderer still renders its own marked result and declines a foreign one; coverage stays at 100
+notes[2]{created_at,author,text}:
+  "2026-08-04T21:36:29.943Z",pi-agent,"Derived command paths from the three api.registerCommand({ name }) calls in index.ts: context-pack (line 1176), context-handoff (line 1302), context-usage (line 1409). All three commands can return a pmContextRendered-marked result via renderedCommandResult(), so the renderer ownership covers all three. The resultDiscriminator reuses the extracted isRenderedCommandResult predicate that renderCommandResult already applies internally."
+  "2026-08-04T21:36:34.115Z",pi-agent,"Derived command paths from the three api.registerCommand({ name }) calls in index.ts: context-pack (line 1176), context-handoff (line 1302), context-usage (line 1409). All three commands can return a pmContextRendered-marked result via renderedCommandResult(), so the renderer ownership covers all three. The resultDiscriminator reuses the extracted isRenderedCommandResult predicate that renderCommandResult already applies internally."
+body: ""
