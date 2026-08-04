@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Declare renderer ownership so the host enforces scoping the package only applied at runtime ([pm-context-lhse](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-lhse.toon))
+
 ## 2026.8.4 - 2026-08-04
 
 ### Other

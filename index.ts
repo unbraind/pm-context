@@ -184,9 +184,20 @@ function renderedCommandResult(output: string): RenderedCommandResult {
   return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
 }
 
+/** Determine whether an unknown command result carries valid pre-rendered pm-context output. */
+function isRenderedCommandResult(value: unknown): value is RenderedCommandResult {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "pmContextRendered" in value &&
+    (value as Partial<RenderedCommandResult>).pmContextRendered === true &&
+    "output" in value &&
+    typeof (value as Partial<RenderedCommandResult>).output === "string"
+  );
+}
+
 function renderCommandResult(context: { result?: unknown } | null | undefined): string | null {
-  const result = context?.result as Partial<RenderedCommandResult> | null | undefined;
-  return result?.pmContextRendered === true && typeof result.output === "string" ? result.output : null;
+  return isRenderedCommandResult(context?.result) ? context.result.output : null;
 }
 
 export interface SuggestedAgentCommandInput {
@@ -1493,8 +1504,12 @@ export default defineExtension({
   activate(api: ExtensionApi) {
     setupCommands(api);
     if (typeof api.registerRenderer === "function") {
-      api.registerRenderer("toon", renderCommandResult);
-      api.registerRenderer("json", renderCommandResult);
+      const rendererOwnership = {
+        commands: ["context-pack", "context-handoff", "context-usage"],
+        resultDiscriminator: isRenderedCommandResult,
+      };
+      api.registerRenderer("toon", renderCommandResult, rendererOwnership);
+      api.registerRenderer("json", renderCommandResult, rendererOwnership);
     }
   },
 });
