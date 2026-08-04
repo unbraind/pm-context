@@ -1,10 +1,15 @@
 # Changelog
 
-## 2026.8.4 - 2026-08-04
+## Unreleased
 
 ### Other
 
 - Declare renderer ownership so the host enforces scoping the package only applied at runtime ([pm-context-lhse](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-lhse.toon))
+
+## 2026.8.4 - 2026-08-04
+
+### Other
+
 - Resolve pm-changelog to the release that derives release dates in UTC ([pm-context-6rua](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-6rua.toon))
 
 ## 2026.7.31 - 2026-07-31
