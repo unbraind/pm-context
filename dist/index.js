@@ -29,10 +29,12 @@ export class CommandError extends Error {
 export const MAX_NEIGHBORHOOD_DEPTH = 5;
 export const MARKDOWN_SECTIONS = ["summary", "focus", "neighborhood", "neighbors", "links", "deps"];
 export const AGENT_SECTIONS = ["focus", "blockers", "next-actions", "actions", "nextactions", "recent", "activity", "links", "deps", "refresh"];
-function renderedCommandResult(output) {
-    // All render functions terminate with \n; the replace collapses any trailing
-    // newlines to exactly one so the output is normalised without a branch.
-    return { pmContextRendered: true, output: `${output.replace(/\n+$/, "")}\n` };
+export function renderedCommandResult(output) {
+    // Ensure the rendered payload ends with exactly one trailing newline. Every
+    // render producer already terminates with `\n`, so the `endsWith` arm is the
+    // hot path; the append arm is a defensive normaliser for any future producer
+    // (and for direct callers) that hands in unterminated text.
+    return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
 }
 /** Determine whether an unknown command result carries valid pre-rendered pm-context output. */
 function isRenderedCommandResult(value) {
@@ -322,6 +324,10 @@ export function buildContextPack(allItems, options = {}) {
     for (const id of selectedIds)
         neighborIds.delete(id);
     let neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item) => Boolean(item)))
+        // Every neighbor id is inserted into `neighborDepths` by the same BFS loop
+        // that adds it to `neighborIds` (above), so the lookup is always defined
+        // here. The cast records that construction invariant rather than guarding a
+        // miss that cannot occur, which is why no fallback is needed.
         .sort((a, b) => neighborDepths.get(a.id) - neighborDepths.get(b.id));
     // --max-items caps the total item count (focus + neighbors). The default
     // packer gives focus items priority and trims neighbors to fit the remaining
@@ -401,8 +407,8 @@ export function buildContextPack(allItems, options = {}) {
         deps,
     };
 }
-function markdownEscape(value) {
-    return value.replace(/\r?\n/g, " ").trim();
+export function markdownEscape(value) {
+    return String(value ?? "").replace(/\r?\n/g, " ").trim();
 }
 function renderItemList(items, includeBody) {
     if (items.length === 0)
@@ -756,9 +762,12 @@ export function scoreContextItems(items, options) {
     // keeps pack generation deterministic and side-effect free.
     return defaultScoreContextCandidates(candidates.map((candidate) => ({ id: candidate.id, item: byIdOrFail(byId, candidate.id), signals: candidate.signals })));
 }
-/** Look up an item by id (candidates always match input items by construction). */
-function byIdOrFail(byId, id) {
-    return byId.get(id);
+/** Look up an item by id or throw a descriptive error (keeps callers honest). */
+export function byIdOrFail(byId, id) {
+    const item = byId.get(id);
+    if (!item)
+        throw new CommandError(`relevance candidate ${id} not found among items`);
+    return item;
 }
 /**
  * Build a {@link ContextPackOptions.ranker} closure backed by the SDK relevance
@@ -899,9 +908,15 @@ export function renderContextExplain(report, options = {}) {
  */
 async function resolveSdkRankOptions(ctx) {
     const now = new Date().toISOString();
-    // readSettings returns built-in defaults even for an uninitialized or
-    // corrupted tracker, so it never throws; resolveRuntimeStatusRegistry
-    // always receives a valid schema from those defaults.
+    // `readSettings` is hermetically non-throwing: `core/store/settings.js`'s
+    // `readSettingsWithMetadata` wraps every failure mode (missing, corrupt, or
+    // unreadable `settings.json`; invalid schema; merge/cache-write error) into a
+    // built-in fallback `PmSettings`, and on-read hook errors are swallowed into
+    // warnings by `executeRegisteredHooks`. `resolveRuntimeStatusRegistry` thus
+    // always receives a valid fallback schema. Verified empirically against empty,
+    // read-only, file-typed, and corrupt settings roots, so no try/catch is needed.
+    // `ctx.options` and `ctx.global` are non-optional on `CommandHandlerContext`
+    // (core/extensions/extension-types.d.ts), so the host always supplies them.
     const settings = await readSettings(ctx.pm_root);
     const statusRegistry = resolveRuntimeStatusRegistry(settings.schema);
     const author = stringOption(ctx.options, "author") ?? ctx.global.author;

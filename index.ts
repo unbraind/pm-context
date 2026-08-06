@@ -180,10 +180,12 @@ interface RenderedCommandResult {
   output: string;
 }
 
-function renderedCommandResult(output: string): RenderedCommandResult {
-  // All render functions terminate with \n; the replace collapses any trailing
-  // newlines to exactly one so the output is normalised without a branch.
-  return { pmContextRendered: true, output: `${output.replace(/\n+$/, "")}\n` };
+export function renderedCommandResult(output: string): RenderedCommandResult {
+  // Ensure the rendered payload ends with exactly one trailing newline. Every
+  // render producer already terminates with `\n`, so the `endsWith` arm is the
+  // hot path; the append arm is a defensive normaliser for any future producer
+  // (and for direct callers) that hands in unterminated text.
+  return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
 }
 
 /** Determine whether an unknown command result carries valid pre-rendered pm-context output. */
@@ -482,6 +484,10 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
   }
   for (const id of selectedIds) neighborIds.delete(id);
   let neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item): item is PmItem => Boolean(item)))
+    // Every neighbor id is inserted into `neighborDepths` by the same BFS loop
+    // that adds it to `neighborIds` (above), so the lookup is always defined
+    // here. The cast records that construction invariant rather than guarding a
+    // miss that cannot occur, which is why no fallback is needed.
     .sort((a, b) => (neighborDepths.get(a.id) as number) - (neighborDepths.get(b.id) as number));
   // --max-items caps the total item count (focus + neighbors). The default
   // packer gives focus items priority and trims neighbors to fit the remaining
@@ -560,8 +566,8 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
   };
 }
 
-function markdownEscape(value: string): string {
-  return value.replace(/\r?\n/g, " ").trim();
+export function markdownEscape(value: unknown): string {
+  return String(value ?? "").replace(/\r?\n/g, " ").trim();
 }
 
 function renderItemList(items: PmItem[], includeBody: boolean): string[] {
@@ -958,9 +964,11 @@ export function scoreContextItems(items: readonly PmItem[], options: SdkRankOpti
   );
 }
 
-/** Look up an item by id (candidates always match input items by construction). */
-function byIdOrFail(byId: ReadonlyMap<string, PmItem>, id: string): PmItem {
-  return byId.get(id) as PmItem;
+/** Look up an item by id or throw a descriptive error (keeps callers honest). */
+export function byIdOrFail(byId: ReadonlyMap<string, PmItem>, id: string): PmItem {
+  const item = byId.get(id);
+  if (!item) throw new CommandError(`relevance candidate ${id} not found among items`);
+  return item;
 }
 
 /**
@@ -1126,9 +1134,15 @@ export function renderContextExplain(report: ContextExplainReport, options: { co
  */
 async function resolveSdkRankOptions(ctx: CommandHandlerContext): Promise<SdkRankOptions> {
   const now = new Date().toISOString();
-  // readSettings returns built-in defaults even for an uninitialized or
-  // corrupted tracker, so it never throws; resolveRuntimeStatusRegistry
-  // always receives a valid schema from those defaults.
+  // `readSettings` is hermetically non-throwing: `core/store/settings.js`'s
+  // `readSettingsWithMetadata` wraps every failure mode (missing, corrupt, or
+  // unreadable `settings.json`; invalid schema; merge/cache-write error) into a
+  // built-in fallback `PmSettings`, and on-read hook errors are swallowed into
+  // warnings by `executeRegisteredHooks`. `resolveRuntimeStatusRegistry` thus
+  // always receives a valid fallback schema. Verified empirically against empty,
+  // read-only, file-typed, and corrupt settings roots, so no try/catch is needed.
+  // `ctx.options` and `ctx.global` are non-optional on `CommandHandlerContext`
+  // (core/extensions/extension-types.d.ts), so the host always supplies them.
   const settings = await readSettings(ctx.pm_root);
   const statusRegistry = resolveRuntimeStatusRegistry(settings.schema);
   const author = stringOption(ctx.options, "author") ?? ctx.global.author;

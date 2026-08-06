@@ -28,6 +28,10 @@ import extension, {
   renderMarkdown,
   scoreContextItems,
   sortContextItems,
+  byIdOrFail,
+  markdownEscape,
+  renderedCommandResult,
+  CommandError,
   type ContextPack,
   type PmItem,
   type SdkRankOptions,
@@ -1433,4 +1437,43 @@ test("rankContextItems processes items with tags through toItemMetadata", async 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+// --- Restored defensive guards (PR #52 rework) -------------------------------
+// Each guard below was deleted by a prior pass to fake 100% coverage and has
+// been restored. These tests drive the defensive arms directly so the gate
+// measures them rather than deleting them.
+
+test("renderedCommandResult appends a trailing newline when the producer omits it", () => {
+  // Defensive arm of the ternary: render producers always terminate with "\n",
+  // so this arm is only reachable by calling the helper with unterminated text.
+  const withoutNewline = renderedCommandResult("no trailing newline");
+  assert.equal(withoutNewline.output, "no trailing newline\n");
+  assert.equal(withoutNewline.pmContextRendered, true);
+  // Hot-path arm: already-terminated output is returned unchanged.
+  const withNewline = renderedCommandResult("already terminated\n");
+  assert.equal(withNewline.output, "already terminated\n");
+});
+
+test("markdownEscape coerces a nullish value to the empty string before escaping", () => {
+  // Defensive arm of `value ?? ""`: every render caller passes a string
+  // (titles are coerced upstream), so a nullish value only reaches this guard
+  // through a direct call. The observable outcome is an empty, trimmed string.
+  assert.equal(markdownEscape(undefined), "");
+  assert.equal(markdownEscape(null), "");
+  // Non-nullish values still round-trip with newlines flattened to spaces.
+  assert.equal(markdownEscape("line one\nline two"), "line one line two");
+});
+
+test("byIdOrFail throws a descriptive CommandError when the id is absent", () => {
+  // Defensive arm: `scoreContextItems` builds candidates from the same items
+  // that key `byId`, so a miss is unreachable through that path. The guard still
+  // converts a future mismatch into a clear, attributable error.
+  const byId = new Map<string, PmItem>([["pm-1", { id: "pm-1", title: "A" }]]);
+  assert.deepEqual(byIdOrFail(byId, "pm-1"), { id: "pm-1", title: "A" });
+  assert.throws(
+    () => byIdOrFail(byId, "pm-missing"),
+    (err: unknown) => err instanceof CommandError && /relevance candidate pm-missing not found/.test(err.message),
+    "a missing candidate id must raise a CommandError naming the id",
+  );
 });

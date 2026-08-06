@@ -78,7 +78,8 @@
   },
   "coverageGate": {
     "sources": [
-      "."
+      ".",
+      "scripts/coverage-gate.ts"
     ],
     "tests": [
       "test/*.test.ts"

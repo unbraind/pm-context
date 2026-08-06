@@ -172,6 +172,11 @@ export interface SelectionOptions {
     tag?: string;
     inferredStatus: boolean;
 }
+interface RenderedCommandResult {
+    pmContextRendered: true;
+    output: string;
+}
+export declare function renderedCommandResult(output: string): RenderedCommandResult;
 export interface SuggestedAgentCommandInput {
     commandName: "context-pack" | "context-handoff";
     selection: SelectionOptions;
@@ -200,6 +205,7 @@ export declare function extractRelationships(item: PmItem): Array<{
     kind: string;
 }>;
 export declare function buildContextPack(allItems: PmItem[], options?: ContextPackOptions): ContextPack;
+export declare function markdownEscape(value: unknown): string;
 export declare function renderMarkdown(pack: ContextPack, options?: RenderOptions): string;
 export declare function buildAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
@@ -252,6 +258,8 @@ export declare function rankContextItems(items: readonly PmItem[], options: SdkR
  * --explain`.
  */
 export declare function scoreContextItems(items: readonly PmItem[], options: SdkRankOptions): ContextRelevanceReport<PmItem>;
+/** Look up an item by id or throw a descriptive error (keeps callers honest). */
+export declare function byIdOrFail(byId: ReadonlyMap<string, PmItem>, id: string): PmItem;
 /**
  * Build a {@link ContextPackOptions.ranker} closure backed by the SDK relevance
  * model. The closure ranks whatever focus subset {@link buildContextPack} hands
