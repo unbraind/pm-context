@@ -363,6 +363,52 @@ test("renderUsageReport degrades every optional field to a placeholder", () => {
   assert.doesNotMatch(output, /## Items/);
 });
 
+test("renderUsageReport renders the affinity section with entries", () => {
+  const output = renderUsageReport({
+    ledger_present: true,
+    event_count: 1,
+    malformed_line_count: 0,
+    serve_event_count: 1,
+    touch_event_count: 0,
+    authors: ["a"],
+    surfaces: ["context"],
+    from: "2026-07-01T00:00:00.000Z",
+    to: "2026-07-01T00:05:00.000Z",
+    items: [],
+    waste: [],
+    misses: [],
+    conversion_rate: null,
+    affinity: { affinity: { "x-1": 0.5, "x-2": 0.2 }, positive_judgments: 2, serving_events: 1 },
+  });
+  assert.match(output, /## Author affinity \(SDK decayed\)/);
+  assert.match(output, /positive judgments: 2/);
+  assert.match(output, /serving events: 1/);
+  assert.match(output, /- x-1: 0\.500/);
+  assert.match(output, /- x-2: 0\.200/);
+});
+
+test("renderUsageReport renders the affinity section with no entries", () => {
+  const output = renderUsageReport({
+    ledger_present: true,
+    event_count: 1,
+    malformed_line_count: 0,
+    serve_event_count: 1,
+    touch_event_count: 0,
+    authors: ["a"],
+    surfaces: ["context"],
+    from: "2026-07-01T00:00:00.000Z",
+    to: "2026-07-01T00:05:00.000Z",
+    items: [],
+    waste: [],
+    misses: [],
+    conversion_rate: null,
+    affinity: { affinity: {}, positive_judgments: 0, serving_events: 1 },
+  });
+  assert.match(output, /## Author affinity \(SDK decayed\)/);
+  assert.match(output, /serving events: 1/);
+  assert.match(output, /_no decayed affinity yet\._/);
+});
+
 /** Activate the extension through the SDK host harness with the manifest's real capabilities. */
 async function harness() {
   const created = await createExtensionTestHarness(extension, {

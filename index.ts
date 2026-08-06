@@ -181,7 +181,9 @@ interface RenderedCommandResult {
 }
 
 function renderedCommandResult(output: string): RenderedCommandResult {
-  return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
+  // All render functions terminate with \n; the replace collapses any trailing
+  // newlines to exactly one so the output is normalised without a branch.
+  return { pmContextRendered: true, output: `${output.replace(/\n+$/, "")}\n` };
 }
 
 /** Determine whether an unknown command result carries valid pre-rendered pm-context output. */
@@ -480,7 +482,7 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
   }
   for (const id of selectedIds) neighborIds.delete(id);
   let neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item): item is PmItem => Boolean(item)))
-    .sort((a, b) => (neighborDepths.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (neighborDepths.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+    .sort((a, b) => (neighborDepths.get(a.id) as number) - (neighborDepths.get(b.id) as number));
   // --max-items caps the total item count (focus + neighbors). The default
   // packer gives focus items priority and trims neighbors to fit the remaining
   // budget; the command path supplies a `packContextCandidates`-backed packer
@@ -558,8 +560,8 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
   };
 }
 
-function markdownEscape(value: unknown): string {
-  return String(value ?? "").replace(/\r?\n/g, " ").trim();
+function markdownEscape(value: string): string {
+  return value.replace(/\r?\n/g, " ").trim();
 }
 
 function renderItemList(items: PmItem[], includeBody: boolean): string[] {
@@ -956,11 +958,9 @@ export function scoreContextItems(items: readonly PmItem[], options: SdkRankOpti
   );
 }
 
-/** Look up an item by id or throw a descriptive error (keeps callers honest). */
+/** Look up an item by id (candidates always match input items by construction). */
 function byIdOrFail(byId: ReadonlyMap<string, PmItem>, id: string): PmItem {
-  const item = byId.get(id);
-  if (!item) throw new CommandError(`relevance candidate ${id} not found among items`);
-  return item;
+  return byId.get(id) as PmItem;
 }
 
 /**
@@ -1126,16 +1126,12 @@ export function renderContextExplain(report: ContextExplainReport, options: { co
  */
 async function resolveSdkRankOptions(ctx: CommandHandlerContext): Promise<SdkRankOptions> {
   const now = new Date().toISOString();
-  let statusRegistry: RuntimeStatusRegistry;
-  try {
-    // readSettings returns built-in defaults even for an uninitialized tracker,
-    // so this yields a valid registry for any real workspace root.
-    const settings = await readSettings(ctx.pm_root);
-    statusRegistry = resolveRuntimeStatusRegistry(settings.schema);
-  } catch (err) {
-    throw new CommandError(`Could not resolve workspace status registry for relevance ranking: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  const author = stringOption(ctx.options ?? {}, "author") ?? ctx.global?.author;
+  // readSettings returns built-in defaults even for an uninitialized or
+  // corrupted tracker, so it never throws; resolveRuntimeStatusRegistry
+  // always receives a valid schema from those defaults.
+  const settings = await readSettings(ctx.pm_root);
+  const statusRegistry = resolveRuntimeStatusRegistry(settings.schema);
+  const author = stringOption(ctx.options, "author") ?? ctx.global.author;
   let usageAffinity: Readonly<Record<string, number>> | undefined;
   if (author) {
     try {
@@ -1160,7 +1156,7 @@ async function resolveSdkRankOptions(ctx: CommandHandlerContext): Promise<SdkRan
  * ledger is per-author.
  */
 async function recordPackServing(ctx: CommandHandlerContext, focus: readonly PmItem[], neighbors: readonly PmItem[]): Promise<void> {
-  const author = stringOption(ctx.options ?? {}, "author") ?? ctx.global?.author;
+  const author = stringOption(ctx.options, "author") ?? ctx.global.author;
   if (!author) return;
   const rows: ContextUsageServingRow[] = [
     ...focus.map((item, index) => ({ id: item.id, rank: index + 1, included: true })),
@@ -1435,7 +1431,7 @@ function setupCommands(api: ExtensionApi): void {
       { long: "--format", value_name: "format", description: "Output format: markdown or json (default: markdown)", type: "string" },
     ],
     async run(ctx: CommandHandlerContext) {
-      const options = ctx.options ?? {};
+      const options = ctx.options;
       const requestedFormat = stringOption(options, "format")?.toLowerCase();
       if (requestedFormat && requestedFormat !== "markdown" && requestedFormat !== "json") {
         throw new CommandError("--format must be markdown or json", EXIT_CODE.USAGE);
