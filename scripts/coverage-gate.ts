@@ -35,7 +35,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -128,6 +128,13 @@ const DEFAULT_SKIP_DIRS: readonly string[] = [
   ".git",
   ".github",
 ];
+
+const LITERAL_GLOB_CHARACTERS: Readonly<Record<string, string>> = {
+  "*": "[*]",
+  "?": "[?]",
+  "[": "[[]",
+  "]": "[]]",
+};
 
 /**
  * Resolves the compiler's effective output paths.
@@ -224,10 +231,16 @@ function collectSources(rootDir: string, target: string, skipDirs: Set<string>):
  * @param stdio - Stdio mode for the spawned test runner. Defaults to `"inherit"`
  *   so the real script streams test output. Tests pass `"ignore"` to suppress
  *   fixture output.
+ * @param sourceCollector - Source walker, injectable only to make unexpected
+ *   filesystem failures deterministic without relying on host permissions.
  * @returns Exit code: 0 on success, 1 on a gate failure, or the test runner's
  *   non-zero status when the suite itself fails.
  */
-export function runCoverageGate(rootDir: string, stdio: "inherit" | "ignore" = "inherit"): number {
+export function runCoverageGate(
+  rootDir: string,
+  stdio: "inherit" | "ignore" = "inherit",
+  sourceCollector: (rootDir: string, target: string, skipDirs: Set<string>) => string[] = collectSources,
+): number {
   const manifest = JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8")) as PackageManifest;
   const config = manifest.coverageGate;
 
@@ -235,12 +248,20 @@ export function runCoverageGate(rootDir: string, stdio: "inherit" | "ignore" = "
     console.error("coverage-gate: package.json has no `coverageGate` block.");
     return 1;
   }
+  if (!Array.isArray(config.sources) || config.sources.length === 0) {
+    console.error("coverage-gate: `coverageGate.sources` must be a non-empty array.");
+    return 1;
+  }
+  if (config.thresholds === null || typeof config.thresholds !== "object" || Array.isArray(config.thresholds)) {
+    console.error("coverage-gate: `coverageGate.thresholds` must be an object.");
+    return 1;
+  }
 
   const skipDirs = new Set([...DEFAULT_SKIP_DIRS, ...(config.skipDirs ?? [])]);
 
   let expected: string[];
   try {
-    expected = config.sources.flatMap((source) => collectSources(rootDir, join(rootDir, source), skipDirs));
+    expected = config.sources.flatMap((source) => sourceCollector(rootDir, join(rootDir, source), skipDirs));
   } catch (err) {
     if (err instanceof CoverageGateFailure) {
       console.error(err.message);
@@ -343,7 +364,7 @@ export function runCoverageGate(rootDir: string, stdio: "inherit" | "ignore" = "
       // Passing the enumerated paths rather than a directory glob keeps the two
       // in step by construction, and keeps test files and tooling out of the
       // percentages even when the source root is the repository root.
-      ...required.map((file) => `--test-coverage-include=${file}`),
+      ...required.map((file) => `--test-coverage-include=${file.replace(/[*?[\]]/g, (character) => LITERAL_GLOB_CHARACTERS[character]!)}`),
       `--test-coverage-lines=${config.thresholds.lines}`,
       `--test-coverage-branches=${config.thresholds.branches}`,
       `--test-coverage-functions=${config.thresholds.functions}`,
@@ -448,7 +469,8 @@ const repoRoot = resolve(import.meta.dirname, "..");
  *   script's own parent directory.
  */
 export function runScriptEntry(rootDir: string = repoRoot): void {
-  if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const entry = process.argv[1];
+  if (entry && existsSync(entry) && realpathSync(resolve(entry)) === realpathSync(fileURLToPath(import.meta.url))) {
     process.exit(runCoverageGate(rootDir));
   }
 }

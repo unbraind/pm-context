@@ -14,7 +14,7 @@
  */
 
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -275,8 +275,13 @@ test("coverage gate fails when coverage falls below the threshold", async (t) =>
     thresholds: { lines: 100, branches: 100, functions: 100 },
   });
 
-  const { code } = await runGate(fixture.dir);
+  const { code, stderr } = await runGate(fixture.dir);
   assert.notStrictEqual(code, 0, "gate should fail when coverage is below threshold");
+  assert.doesNotMatch(
+    stderr,
+    /coverage-gate:/,
+    `the failure must come from the runner's threshold check, not gate configuration: ${stderr}`,
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -317,6 +322,36 @@ test("coverage gate fails when package.json has no coverageGate block", async (t
   const { code, stderr } = await runGate(fixture.dir);
   assert.strictEqual(code, 1);
   assert.match(stderr, /no.*coverageGate.*block/);
+});
+
+test("coverage gate rejects malformed coverageGate collection shapes", async (t) => {
+  for (const [name, gate, diagnostic] of [
+    ["sources", { sources: null, tests: [], thresholds: { lines: 100, branches: 100, functions: 100 } }, /sources.*non-empty array/],
+    ["thresholds", { sources: ["."], tests: [], thresholds: null }, /thresholds.*object/],
+  ] as const) {
+    const fixture = createFixture(`cg-bad-${name}-`);
+    t.after(fixture.cleanup);
+    writePackageJson(fixture.dir, gate);
+    const { code, stderr } = await runGate(fixture.dir);
+    assert.equal(code, 1);
+    assert.match(stderr, diagnostic);
+  }
+});
+
+test("coverage include paths treat glob metacharacters as literal filename characters", async (t) => {
+  const fixture = createFixture("cg-literal-glob-");
+  t.after(fixture.cleanup);
+  writeTsConfig(fixture.dir);
+  writeSource(fixture.dir, "value[1]");
+  writeTest(fixture.dir, "value[1]", "literal");
+  writePackageJson(fixture.dir, {
+    sources: ["."],
+    tests: [testPath("literal")],
+    thresholds: { lines: 100, branches: 100, functions: 100 },
+  });
+  const { code, stdout, stderr } = await runGate(fixture.dir);
+  assert.equal(code, 0, `literal filename should be measured; stderr: ${stderr}`);
+  assert.match(stdout, /thresholds met/);
 });
 
 // ---------------------------------------------------------------------------
@@ -520,36 +555,18 @@ test("coverage gate walks subdirectories to find source files", async (t) => {
 
 test("coverage gate propagates unexpected filesystem errors from the source walk", async (t) => {
   const fixture = createFixture("cg-walk-error-");
-  // Restore permissions before cleanup so rmSync can delete the directory.
-  t.after(() => {
-    try { chmodSync(join(fixture.dir, "noperm"), 0o755); } catch { /* already gone */ }
-    fixture.cleanup();
-  });
-
-  writeTsConfig(fixture.dir);
-  writeSource(fixture.dir, "src");
-  writeTest(fixture.dir, "src", "src");
-  // Create a directory with no read permissions — readdirSync will throw EACCES,
-  // which is not a CoverageGateFailure, so it must be re-thrown, not swallowed.
-  mkdirSync(join(fixture.dir, "noperm"), { recursive: true });
-  chmodSync(join(fixture.dir, "noperm"), 0o000);
+  t.after(fixture.cleanup);
   writePackageJson(fixture.dir, {
     sources: ["."],
-    tests: [testPath("src")],
+    tests: [],
     thresholds: { lines: 100, branches: 100, functions: 100 },
   });
-
-  const savedPath = process.env.PATH;
-  process.env.PATH = `${NODE_MODULES_BIN}:${savedPath ?? ""}`;
-  try {
-    await assert.rejects(
-      () => captureOutput(() => Promise.resolve(runCoverageGate(fixture.dir, "ignore"))),
-      (err: unknown) => err instanceof Error && (err as NodeJS.ErrnoException).code === "EACCES",
-      "the gate must re-throw the EACCES error, not swallow it",
-    );
-  } finally {
-    process.env.PATH = savedPath;
-  }
+  const filesystemError = Object.assign(new Error("source walk failed"), { code: "EIO" });
+  await assert.rejects(
+    () => captureOutput(() => Promise.resolve(runCoverageGate(fixture.dir, "ignore", () => { throw filesystemError; }))),
+    (err: unknown) => err === filesystemError,
+    "the gate must re-throw the original filesystem error",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -690,6 +707,36 @@ test("runScriptEntry runs the gate and exits when argv[1] matches the script pat
   }
 });
 
+test("runScriptEntry recognizes a symlink to the coverage-gate script", async (t) => {
+  const fixture = createFixture("cg-entry-symlink-");
+  t.after(fixture.cleanup);
+  writeTsConfig(fixture.dir);
+  writeSource(fixture.dir, "src");
+  writeTest(fixture.dir, "src", "src");
+  writePackageJson(fixture.dir, {
+    sources: ["."],
+    tests: [testPath("src")],
+    thresholds: { lines: 100, branches: 100, functions: 100 },
+    skipDirs: ["bin"],
+  });
+  const scriptPath = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "coverage-gate.ts");
+  mkdirSync(join(fixture.dir, "bin"));
+  const linkedPath = join(fixture.dir, "bin", "coverage-gate-link.ts");
+  symlinkSync(scriptPath, linkedPath);
+  const savedArgv1 = process.argv[1];
+  const savedExit = process.exit;
+  let exitCode: number | undefined;
+  process.argv[1] = linkedPath;
+  process.exit = ((code?: number) => { exitCode = code; }) as typeof process.exit;
+  try {
+    runScriptEntry(fixture.dir);
+    assert.equal(exitCode, 0);
+  } finally {
+    process.argv[1] = savedArgv1;
+    process.exit = savedExit;
+  }
+});
+
 // ---------------------------------------------------------------------------
 // resolveEmitPaths: stderr in error message (line 163 true branch)
 // ---------------------------------------------------------------------------
@@ -733,7 +780,9 @@ test("coverage gate uses default emit paths when tsc output has no compilerOptio
   const fixture = createFixture("cg-no-compopts-");
   t.after(fixture.cleanup);
 
-  writeTsConfig(fixture.dir);
+  // The emitted fixture remains under dist, so only the fallback — not this
+  // deliberately different configured path — can locate it.
+  writeTsConfig(fixture.dir, "out");
   // Two source files: one type-only (ignored), one with runtime code (tested).
   writeFileSync(join(fixture.dir, "types.ts"), "export type Point = { x: number; y: number };\n");
   writeSource(fixture.dir, "main");

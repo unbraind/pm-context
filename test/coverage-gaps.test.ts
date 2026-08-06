@@ -43,6 +43,15 @@ import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 import { readContextUsageAffinity } from "@unbrained/pm-cli/sdk/query";
 import { readSettings, resolveRuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
 
+type ExtensionHarness = Awaited<ReturnType<typeof createExtensionTestHarness>>;
+
+const activeHarnesses = new Set<ExtensionHarness>();
+
+test.afterEach(async () => {
+  for (const runner of activeHarnesses) await runner.deactivate();
+  activeHarnesses.clear();
+});
+
 /** Manifest capabilities the harness must grant for registration to be permitted. */
 const CAPABILITIES = ["commands", "renderers", "schema"] as const;
 
@@ -221,8 +230,8 @@ test("createSdkPacker handles items without body in projection cost estimation",
   // maxItems = 2 should pack both items; the body-absent branch in
   // estimateProjectionCosts is exercised here.
   const result = packer(focus, neighbors, 2);
-  assert.ok(result.focus.length <= 2);
-  assert.ok(result.focus.length + result.neighbors.length <= 2);
+  assert.equal(result.focus.length, 1);
+  assert.equal(result.neighbors.length, 1);
 });
 
 test("scoreContextItems fills missing optional fields via toItemMetadata", async () => {
@@ -305,6 +314,7 @@ async function harness() {
     capabilities: CAPABILITIES,
   });
   assert.deepEqual(created.activation.failed, [], "activation must not fail");
+  activeHarnesses.add(created);
   return created;
 }
 
@@ -485,7 +495,8 @@ test("context-handoff uses max-items to budget the pack", async () => {
     const output = commandResult<{ output?: string }>(result).output;
     assert.ok(output, "expected json output");
     const handoff = JSON.parse(output) as { counts: { focus: number; neighbors: number } };
-    assert.ok(handoff.counts.focus + handoff.counts.neighbors <= 1, `total should be <= 1, got focus=${handoff.counts.focus} neighbors=${handoff.counts.neighbors}`);
+    assert.equal(handoff.counts.focus, 1);
+    assert.equal(handoff.counts.neighbors, 0);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

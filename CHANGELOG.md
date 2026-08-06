@@ -8,6 +8,7 @@
 
 ### Other
 
+- Harden exact coverage gate and assertions from exact-head review ([pm-context-6ywm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-6ywm.toon))
 - Raise the coverage gate to a measured 100/100/100 and bring scripts/coverage-gate.ts under it ([pm-context-5925](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-5925.toon))
 
 ## 2026.8.5 - 2026-08-05
