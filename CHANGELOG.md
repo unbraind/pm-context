@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Gate durable PM project health in CI on pm CLI 2026.8.6 ([pm-context-k6aa](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-k6aa.toon))
+
 ### Other
 
 - Raise the coverage gate to a measured 100/100/100 and bring scripts/coverage-gate.ts under it ([pm-context-5925](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-5925.toon))
