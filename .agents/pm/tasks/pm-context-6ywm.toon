@@ -1,0 +1,32 @@
+id: pm-context-6ywm
+title: Harden exact coverage gate and assertions from exact-head review
+description: "Disposition current CodeRabbit findings: preserve defensive invariants without ignore directives, assert exact packer results, scope harness teardown, validate manifest shape, harden literal include paths and entry invocation, and remove platform-dependent or non-discriminating tests."
+type: Task
+status: closed
+priority: 1
+tags: []
+created_at: "2026-08-06T23:17:46.526Z"
+updated_at: "2026-08-06T23:35:27.482Z"
+closed_at: "2026-08-06T23:28:57.831Z"
+completed_at: "2026-08-06T23:28:57.831Z"
+author: codex
+estimated_minutes: 120
+acceptance_criteria: every current review thread is verified and answered; valid findings have regression tests and minimal fixes; exact 100/100/100 and package release gates pass; no coverage ignore directive or artificial branch is introduced
+resolution: Hardened the coverage gate and made every valid review assertion exact and deterministic.
+expected_result: All valid current review findings have tested fixes without ignore directives or deleted defensive checks.
+actual_result: "195 tests pass with exact 100/100/100; literal glob paths, malformed manifests, symlink entrypoints, harness teardown, and exact pack counts are verified."
+dependencies[1]{id,kind,created_at,author,source_kind,author_source}:
+  pm-context-5925,related,"2026-08-06T23:17:46.526Z",codex,"cli:create:dep",detected
+notes[2]{created_at,author,text}:
+  "2026-08-06T23:28:57.226Z",codex,"Verified exact-head review: defensive byIdOrFail and markdown narrowing already exist with direct behavior assertions; no coverage-ignore directive was added. Valid findings were fixed with exact pack assertions, per-test harness teardown, manifest validation, literal glob escaping, symlink-safe entry detection, deterministic filesystem failure injection, and discriminating fixtures."
+  "2026-08-06T23:35:27.482Z",codex,"Follow-up exact-head review hardening removed every remaining POSIX shell fixture and process.execPath mutation. The gate now accepts typed compiler/runner/source-collector boundaries, fixtures execute portable Node .mjs commands, PATH composition uses node:path delimiter, and the focused coverage run passes 195 tests with zero skips at exact 100/100/100."
+files[3]{path,scope}:
+  scripts/coverage-gate.ts,project
+  test/coverage-gaps.test.ts,project
+  test/coverage-gate.test.ts,project
+tests[1]{command,scope,timeout_seconds,pm_context_mode}:
+  "npm run release:check",project,900,tracker
+docs[1]{path,scope}:
+  "https://github.com/unbraind/pm-context/pull/52",project
+close_reason: "Fixed every valid current review finding, retained and tested defensive guards, and passed 195 tests at exact 100/100/100 plus the full release gate."
+body: ""

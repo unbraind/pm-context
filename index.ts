@@ -180,7 +180,11 @@ interface RenderedCommandResult {
   output: string;
 }
 
-function renderedCommandResult(output: string): RenderedCommandResult {
+export function renderedCommandResult(output: string): RenderedCommandResult {
+  // Ensure the rendered payload ends with exactly one trailing newline. Every
+  // render producer already terminates with `\n`, so the `endsWith` arm is the
+  // hot path; the append arm is a defensive normaliser for any future producer
+  // (and for direct callers) that hands in unterminated text.
   return { pmContextRendered: true, output: output.endsWith("\n") ? output : `${output}\n` };
 }
 
@@ -480,7 +484,11 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
   }
   for (const id of selectedIds) neighborIds.delete(id);
   let neighbors = sortContextItems([...neighborIds].map((id) => byId.get(id)).filter((item): item is PmItem => Boolean(item)))
-    .sort((a, b) => (neighborDepths.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (neighborDepths.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+    // Every neighbor id is inserted into `neighborDepths` by the same BFS loop
+    // that adds it to `neighborIds` (above), so the lookup is always defined
+    // here. The cast records that construction invariant rather than guarding a
+    // miss that cannot occur, which is why no fallback is needed.
+    .sort((a, b) => (neighborDepths.get(a.id) as number) - (neighborDepths.get(b.id) as number));
   // --max-items caps the total item count (focus + neighbors). The default
   // packer gives focus items priority and trims neighbors to fit the remaining
   // budget; the command path supplies a `packContextCandidates`-backed packer
@@ -558,7 +566,7 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
   };
 }
 
-function markdownEscape(value: unknown): string {
+export function markdownEscape(value: unknown): string {
   return String(value ?? "").replace(/\r?\n/g, " ").trim();
 }
 
@@ -957,7 +965,7 @@ export function scoreContextItems(items: readonly PmItem[], options: SdkRankOpti
 }
 
 /** Look up an item by id or throw a descriptive error (keeps callers honest). */
-function byIdOrFail(byId: ReadonlyMap<string, PmItem>, id: string): PmItem {
+export function byIdOrFail(byId: ReadonlyMap<string, PmItem>, id: string): PmItem {
   const item = byId.get(id);
   if (!item) throw new CommandError(`relevance candidate ${id} not found among items`);
   return item;
@@ -1126,16 +1134,18 @@ export function renderContextExplain(report: ContextExplainReport, options: { co
  */
 async function resolveSdkRankOptions(ctx: CommandHandlerContext): Promise<SdkRankOptions> {
   const now = new Date().toISOString();
-  let statusRegistry: RuntimeStatusRegistry;
-  try {
-    // readSettings returns built-in defaults even for an uninitialized tracker,
-    // so this yields a valid registry for any real workspace root.
-    const settings = await readSettings(ctx.pm_root);
-    statusRegistry = resolveRuntimeStatusRegistry(settings.schema);
-  } catch (err) {
-    throw new CommandError(`Could not resolve workspace status registry for relevance ranking: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  const author = stringOption(ctx.options ?? {}, "author") ?? ctx.global?.author;
+  // `readSettings` is hermetically non-throwing: `core/store/settings.js`'s
+  // `readSettingsWithMetadata` wraps every failure mode (missing, corrupt, or
+  // unreadable `settings.json`; invalid schema; merge/cache-write error) into a
+  // built-in fallback `PmSettings`, and on-read hook errors are swallowed into
+  // warnings by `executeRegisteredHooks`. `resolveRuntimeStatusRegistry` thus
+  // always receives a valid fallback schema. Verified empirically against empty,
+  // read-only, file-typed, and corrupt settings roots, so no try/catch is needed.
+  // `ctx.options` and `ctx.global` are non-optional on `CommandHandlerContext`
+  // (core/extensions/extension-types.d.ts), so the host always supplies them.
+  const settings = await readSettings(ctx.pm_root);
+  const statusRegistry = resolveRuntimeStatusRegistry(settings.schema);
+  const author = stringOption(ctx.options, "author") ?? ctx.global.author;
   let usageAffinity: Readonly<Record<string, number>> | undefined;
   if (author) {
     try {
@@ -1160,7 +1170,7 @@ async function resolveSdkRankOptions(ctx: CommandHandlerContext): Promise<SdkRan
  * ledger is per-author.
  */
 async function recordPackServing(ctx: CommandHandlerContext, focus: readonly PmItem[], neighbors: readonly PmItem[]): Promise<void> {
-  const author = stringOption(ctx.options ?? {}, "author") ?? ctx.global?.author;
+  const author = stringOption(ctx.options, "author") ?? ctx.global.author;
   if (!author) return;
   const rows: ContextUsageServingRow[] = [
     ...focus.map((item, index) => ({ id: item.id, rank: index + 1, included: true })),
@@ -1435,7 +1445,7 @@ function setupCommands(api: ExtensionApi): void {
       { long: "--format", value_name: "format", description: "Output format: markdown or json (default: markdown)", type: "string" },
     ],
     async run(ctx: CommandHandlerContext) {
-      const options = ctx.options ?? {};
+      const options = ctx.options;
       const requestedFormat = stringOption(options, "format")?.toLowerCase();
       if (requestedFormat && requestedFormat !== "markdown" && requestedFormat !== "json") {
         throw new CommandError("--format must be markdown or json", EXIT_CODE.USAGE);
