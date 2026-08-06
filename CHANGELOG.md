@@ -6,6 +6,10 @@
 
 - Gate durable PM project health in CI on pm CLI 2026.8.6 ([pm-context-k6aa](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-k6aa.toon))
 
+### Removed
+
+- Remove unused SDK query import flagged by DeepScan ([pm-context-dmsf](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-dmsf.toon))
+
 ### Other
 
 - Harden exact coverage gate and assertions from exact-head review ([pm-context-6ywm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-6ywm.toon))

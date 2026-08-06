@@ -40,7 +40,6 @@ import extension, {
 import { init } from "@unbrained/pm-cli/sdk";
 import { create } from "@unbrained/pm-cli/sdk/core";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
-import { readContextUsageAffinity } from "@unbrained/pm-cli/sdk/query";
 import { readSettings, resolveRuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
 
 type ExtensionHarness = Awaited<ReturnType<typeof createExtensionTestHarness>>;
