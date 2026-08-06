@@ -89,6 +89,20 @@ interface PackageManifest {
   readonly coverageGate?: CoverageGateConfig;
 }
 
+/** One external command and any arguments that must precede gate-owned flags. */
+interface CommandInvocation {
+  readonly executable: string;
+  readonly args: readonly string[];
+  readonly shell?: boolean;
+}
+
+/** Injectable process and filesystem boundaries used by deterministic tests. */
+interface CoverageGateRuntime {
+  readonly runner?: CommandInvocation;
+  readonly compiler?: CommandInvocation;
+  readonly sourceCollector?: (rootDir: string, target: string, skipDirs: Set<string>) => string[];
+}
+
 /** Compiler paths used to locate a source file's emitted output. */
 interface TsConfig {
   readonly compilerOptions?: { readonly outDir?: string; readonly rootDir?: string };
@@ -150,16 +164,17 @@ const LITERAL_GLOB_CHARACTERS: Readonly<Record<string, string>> = {
  * file — the one outcome this gate must never produce. A package that cannot
  * run its own compiler has a problem worth stopping for.
  */
-function resolveEmitPaths(rootDir: string): { outDir: string; rootDir: string } {
+function resolveEmitPaths(rootDir: string, command?: CommandInvocation): { outDir: string; rootDir: string } {
   // Call `tsc` directly rather than `npx tsc`: the gate always runs through
   // `npm run coverage`, which prepends `node_modules/.bin` to PATH, so the
   // compiler is already reachable. `npx` in a directory without a local
   // TypeScript install instead runs a stub that exits non-zero, which would
   // make every `ignore` entry fail in a fixture or a clean checkout.
-  const shown = spawnSync("tsc", ["--showConfig", "-p", "tsconfig.json"], {
+  const compiler = command ?? { executable: "tsc", args: [], shell: process.platform === "win32" };
+  const shown = spawnSync(compiler.executable, [...compiler.args, "--showConfig", "-p", "tsconfig.json"], {
     cwd: rootDir,
     encoding: "utf8",
-    shell: process.platform === "win32",
+    shell: compiler.shell ?? false,
   });
   if (shown.error || shown.status !== 0 || !shown.stdout) {
     throw new CoverageGateFailure(
@@ -231,15 +246,15 @@ function collectSources(rootDir: string, target: string, skipDirs: Set<string>):
  * @param stdio - Stdio mode for the spawned test runner. Defaults to `"inherit"`
  *   so the real script streams test output. Tests pass `"ignore"` to suppress
  *   fixture output.
- * @param sourceCollector - Source walker, injectable only to make unexpected
- *   filesystem failures deterministic without relying on host permissions.
+ * @param runtime - Optional command and source-walk boundaries used to drive
+ *   process failures deterministically on every supported operating system.
  * @returns Exit code: 0 on success, 1 on a gate failure, or the test runner's
  *   non-zero status when the suite itself fails.
  */
 export function runCoverageGate(
   rootDir: string,
   stdio: "inherit" | "ignore" = "inherit",
-  sourceCollector: (rootDir: string, target: string, skipDirs: Set<string>) => string[] = collectSources,
+  runtime: CoverageGateRuntime = {},
 ): number {
   const manifest = JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8")) as PackageManifest;
   const config = manifest.coverageGate;
@@ -261,6 +276,7 @@ export function runCoverageGate(
 
   let expected: string[];
   try {
+    const sourceCollector = runtime.sourceCollector ?? collectSources;
     expected = config.sources.flatMap((source) => sourceCollector(rootDir, join(rootDir, source), skipDirs));
   } catch (err) {
     if (err instanceof CoverageGateFailure) {
@@ -297,7 +313,7 @@ export function runCoverageGate(
 
   let emitPaths: { outDir: string; rootDir: string };
   try {
-    emitPaths = (config.ignore ?? []).length > 0 ? resolveEmitPaths(rootDir) : { outDir: "dist", rootDir: "." };
+    emitPaths = (config.ignore ?? []).length > 0 ? resolveEmitPaths(rootDir, runtime.compiler) : { outDir: "dist", rootDir: "." };
   } catch (err) {
     if (err instanceof CoverageGateFailure) {
       console.error(err.message);
@@ -355,9 +371,11 @@ export function runCoverageGate(
   // "no coverage report was written" instead of measuring anything.
   const { NODE_TEST_CONTEXT: _dropCtx, NODE_TEST_WORKER_ID: _dropWid, ...cleanEnv } = process.env;
 
+  const runner = runtime.runner ?? { executable: process.execPath, args: [] };
   const result = spawnSync(
-    process.execPath,
+    runner.executable,
     [
+      ...runner.args,
       "--test",
       "--experimental-test-coverage",
       // Scope the report to exactly the files the presence check requires.
@@ -377,6 +395,7 @@ export function runCoverageGate(
     {
       cwd: rootDir,
       stdio,
+      shell: runner.shell ?? false,
       // Pin the timezone so the measurement is reproducible on any machine.
       // Code that branches on a timestamp's UTC offset takes different paths
       // under a local offset than under UTC, which moves the reported
