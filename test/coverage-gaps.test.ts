@@ -322,6 +322,13 @@ function commandResult<TResult>(result: unknown): TResult {
   return (result as { result: TResult }).result;
 }
 
+/** Parse a JSON-rendered extension command result. */
+function jsonCommandResult<TResult>(result: unknown): TResult {
+  const output = commandResult<{ output?: string }>(result).output;
+  assert.ok(output, "expected rendered JSON output");
+  return JSON.parse(output) as TResult;
+}
+
 test("context-handoff renders agent handoff for a focus item", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
@@ -534,7 +541,7 @@ test("context-usage with --by returns affinity from the SDK store", async () => 
       options: { by: "a" },
       global: { json: true },
     });
-    const report = commandResult<{ affinity?: { affinity: Record<string, number>; positive_judgments: number; serving_events: number } }>(result);
+    const report = jsonCommandResult<{ affinity?: { affinity: Record<string, number>; positive_judgments: number; serving_events: number } }>(result);
     assert.ok(report.affinity, "affinity must be present when --by is given");
     assert.equal(report.affinity!.positive_judgments, 1);
     assert.equal(report.affinity!.serving_events, 1);
@@ -592,7 +599,7 @@ test("context-usage with --by degrades gracefully when affinity read fails", asy
       options: { by: "a" },
       global: { json: true },
     });
-    const report = commandResult<{ ledger_present?: boolean; affinity?: unknown }>(result);
+    const report = jsonCommandResult<{ ledger_present?: boolean; affinity?: unknown }>(result);
     assert.equal(report.ledger_present, true);
     assert.equal(report.affinity, undefined, "affinity must be absent when the read fails");
   } finally {

@@ -1,0 +1,30 @@
+id: pm-context-r6x0
+title: Remove non-allowlisted personal identity from public git history
+description: "The full commit-identity inventory contains a legacy personal-domain email identity. Rewrite the public repository history only with explicit maintainer approval, preserve tag and release semantics, coordinate the force update, and verify every ref contains only approved noreply and automation identities before any later publication."
+type: Issue
+status: open
+priority: 0
+tags: []
+created_at: "2026-08-07T16:55:11.230Z"
+updated_at: "2026-08-07T16:55:55.492Z"
+assignee: maintainer
+author: "harness:codex"
+estimated_minutes: 240
+acceptance_criteria: maintainer approves the coordinated history rewrite; every branch and tag is inventoried before mutation; rewritten refs contain only allowlisted noreply or automation identities; tags releases package provenance and clone instructions are verified after the force update; publication remains disabled until an independent privacy review approves the rewritten history
+definition_of_ready: Maintainer selects approved replacement identity and maintenance window
+reviewer: maintainer
+risk: critical
+confidence: high
+release: blocked
+severity: critical
+expected_result: Public history contains no personal-domain author or committer identity
+actual_result: A non-allowlisted personal-domain identity is reachable in legacy commit metadata
+affected_version: all reachable history through 2026.8.7
+component: release privacy
+customer_impact: Publication cannot satisfy the explicit no-personal-data history gate until remediated
+files[1]{path,scope,note}:
+  .git,project,reachable commit metadata requiring coordinated rewrite
+docs[2]{path,scope,note}:
+  "https://github.com/unbraind/pm-context/issues/53",global,GitHub release privacy blocker
+  .agents/pm/chores/pm-context-5njx.toon,project,discovery evidence from the 2026.8.7 compatibility tranche
+body: ""

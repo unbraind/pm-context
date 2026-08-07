@@ -1265,7 +1265,7 @@ function setupCommands(api) {
             // silently shadowed and never populate ctx.options. Read the global instead,
             // so `pm context-usage --json` returns the raw report as an agent expects.
             const wantsJson = requestedFormat === "json" || ctx.global?.json === true;
-            return wantsJson ? reportWithAffinity : renderedCommandResult(renderUsageReport(reportWithAffinity));
+            return renderedCommandResult(wantsJson ? `${JSON.stringify(reportWithAffinity, null, 2)}\n` : renderUsageReport(reportWithAffinity));
         },
     });
 }
