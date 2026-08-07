@@ -1509,7 +1509,7 @@ const defineExtension = <TModule extends ExtensionModule>(module: TModule): TMod
 
 export default defineExtension({
   name: "pm-context",
-  version: "2026.8.5",
+  version: "2026.8.7",
   description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
   activate(api: ExtensionApi) {
     setupCommands(api);
