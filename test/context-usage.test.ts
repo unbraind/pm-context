@@ -424,6 +424,13 @@ function commandResult<TResult>(result: unknown): TResult {
   return (result as { result: TResult }).result;
 }
 
+/** Parse a JSON-rendered extension command result. */
+function jsonCommandResult<TResult>(result: unknown): TResult {
+  const output = commandResult<{ output?: string }>(result).output;
+  assert.ok(output, "expected rendered JSON output");
+  return JSON.parse(output) as TResult;
+}
+
 /** A tracker seeded with one converted serve and one unserved touch. */
 function seededTracker(): string {
   return trackerWithLedger(
@@ -449,13 +456,13 @@ test("context-usage renders markdown by default", async () => {
   }
 });
 
-test("context-usage returns the raw report for --format json and the global --json alike", async () => {
+test("context-usage renders valid JSON for --format json and the global --json alike", async () => {
   const root = seededTracker();
   try {
     const runner = await harness();
     for (const run of [{ options: { format: "json" } }, { global: { json: true } }]) {
       const result = await runner.runCommand({ command: "context-usage", pmRoot: root, ...run });
-      const report = commandResult<{ ledger_present?: boolean; conversion_rate?: number | null }>(result);
+      const report = jsonCommandResult<{ ledger_present?: boolean; conversion_rate?: number | null }>(result);
       assert.equal(report.ledger_present, true);
       assert.equal(report.conversion_rate, 0.5);
     }
@@ -471,9 +478,9 @@ test("context-usage forwards author, surface, since, and limit filters", async (
       command: "context-usage",
       pmRoot: root,
       global: { json: true },
-      options: { author: "a", surface: "next", since: "2020-01-01T00:00:00.000Z", limit: "1" },
+      options: { by: "a", surface: "next", since: "2020-01-01T00:00:00.000Z", limit: "1" },
     });
-    const report = commandResult<{ items: Array<{ id: string }>; serve_event_count: number }>(result);
+    const report = jsonCommandResult<{ items: Array<{ id: string }>; serve_event_count: number }>(result);
     assert.equal(report.serve_event_count, 0, "the only serve event is on the context surface");
     assert.equal(report.items.length, 1, "limit must cap the item rows");
   } finally {
@@ -506,7 +513,7 @@ test("context-usage reports an absent ledger through the command surface", async
   const root = trackerWithLedger();
   try {
     const result = await (await harness()).runCommand({ command: "context-usage", pmRoot: root, global: { json: true } });
-    assert.equal(commandResult<{ ledger_present?: boolean }>(result).ledger_present, false);
+    assert.equal(jsonCommandResult<{ ledger_present?: boolean }>(result).ledger_present, false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

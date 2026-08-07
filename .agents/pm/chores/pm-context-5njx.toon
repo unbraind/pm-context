@@ -1,0 +1,42 @@
+id: pm-context-5njx
+title: Adopt pm CLI 2026.8.7 and protect extension assets during multi-agent merges
+description: "Upgrade pm-context's peer/development pm CLI and pm SDK contract plus pm-changelog tooling, regenerate the lockfile, and install the 2026.8.7 extension-asset merge fence so generated extension contents never receive semantic PM merges while .managed-extensions.json retains key-level pm-json merging."
+type: Chore
+status: closed
+priority: 0
+tags: []
+created_at: "2026-08-07T16:42:20.784Z"
+updated_at: "2026-08-07T17:03:02.330Z"
+closed_at: "2026-08-07T17:02:47.617Z"
+completed_at: "2026-08-07T17:02:47.617Z"
+author: "harness:codex"
+estimated_minutes: 180
+acceptance_criteria: "package and lockfile use current pm CLI/SDK 2026.8.7 and current pm-changelog; pm merge install emits extensions/** -merge before the managed-manifest pm-json override; exact 100/100/100 coverage, tests, npm and Bun release gates, privacy patch scan, package dry-run, and changelog check pass; exact-head PR review completes with no unresolved findings; no publication occurs; pm context-usage --format json emits parseable JSON through the real installed CLI; pm validate and pm health --check-only --strict-exit pass"
+definition_of_ready: "Canonical checkout is clean on main, no open PR or package item duplicates the work, and installed pm 2026.8.7 is available"
+value: Keep agent-generated extension assets and their managed registry safe across concurrent branches
+impact: Prevents generated artifacts from being parsed or semantically merged as PM data
+outcome: pm-context carries the current SDK contract and canonical extension merge fence
+why_now: Companion critical issue pm-cli-website-19ju identifies pm-context as one of five remaining drifted packages
+reviewer: maintainer
+risk: critical
+confidence: high
+sprint: 2026-08-compatibility
+release: Unreleased
+resolution: "Upgraded the pm 2026.8.7 contracts and merge fence, corrected context-usage process-boundary JSON rendering, and verified the complete package through exact coverage, npm/Bun, fresh installed-CLI, security, and available review gates."
+expected_result: "pm-context emits parseable JSON through the real CLI, protects generated extension assets during concurrent merges, and passes all package-local release gates without publication."
+actual_result: "The exact behavior and merge protections were implemented and validated; all mandatory checks and Greptile exact-head review passed, unavailable reviewers were documented, and publication remains blocked by pm-context-r6x0."
+files[3]{path,scope,note}:
+  package.json,project,pm CLI SDK and changelog version contract
+  package-lock.json,project,resolved dependency graph
+  .gitattributes,project,multi-agent extension merge fence
+tests[4]{command,path,scope,timeout_seconds}:
+  "bun install --no-save && bun run release:check",.github/workflows/ci.yml,project,1800
+  "NPM_CONFIG_USERCONFIG=/dev/null npm run release:check",.github/workflows/ci.yml,project,1800
+  npm run coverage,scripts/coverage-gate.ts,project,1800
+  fresh npm-installed pm 2026.8.7 project installs local extension and validates context-pack context-usage JSON and strict check-only health,test/context-usage.test.ts,project,1800
+docs[3]{path,scope,note}:
+  "https://github.com/unbraind/pm-cli-companion/blob/main/.agents/pm/issues/pm-cli-website-19ju.toon",global,Companion fleet merge-fence tracker
+  "https://github.com/unbraind/pm-context/pull/54",global,implementation and exact-head review PR
+  .agents/pm/issues/pm-context-r6x0.toon,project,independent history identity publication blocker
+close_reason: "Implemented real JSON process-boundary rendering, adopted pm 2026.8.7 and the extension merge fence, passed exact coverage and npm/Bun/fresh-project gates, completed available exact-head review with no findings, and kept publication blocked by independent history-identity issue pm-context-r6x0."
+body: "Implementation evidence (2026-08-07):\n- Upgraded pm CLI/SDK and pm-changelog contracts to 2026.8.7; lock resolution is current and npm audit reports zero vulnerabilities after brace-expansion 5.0.9.\n- Installed the canonical extension merge fence: generated extensions are non-mergeable while .managed-extensions.json retains pm-json semantic merging.\n- A fresh npm-installed pm 2026.8.7 tracker exposed that context-usage --format json returned host-default TOON. The command now returns an owned rendered JSON payload; behavior-driven tests cover local --format json, global --json, filters, missing ledgers, affinity, and graceful SDK-affinity failure.\n- Fresh acceptance at a disposable /tmp tracker installed this exact local extension, activated all three commands, packed a real item, parsed context-usage JSON, and passed strict check-only health with no warnings.\n- Exact coverage: 195 tests passed; lines 100%, branches 100%, functions 100% across all three runtime source files.\n- npm and Bun release gates, package dry-run, changelog check, dependency freshness, and npm production/full audits pass.\n- Full vector health without --check-only is separately tracked upstream in pm-cli#928; the silent Ollama wait reproduced under a 45-second bound and fresh evidence was added without duplicating the issue.\n- Publication remains maintainer-gated and was not attempted.\n\nPrivacy evidence addendum:\n- The changed patch and tracked working tree contain no secret signatures, host addresses, or absolute host paths under the package privacy pattern scan.\n- Reachable commit metadata still contains one legacy personal-domain identity class. This is not introduced by this patch and does not block merging the package fix, but it blocks publication approval; remediation is tracked separately in pm-context-r6x0 because rewriting shared public history requires explicit maintainer coordination.\n\nReview handoff:\n- PR #54 opened from commit e0e22c1. Exact-head automated review will begin after this PM-link commit so all reviewers inspect the complete evidence state.\n\nExact-head review outcome for f567074f7f1f02dbd6bb3ee7170fef7b326227df:\n- GitHub CI on Node 22 and 26, Semgrep, DeepScan, and Hound passed.\n- Greptile reviewed the exact SHA at 5/5 and reported no blocking or non-blocking defect.\n- GraphQL reported zero review threads.\n- CodeRabbit exact-head review was unavailable because its included quota was exhausted; both artifacts were read, positively rated, and acknowledged with specific context.\n- Sourcery review was unavailable because its weekly diff-character quota was exhausted; its artifacts were read, positively rated, and acknowledged.\n- Gemini produced no acknowledgement, check, comment, or review artifact during the completed check window and is therefore recorded as unavailable, not approval.\n- No remediation finding remains and publication was not attempted."
