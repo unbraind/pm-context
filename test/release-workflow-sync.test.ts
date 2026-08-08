@@ -6,12 +6,20 @@
  * The release job bumps `package.json` to the pending version long before it
  * pushes the release tag, so the generate step cannot derive the section name
  * from a tag that does not exist yet. The fix names the section after the tag
- * being created by passing `--version "${{ steps.decide.outputs.tag }}"` to
- * BOTH the generate and the check invocation. This test parses the workflow
- * YAML (a real structural parse, not a loose regex) and asserts those two
- * invocations are byte-identical apart from the terminal flag
- * (`--github-step-summary` on generate, `--check` on the verify), so a future
- * edit cannot silently re-introduce the disagreement.
+ * being created by passing `--version "$RELEASE_TAG"` (the pending tag, flowing
+ * through `env` from `steps.decide.outputs.tag`) to the generate, check AND
+ * notes invocations, all of which expand a single shared `common=(...)` options
+ * array so the three cannot drift. This test parses the workflow YAML (a real
+ * structural parse, not a loose regex) and asserts:
+ *
+ *   - the generate step runs BEFORE the release-checks step (order matters);
+ *   - the generate and check invocations are byte-identical apart from the
+ *     terminal flag (`--github-step-summary` on generate, `--check` on verify);
+ *   - both expand the same shared `common` array;
+ *   - the `--version` that follows in that array is the pending-tag expression
+ *     (`"$RELEASE_TAG"`), locking in the actual root-cause fix rather than just
+ *     the presence of the flag;
+ *   - the notes invocation expands the same `common` array too.
  *
  * The YAML parser below is a small, dependency-free recursive-descent parser
  * scoped to the subset of YAML that GitHub Actions workflow files use: block
@@ -19,6 +27,11 @@
  * block scalars (`run: |`), plain scalars, and quoted scalars. It exists only
  * to navigate to a step's `run` block scalar; it is intentionally not a
  * general-purpose YAML implementation.
+ *
+ * No maintained YAML parser is available in this project's dependency tree
+ * (`node_modules` exposes neither `js-yaml` nor `yaml`), so importing one would
+ * add a new dependency for a single test. This scoped parser is the smaller
+ * cost and is confined to this file.
  */
 
 import assert from "node:assert/strict";
@@ -155,7 +168,8 @@ function parseWorkflowYaml(text: string): YamlNode {
 
   /**
    * Parses a block mapping at `indent`, optionally seeded with an inline first
-   * entry (the `- key: value` sequence-item form).
+   * entry (the `- key: value` sequence-item form). The inline entry seeds the
+   * loop's pending content and is consumed on the first iteration.
    *
    * @param indent - The indent of every key in this mapping.
    * @param firstEntry - Optional inline `key: value` text from a sequence item.
@@ -184,7 +198,6 @@ function parseWorkflowYaml(text: string): YamlNode {
       } else {
         obj[key] = parseScalar(valuePart);
       }
-      if (firstEntry !== undefined && content === firstEntry) firstEntry = undefined;
     }
     return obj;
   };
@@ -273,6 +286,28 @@ function lineEndingWith(lines: string[], flag: string): string {
   return matches[0];
 }
 
+/**
+ * Extracts the whitespace-delimited tokens of the shared `common=(...)` bash
+ * array that the generate, check and notes invocations expand. The array is the
+ * single source of truth for the pending-tag pair, so asserting the options it
+ * carries once covers every invocation that expands it.
+ *
+ * @param runScript - The literal `run` block scalar text of the generate step.
+ * @returns The array element tokens, in order.
+ */
+function extractCommonArray(runScript: string): string[] {
+  const rawLines = runScript.split("\n");
+  const start = rawLines.findIndex((line) => /^\s*common=\(\s*$/.test(line));
+  assert.ok(start !== -1, "expected a common=(...) pm-changelog options array in the generate step");
+  const elements: string[] = [];
+  for (let i = start + 1; i < rawLines.length; i++) {
+    const line = rawLines[i];
+    if (/^\s*\)\s*$/.test(line)) break;
+    elements.push(line.trim());
+  }
+  return elements.join(" ").split(/\s+/).filter((token) => token !== "");
+}
+
 test("release workflow names the changelog section after the tag in both generate and check", () => {
   const doc = parseWorkflowYaml(readFileSync(WORKFLOW_PATH, "utf8")) as {
     jobs?: { release?: { steps?: Array<{ name?: string; run?: string }> } };
@@ -283,10 +318,23 @@ test("release workflow names the changelog section after the tag in both generat
   const steps = doc.jobs?.release?.steps;
   assert.ok(Array.isArray(steps), "parser must expose jobs.release.steps as an array");
   const names = steps.map((step) => step.name).filter((name): name is string => typeof name === "string");
-  assert.ok(names.includes("Generate changelog and release notes"), "generate step must exist");
-  assert.ok(names.includes("Run release checks"), "release-checks step must exist");
 
-  const generateStep = steps.find((step) => step.name === "Generate changelog and release notes");
+  const generateName = "Generate changelog and release notes";
+  const releaseChecksName = "Run release checks";
+  assert.ok(names.includes(generateName), "generate step must exist");
+  assert.ok(names.includes(releaseChecksName), "release-checks step must exist");
+
+  // The release depends on step ORDER, not just step existence: the generate
+  // step must run before the release checks. Asserting only the names would let
+  // a future edit that reorders them pass silently.
+  const generateIndex = steps.findIndex((step) => step.name === generateName);
+  const releaseChecksIndex = steps.findIndex((step) => step.name === releaseChecksName);
+  assert.ok(
+    generateIndex >= 0 && releaseChecksIndex >= 0 && generateIndex < releaseChecksIndex,
+    "generate must run before the release checks",
+  );
+
+  const generateStep = steps[generateIndex];
   assert.ok(typeof generateStep?.run === "string", "generate step must have a run block");
   const run = generateStep.run as string;
 
@@ -306,14 +354,36 @@ test("release workflow names the changelog section after the tag in both generat
     "generate and check must be byte-identical apart from --github-step-summary vs --check",
   );
 
-  // Lock in the actual root-cause fix: the pending tag must be passed
-  // explicitly so generate and check derive the section name from one source.
+  // The shared options must come from ONE definition (the `common` array) so
+  // generate, check and notes cannot drift apart. Both invocations expand it.
   assert.ok(
-    generateCore.includes("--version"),
-    "the release pair must pass --version explicitly (the root-cause fix)",
+    generateCore.includes('"${common[@]}"'),
+    "generate and check must expand a shared common=(...) options array",
+  );
+
+  // Lock in the actual root-cause fix, not just the presence of the flag: the
+  // token that FOLLOWS --version must be the pending-tag expression. The common
+  // array is the single source of truth, and generate/check are already proven
+  // byte-identical and both expand the array, so this one assertion covers both.
+  const common = extractCommonArray(run);
+  const versionIndex = common.indexOf("--version");
+  assert.ok(versionIndex !== -1, "the release pair must pass --version explicitly (the root-cause fix)");
+  assert.strictEqual(
+    common[versionIndex + 1],
+    '"$RELEASE_TAG"',
+    "--version must be followed by the pending tag ($RELEASE_TAG), not a stale package-derived value",
   );
   assert.ok(
-    generateCore.includes("--all-release-tags"),
+    common.includes("--all-release-tags"),
     "the release pair must rebuild full history with --all-release-tags",
+  );
+
+  // The notes invocation must share the same common array so release notes can
+  // never diverge from the generated changelog section.
+  const notesLine = lines.find((line) => isPmChangelogLine(line) && line.includes("--stdout"));
+  assert.ok(notesLine, "a notes (stdout) pm-changelog invocation must exist");
+  assert.ok(
+    tokenize(notesLine).includes('"${common[@]}"'),
+    "the notes invocation must expand the same common options array as generate and check",
   );
 });

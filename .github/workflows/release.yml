@@ -98,58 +98,67 @@ jobs:
           rm -rf dist
           npm run build
 
-      - name: Run release checks
-        if: steps.decide.outputs.should_release == 'true'
-        run: npm run release:check
-
       - name: Generate changelog and release notes
+        if: steps.decide.outputs.should_release == 'true'
+        shell: bash
+        env:
+          # RELEASE_TAG flows through env rather than inline template expansion
+          # to avoid template-injection surface (zizmor); it is the pending tag
+          # the final "Push release tag and main" step will create.
+          RELEASE_TAG: ${{ steps.decide.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Common pm-changelog options shared by the generate, check and notes
+          # invocations below. Declared once so the three cannot drift: the
+          # pending release section is named after the tag being created
+          # (--version "$RELEASE_TAG") over the full release history
+          # (--all-release-tags), so generate and check derive the section name
+          # from one source and cannot disagree. Before this fix the generate
+          # used --until-release-tag (no tag exists yet, so it wrote "##
+          # Unreleased") while the check used --release-version-from-package
+          # (which derived "## <version> - <date>"), so the check always rejected
+          # the generate output and the release could not pass. Mirrors the
+          # pm-changelog release workflow, which passes the pending tag
+          # explicitly so generate and check cannot disagree.
+          common=(
+            --pm-root .agents/pm
+            --all-release-tags
+            --version "$RELEASE_TAG"
+            --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm
+            --respect-item-release
+            --pm-bin ./node_modules/.bin/pm
+          )
+          ./node_modules/.bin/pm-changelog "${common[@]}" --mode replace --output CHANGELOG.md --github-step-summary
+          ./node_modules/.bin/pm-changelog "${common[@]}" --mode replace --output CHANGELOG.md --check
+          # RELEASE_NOTES.md is the single section just generated for this tag,
+          # emitted to stdout with --limit 1 and trimmed of anything before the
+          # first '## ' heading.
+          ./node_modules/.bin/pm-changelog "${common[@]}" --stdout --limit 1 \
+            | sed -n '/^## /,$p' > RELEASE_NOTES.md
+          # Guard against an empty notes file: `sed -n '/^## /,$p'` exits 0 even
+          # when it matches nothing, so without this the job would reach "Create
+          # GitHub release" with an empty --notes-file and publish a release with
+          # no notes.
+          if [[ ! -s RELEASE_NOTES.md ]]; then
+            echo "::error::RELEASE_NOTES.md is empty for $RELEASE_TAG; no '## ' heading was extracted from the generated changelog."
+            exit 1
+          fi
+
+      - name: Run release checks
         if: steps.decide.outputs.should_release == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          release_tag="${{ steps.decide.outputs.tag }}"
-          # The generate and check invocations below are byte-identical apart from
-          # the terminal flag (--github-step-summary vs --check), and both name the
-          # pending release section after the tag being created via --version.
-          # Before this the generate used --until-release-tag (no tag exists yet at
-          # this point in the job, so it wrote "## Unreleased") while the check used
-          # --release-version-from-package (which derived "## <version> - <date>"),
-          # so the check always rejected the generate output and the release could
-          # not pass. Mirrors the pm-changelog release workflow, which passes the
-          # pending tag explicitly so generate and check cannot disagree.
-          ./node_modules/.bin/pm-changelog \
-            --pm-root .agents/pm \
-            --mode replace \
-            --output CHANGELOG.md \
-            --all-release-tags \
-            --version "$release_tag" \
-            --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm \
-            --respect-item-release \
-            --pm-bin ./node_modules/.bin/pm \
-            --github-step-summary
-          ./node_modules/.bin/pm-changelog \
-            --pm-root .agents/pm \
-            --mode replace \
-            --output CHANGELOG.md \
-            --all-release-tags \
-            --version "$release_tag" \
-            --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm \
-            --respect-item-release \
-            --pm-bin ./node_modules/.bin/pm \
-            --check
-          # RELEASE_NOTES.md is the single section just generated for this tag,
-          # emitted to stdout with --limit 1 and trimmed of the leading title.
-          ./node_modules/.bin/pm-changelog \
-            --pm-root .agents/pm \
-            --stdout \
-            --all-release-tags \
-            --version "$release_tag" \
-            --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm \
-            --respect-item-release \
-            --pm-bin ./node_modules/.bin/pm \
-            --limit 1 \
-            | sed -n '/^## /,$p' \
-            > RELEASE_NOTES.md
+          # release:check deliberately omits changelog:check. At release time
+          # package.json is already bumped to the pending version while the
+          # release tag is not pushed until the final step, so the prepend-mode
+          # changelog:check would demand an '## Unreleased' heading exactly when
+          # the generate step above just replaced it. The workflow's own
+          # tag-explicit generate+check pair above is the release-time authority.
+          # PR-time changelog coverage lives in ci.yml (changelog:check and
+          # changelog:full:check). Mirrors pm-changelog's release workflow,
+          # whose "Run release checks" runs only check/test/audit/pack.
+          npm run release:check
 
       - name: Commit release files
         if: steps.decide.outputs.should_release == 'true'
