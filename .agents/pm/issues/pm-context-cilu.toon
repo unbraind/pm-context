@@ -1,0 +1,20 @@
+id: pm-context-cilu
+title: Release changelog generate and check derived the section name from two different sources
+description: "The daily release job runs a generate step (npm run changelog, --mode prepend --since-previous-tag --until-release-tag --release-version-from-package) followed by a check step (npm run changelog:check, --mode replace --all-release-tags --release-version-from-package --check). At release time package.json is already bumped to the pending version, but the release tag is not pushed until the final step, so --until-release-tag cannot resolve the pending tag and the generate writes the section as '## Unreleased' while --release-version-from-package on the check side derives the same section as '## <version> - <date>'. The two commands disagree by construction, the check exits 1, and the release has failed every day since 2026-08-08 with no self-recovery path. Fix: make the release-time generate and check a byte-identical pair that names the pending section after the tag being created via an explicit --version, mirroring pm-changelog; and redefine the PR-time changelog:check as 'npm run changelog -- --check' so the PR pair cannot drift either."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-08T22:34:00.364Z"
+updated_at: "2026-08-08T22:44:26.197Z"
+closed_at: "2026-08-08T22:44:26.185Z"
+completed_at: "2026-08-08T22:44:26.185Z"
+claim_principal: pi-agent
+author: pi-agent
+notes[2]{created_at,author,text}:
+  "2026-08-08T22:43:54.696Z",pi-agent,"END-TO-END PROOF (scratch copy /tmp/pmctx-sim, package.json bumped to 2026.8.9, tag v2026.08.09 not yet pushed):\n\nOLD pair (the bug) - generate derived the name from --until-release-tag (no tag yet -> Unreleased), check derived it from --release-version-from-package (-> version):\n  generate wrote heading: '## Unreleased'\n  check diff: -## Unreleased  +## 2026.8.9 - 2026-08-08\n  check exit code: 1  (release could not pass)\n\nNEW pair (the fix) - both invocations byte-identical apart from --github-step-summary vs --check, both pass --version v2026.08.09:\n  generate wrote heading: '## 2026.8.9 - 2026-08-08'  (named after the tag, normalized to unpadded)\n  check: 'Changelog is up to date'\n  check exit code: 0\n  RELEASE_NOTES.md section: '## 2026.8.9 - 2026-08-08' with the unreleased item folded in.\n\nAlso verified the reordered 'Run release checks' (prepend changelog:check) passes against the committed CHANGELOG BEFORE the generate step mutates it (exit 0), matching pm-changelog's release-workflow ordering."
+  "2026-08-08T22:44:01.941Z",pi-agent,"TEST LOCK-IN: added test/release-workflow-sync.test.ts (196 tests, 100/100/100 coverage). It parses .github/workflows/release.yml with a dependency-free recursive-descent YAML parser, navigates to the 'Generate changelog and release notes' step run block, and asserts the two pm-changelog invocations are byte-identical apart from the terminal flag (--github-step-summary vs --check), and that --version is present. The test immediately proved its worth: it caught a typo (unbrained vs unbraind) I introduced in the generate --item-url-base before I committed."
+docs[1]{path,scope}:
+  "https://github.com/unbraind/pm-changelog/blob/main/.github/workflows/release.yml",project
+close_reason: "Fixed the release-time changelog generate/check desynchronization: the release workflow now runs a byte-identical pm-changelog generate+check pair that names the pending section after the tag via an explicit --version (mirroring pm-changelog), with 'Run release checks' reordered before the generate step so the prepend-mode changelog:check still validates committed state. Redefined changelog:check as 'npm run changelog -- --check' so the PR-time pair cannot drift. Added test/release-workflow-sync.test.ts that parses the workflow YAML and locks the pair in sync. Verified end-to-end: new pair exits 0 with heading '## 2026.8.9 - 2026-08-08'; old pair exited 1. All gates green (typecheck, 196 tests, 100/100/100 coverage, changelog:check)."
+body: ""

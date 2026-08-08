@@ -98,19 +98,58 @@ jobs:
           rm -rf dist
           npm run build
 
+      - name: Run release checks
+        if: steps.decide.outputs.should_release == 'true'
+        run: npm run release:check
+
       - name: Generate changelog and release notes
         if: steps.decide.outputs.should_release == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          # For the first release (no prior tag), pm-changelog emits the full closed-item window once.
-          npm run changelog -- --github-step-summary
-          npm run changelog:check
-          npm run release:notes > RELEASE_NOTES.md
-
-      - name: Run release checks
-        if: steps.decide.outputs.should_release == 'true'
-        run: npm run release:check
+          release_tag="${{ steps.decide.outputs.tag }}"
+          # The generate and check invocations below are byte-identical apart from
+          # the terminal flag (--github-step-summary vs --check), and both name the
+          # pending release section after the tag being created via --version.
+          # Before this the generate used --until-release-tag (no tag exists yet at
+          # this point in the job, so it wrote "## Unreleased") while the check used
+          # --release-version-from-package (which derived "## <version> - <date>"),
+          # so the check always rejected the generate output and the release could
+          # not pass. Mirrors the pm-changelog release workflow, which passes the
+          # pending tag explicitly so generate and check cannot disagree.
+          ./node_modules/.bin/pm-changelog \
+            --pm-root .agents/pm \
+            --mode replace \
+            --output CHANGELOG.md \
+            --all-release-tags \
+            --version "$release_tag" \
+            --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm \
+            --respect-item-release \
+            --pm-bin ./node_modules/.bin/pm \
+            --github-step-summary
+          ./node_modules/.bin/pm-changelog \
+            --pm-root .agents/pm \
+            --mode replace \
+            --output CHANGELOG.md \
+            --all-release-tags \
+            --version "$release_tag" \
+            --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm \
+            --respect-item-release \
+            --pm-bin ./node_modules/.bin/pm \
+            --check
+          # RELEASE_NOTES.md is the single section just generated for this tag,
+          # emitted to stdout with --limit 1 and trimmed of the leading title.
+          ./node_modules/.bin/pm-changelog \
+            --pm-root .agents/pm \
+            --stdout \
+            --all-release-tags \
+            --version "$release_tag" \
+            --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm \
+            --respect-item-release \
+            --pm-bin ./node_modules/.bin/pm \
+            --limit 1 \
+            | sed -n '/^## /,$p' \
+            > RELEASE_NOTES.md
 
       - name: Commit release files
         if: steps.decide.outputs.should_release == 'true'
