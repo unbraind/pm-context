@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   id-token: write
+  pull-requests: write
 
 concurrency:
   group: daily-release
@@ -81,6 +82,7 @@ jobs:
           echo "should_release=true" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "npm_version=$npm_version" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Update release version
         if: steps.decide.outputs.should_release == 'true'
@@ -198,6 +200,186 @@ jobs:
             exit 1
           fi
 
+      # Persist validated release metadata through the repository's protected
+      # branch policy before publishing an immutable npm artifact. A stable
+      # branch name lets a failed run update/reuse its open release PR, while
+      # the exact remote SHA lease prevents overwriting another actor's work.
+      # Ported from pm-changelog's release.yml (pmc-84ow): main must already
+      # contain the release commit before npm publish runs - the invariant the
+      # old publish-then-push ordering violated (GH006 rejected HEAD:main on
+      # 2026.8.9, leaving npm ahead of git).
+      - name: Merge release metadata through protected PR
+        if: steps.decide.outputs.should_release == 'true'
+        id: release_pr
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BASE_SHA: ${{ steps.decide.outputs.base_sha }}
+          RELEASE_TAG: ${{ steps.decide.outputs.tag }}
+          NPM_VERSION: ${{ steps.decide.outputs.npm_version }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --force
+          current_main_sha="$(git rev-parse origin/main)"
+          if [[ "$current_main_sha" != "$RELEASE_BASE_SHA" ]]; then
+            echo "::error::main advanced from ${RELEASE_BASE_SHA} to ${current_main_sha} while preparing the release. Retry from the new main head."
+            exit 1
+          fi
+
+          release_branch="release/${RELEASE_TAG#v}"
+          release_commit="$(git rev-parse HEAD)"
+          if [[ "$release_commit" == "$current_main_sha" ]]; then
+            echo "Release metadata is already present on main; resuming the publish/tag transaction."
+            if git ls-remote --exit-code --heads origin "refs/heads/${release_branch}" > /dev/null 2>&1; then
+              git push origin --delete "$release_branch"
+            fi
+            {
+              echo "merged_sha=$current_main_sha"
+              echo "pr_number="
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          remote_branch_sha="$(git ls-remote --heads origin "refs/heads/${release_branch}" | cut -f1)"
+          if [[ -n "$remote_branch_sha" ]]; then
+            git push \
+              --force-with-lease="refs/heads/${release_branch}:${remote_branch_sha}" \
+              origin "HEAD:refs/heads/${release_branch}"
+          else
+            git push origin "HEAD:refs/heads/${release_branch}"
+          fi
+
+          pr_number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --base main \
+            --head "$release_branch" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')"
+          if [[ -z "$pr_number" ]]; then
+            pr_url="$(gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base main \
+              --head "$release_branch" \
+              --title "Release pm-context ${RELEASE_TAG}" \
+              --body "Automated daily release metadata for \`${RELEASE_TAG}\`. The release gate passed before this PR was created; npm publication and tagging remain blocked until this protected PR is merged. Tracking: [pm-context-b7ub](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-b7ub.toon).")"
+            pr_number="${pr_url##*/}"
+          fi
+
+          # A 404 means no required checks are configured, which is a real answer.
+          # Any other failure - outage, rate limit, missing token scope - must not
+          # be read as "nothing is required", because that silently restores the
+          # race this step exists to remove.
+          protection_out="$(mktemp)"
+          if gh api \
+               "repos/${GITHUB_REPOSITORY}/branches/main/protection/required_status_checks" \
+               --jq '[(.contexts[]?), (.checks[]?.context)] | map(select(. != null)) | unique' \
+               > "$protection_out" 2>"${protection_out}.err"; then
+            required_json="$(cat "$protection_out")"
+          elif grep -qi 'not found\|HTTP 404' "${protection_out}.err"; then
+            required_json='[]'
+            echo "No required status checks configured on main; merging without waiting."
+          else
+            echo "::error::Could not read branch protection for ${GITHUB_REPOSITORY}: $(tr '\n' ' ' < "${protection_out}.err")"
+            exit 1
+          fi
+          rm -f "$protection_out" "${protection_out}.err"
+
+          if [[ "$(jq -r 'length' <<< "$required_json")" != "0" ]]; then
+            deadline=$(( SECONDS + 1800 ))
+            while :; do
+              rollup="$(gh pr view "$pr_number" \
+                --repo "$GITHUB_REPOSITORY" \
+                --json statusCheckRollup \
+                --jq '[.statusCheckRollup[]?
+                       | {name: (.name // .context),
+                          state: (.conclusion // .state // .status // "PENDING")}]')"
+              report="$(jq -n --argjson req "$required_json" --argjson all "$rollup" \
+                '[$req[] as $name
+                  | ($all | map(select(.name == $name)) | last)
+                  | {name: ($name), state: (.state // "EXPECTED")}]')"
+              # Allowlist the states that mean "settled and acceptable"; classify
+              # every explicit non-passing conclusion as a failure; treat anything
+              # else - REQUESTED, WAITING, a state GitHub adds later - as still
+              # pending. A denylist would let an unrecognised state read as
+              # settled and fire the merge into a check that never ran, which is
+              # the failure this step exists to prevent.
+              pending="$(jq -r '[.[] | select((.state | IN("SUCCESS", "NEUTRAL", "SKIPPED",
+                                                           "FAILURE", "ERROR", "TIMED_OUT",
+                                                           "CANCELLED", "ACTION_REQUIRED",
+                                                           "STARTUP_FAILURE", "STALE")) | not)
+                                 | .name] | join(", ")' <<< "$report")"
+              failed="$(jq -r '[.[] | select(.state | IN("FAILURE", "ERROR", "TIMED_OUT",
+                                                         "CANCELLED", "ACTION_REQUIRED",
+                                                         "STARTUP_FAILURE", "STALE"))
+                                 | .name] | join(", ")' <<< "$report")"
+              if [[ -n "$failed" ]]; then
+                echo "::error::Required checks failed on release PR #${pr_number}: ${failed}. Not merging or publishing."
+                exit 1
+              fi
+              if [[ -z "$pending" ]]; then
+                break
+              fi
+              if (( SECONDS >= deadline )); then
+                echo "::error::Required checks on release PR #${pr_number} did not settle within 30 minutes; still waiting on: ${pending}."
+                exit 1
+              fi
+              echo "Waiting for required checks on PR #${pr_number}: ${pending}"
+              sleep 20
+            done
+          fi
+
+          merged_sha="$(gh api \
+            --method PUT \
+            "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/merge" \
+            -f merge_method=rebase \
+            -f sha="$release_commit" \
+            --jq '.sha')"
+          if [[ -z "$merged_sha" || "$merged_sha" == "null" ]]; then
+            echo "::error::GitHub did not return the merged main SHA for release PR #${pr_number}."
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --heads origin "refs/heads/${release_branch}" > /dev/null 2>&1; then
+            git push origin --delete "$release_branch"
+          fi
+          {
+            echo "merged_sha=$merged_sha"
+            echo "pr_number=$pr_number"
+          } >> "$GITHUB_OUTPUT"
+          echo "Merged release metadata PR #${pr_number} at ${merged_sha}." >> "$GITHUB_STEP_SUMMARY"
+
+      # The release PR can only contain the prepared release commit because the
+      # base SHA is checked immediately before creation. Re-check the exact
+      # merged main commit anyway so npm always receives byte-for-byte validated
+      # repository state, and fail safely before publication if main moved.
+      - name: Verify merged release
+        if: steps.decide.outputs.should_release == 'true'
+        shell: bash
+        env:
+          MERGED_SHA: ${{ steps.release_pr.outputs.merged_sha }}
+          NPM_VERSION: ${{ steps.decide.outputs.npm_version }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --force
+          git checkout --detach origin/main
+          actual_sha="$(git rev-parse HEAD)"
+          if [[ "$actual_sha" != "$MERGED_SHA" ]]; then
+            echo "::error::main advanced from merged release ${MERGED_SHA} to ${actual_sha} before publication. Retry to rebuild release metadata on the new head."
+            exit 1
+          fi
+
+          actual_version="$(npm pkg get version | tr -d '"')"
+          if [[ "$actual_version" != "$NPM_VERSION" ]]; then
+            echo "::error::Merged package version ${actual_version} does not match intended release ${NPM_VERSION}."
+            exit 1
+          fi
+
+          npm ci
+          npm run release:check
+          git diff --exit-code -- \
+            package.json package-lock.json manifest.json index.ts dist CHANGELOG.md
+
       - name: Publish npm package
         if: steps.decide.outputs.should_release == 'true'
         shell: bash
@@ -247,18 +429,30 @@ jobs:
           echo "::error::Publish failed after retries and provenance fallback."
           exit 1
 
-      # Push tag + main AFTER a successful publish so a failed publish does not
-      # leave the repo tagged/skipped. The release ref (fast-forward of
-      # origin/main) was already verified in the "Check release ref" step before
-      # publishing, so here we only create the tag and advance main.
-      - name: Push release tag and main
+      # Tag the exact merged/verified main commit AFTER a successful publish.
+      # main is already advanced by the protected-PR merge above, so this step
+      # only creates and pushes the tag. If publication fails, main retains the
+      # prepared metadata and the next run resumes the same version instead of
+      # inventing another release.
+      - name: Push release tag
         if: steps.decide.outputs.should_release == 'true'
         shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.decide.outputs.tag }}
         run: |
           set -euo pipefail
-          git tag "${{ steps.decide.outputs.tag }}"
-          git push origin HEAD:main
-          git push origin "${{ steps.decide.outputs.tag }}"
+          release_tag="$RELEASE_TAG"
+          if git rev-parse --verify --quiet "refs/tags/${release_tag}" > /dev/null; then
+            existing_sha="$(git rev-list -n 1 "$release_tag")"
+            current_sha="$(git rev-parse HEAD)"
+            if [[ "$existing_sha" != "$current_sha" ]]; then
+              echo "::error::${release_tag} already points to ${existing_sha}, not verified main ${current_sha}."
+              exit 1
+            fi
+          else
+            git tag "$release_tag"
+          fi
+          git push origin "refs/tags/${release_tag}"
 
       - name: Verify bun install of published package
         if: steps.decide.outputs.should_release == 'true'
