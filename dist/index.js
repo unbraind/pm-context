@@ -18,7 +18,20 @@ export const EXIT_CODE = {
     GENERIC_FAILURE: 1,
     USAGE: 2,
 };
+/**
+ * Error carrying the process exit code the CLI should terminate with.
+ *
+ * Lets a failure deep in assembly choose between "the caller made a usage
+ * mistake" and "something went wrong", without every throw site having to
+ * thread an exit code back through its callers. `name` is set to
+ * `"CommandError"` so a handler can recognise it across module boundaries,
+ * where `instanceof` is unreliable.
+ */
 export class CommandError extends Error {
+    /**
+     * Exit code for this failure, defaulting to {@link EXIT_CODE.GENERIC_FAILURE}.
+     * Usage errors pass {@link EXIT_CODE.USAGE} explicitly.
+     */
     exitCode;
     constructor(message, exitCode = EXIT_CODE.GENERIC_FAILURE) {
         super(message);
@@ -27,7 +40,28 @@ export class CommandError extends Error {
     }
 }
 export const MAX_NEIGHBORHOOD_DEPTH = 5;
+/**
+ * Section names `--section` accepts for markdown output.
+ *
+ * `neighborhood` and `neighbors` are two distinct sections despite the similar
+ * names, and the markdown renderer matches each exactly: `neighborhood` emits
+ * "Dependency Neighborhood", the relationship edges between focus items, while
+ * `neighbors` emits "Neighbor Items", the neighbouring items themselves.
+ * Selecting one does not include the other.
+ *
+ * {@link validateSections} rejects anything outside this list and names the
+ * permitted sections in the error.
+ */
 export const MARKDOWN_SECTIONS = ["summary", "focus", "neighborhood", "neighbors", "links", "deps"];
+/**
+ * Section names `--section` accepts for agent output.
+ *
+ * A different set from {@link MARKDOWN_SECTIONS}: `blockers`, `next-actions`,
+ * `recent` and `refresh` have no markdown equivalent, and `summary` is markdown
+ * only. Unlike the markdown renderer, which matches every section name
+ * exactly, the agent renderer accepts aliases: `actions` and `nextactions`
+ * both select `next-actions`, and `activity` selects `recent`.
+ */
 export const AGENT_SECTIONS = ["focus", "blockers", "next-actions", "actions", "nextactions", "recent", "activity", "links", "deps", "refresh"];
 export function renderedCommandResult(output) {
     // Ensure the rendered payload ends with exactly one trailing newline. Every

@@ -1,0 +1,34 @@
+id: pm-context-ylx4
+title: Adopt the canonical docstring gate so the documented surface cannot regress silently
+description: "pm-context had no docstring gate, so six exported declarations carried no documentation and nothing would have caught a seventh. Wired in the canonical analyzer published as pm-ops docstrings through a thin launcher and documented the remaining surface."
+type: Task
+status: closed
+priority: 1
+tags[3]: ci,docstrings,gate
+created_at: "2026-08-09T21:55:25.640Z"
+updated_at: "2026-08-09T21:55:32.302Z"
+deadline: "2026-08-10T00:00:00.000Z"
+closed_at: "2026-08-09T21:55:32.286Z"
+completed_at: "2026-08-09T21:55:32.286Z"
+author: claude
+estimated_minutes: 60
+acceptance_criteria: "npm run docstring exits zero, the gate is a required CI step and part of release:check, the analyzer is imported from pm-ops rather than vendored, and coverage stays at 100 percent with the launcher included"
+resolution: fixed
+expected_result: npm run docstring exits zero as a required CI step and coverage stays at 100 percent
+actual_result: "The gate reports 4 files and 19 declarations documented, coverage is 100 across statements branches and functions including the launcher, and the step is required in ci.yml and release:check"
+dependencies[1]{id,kind,created_at,author,source_kind,author_source}:
+  pm-context-btl1,related,"2026-08-09T21:55:25.640Z",claude,"cli:create:dep",asserted
+comments[1]{created_at,author,text}:
+  "2026-08-09T21:55:25.640Z",claude,Added scripts/docstring-gate.ts to coverageGate.sources so the launcher is held to the same 100 percent floor as the rest of the package rather than sitting outside the gate
+notes[1]{created_at,author,text}:
+  "2026-08-09T21:55:25.640Z",claude,"Takes canonical adoption to 18 of 22 repositories once pm-web merges,leaving pm-csv plus pm-cli which is upstream and pm-rust which is Rust"
+learnings[1]{created_at,author,text}:
+  "2026-08-09T21:55:25.640Z",claude,"A docstring that reads plausibly from a constant list can still be false. Two similar section names were documented as aliases of one section,and reading the renderer showed they are two distinct sections the markdown path matches exactly,so the claim would have misled every caller who trusted it"
+files[1]{path,scope,note}:
+  index.ts,project,six declarations documented
+tests[1]{command,scope,timeout_seconds}:
+  npm run docstring,project,120
+docs[1]{path,scope,note}:
+  scripts/docstring-gate.ts,project,thin launcher over the canonical pm-ops analyzer
+close_reason: Wired the canonical pm-ops analyzer in through a thin launcher and documented the six remaining declarations
+body: "The six undocumented declarations were CommandError and its exitCode member, the PmItem and ContextPackOptions interfaces, and the MARKDOWN_SECTIONS and AGENT_SECTIONS constants. Documenting them required reading the two renderers rather than the constant lists: the agent renderer accepts aliases through a second include parameter while the markdown renderer matches every section name exactly."

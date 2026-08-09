@@ -40,7 +40,20 @@ export const EXIT_CODE = {
   USAGE: 2,
 } as const;
 
+/**
+ * Error carrying the process exit code the CLI should terminate with.
+ *
+ * Lets a failure deep in assembly choose between "the caller made a usage
+ * mistake" and "something went wrong", without every throw site having to
+ * thread an exit code back through its callers. `name` is set to
+ * `"CommandError"` so a handler can recognise it across module boundaries,
+ * where `instanceof` is unreliable.
+ */
 export class CommandError extends Error {
+  /**
+   * Exit code for this failure, defaulting to {@link EXIT_CODE.GENERIC_FAILURE}.
+   * Usage errors pass {@link EXIT_CODE.USAGE} explicitly.
+   */
   exitCode: number;
   constructor(message: string, exitCode: number = EXIT_CODE.GENERIC_FAILURE) {
     super(message);
@@ -49,6 +62,19 @@ export class CommandError extends Error {
   }
 }
 
+/**
+ * One pm item as read from the tracker, in the shape this package consumes.
+ *
+ * Only `id` is guaranteed: the rest are optional because a pack may be built
+ * from a projection that omits fields, and because item type determines which
+ * are populated. The index signature is deliberate — trackers carry
+ * project-defined fields this package neither knows nor needs, and they must
+ * survive a round trip rather than be dropped.
+ *
+ * Several relationship fields appear under more than one spelling (`deps` and
+ * `dependencies`, `blocked_by` and `blockedBy`) because the SDK and the CLI
+ * JSON surface disagree; readers accept either rather than assuming one.
+ */
 export interface PmItem {
   id: string;
   title?: string;
@@ -77,9 +103,44 @@ export interface PmItem {
 
 export const MAX_NEIGHBORHOOD_DEPTH = 5;
 
+/**
+ * Section names `--section` accepts for markdown output.
+ *
+ * `neighborhood` and `neighbors` are two distinct sections despite the similar
+ * names, and the markdown renderer matches each exactly: `neighborhood` emits
+ * "Dependency Neighborhood", the relationship edges between focus items, while
+ * `neighbors` emits "Neighbor Items", the neighbouring items themselves.
+ * Selecting one does not include the other.
+ *
+ * {@link validateSections} rejects anything outside this list and names the
+ * permitted sections in the error.
+ */
 export const MARKDOWN_SECTIONS = ["summary", "focus", "neighborhood", "neighbors", "links", "deps"] as const;
+
+/**
+ * Section names `--section` accepts for agent output.
+ *
+ * A different set from {@link MARKDOWN_SECTIONS}: `blockers`, `next-actions`,
+ * `recent` and `refresh` have no markdown equivalent, and `summary` is markdown
+ * only. Unlike the markdown renderer, which matches every section name
+ * exactly, the agent renderer accepts aliases: `actions` and `nextactions`
+ * both select `next-actions`, and `activity` selects `recent`.
+ */
 export const AGENT_SECTIONS = ["focus", "blockers", "next-actions", "actions", "nextactions", "recent", "activity", "links", "deps", "refresh"] as const;
 
+/**
+ * Inputs controlling which items enter a context pack and how it is rendered.
+ *
+ * Every field is optional: the assembly path applies its own defaults, so a
+ * caller supplies only what it wants to override. The options fall into three
+ * groups — selection (`ids`, `status`, `type`, `tag`, `includeClosed`), size
+ * (`limit`, `maxItems`, `neighborhood`, `neighborhoodDepth`), and rendering
+ * (`includeBody`, `includeDeps`, `generatedAt`).
+ *
+ * `generatedAt` exists so a caller can stamp a fixed timestamp instead of
+ * reading the clock, which is what keeps generated packs comparable between
+ * runs.
+ */
 export interface ContextPackOptions {
   ids?: string[];
   status?: string;

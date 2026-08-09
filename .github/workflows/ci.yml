@@ -58,6 +58,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Verify complete docstring coverage
+        run: npm run docstring
+
       - name: Build and verify committed output is current
         shell: bash
         run: |
