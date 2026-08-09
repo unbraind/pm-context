@@ -6,7 +6,7 @@ status: closed
 priority: 2
 tags[3]: changelog,ci,cleanup
 created_at: "2026-08-09T20:03:45.040Z"
-updated_at: "2026-08-09T20:04:11.918Z"
+updated_at: "2026-08-09T21:37:28.216Z"
 deadline: "2026-08-10T00:00:00.000Z"
 closed_at: "2026-08-09T20:04:11.906Z"
 completed_at: "2026-08-09T20:04:11.906Z"
@@ -26,7 +26,8 @@ learnings[1]{created_at,author,text}:
   "2026-08-09T20:03:45.040Z",claude,"When two script aliases converge onto one command,the stale comments that justified the split are the last thing to be noticed and should be rewritten in the same change"
 files[1]{path,scope,note}:
   .github/workflows/ci.yml,project,duplicate verification step removed
-tests[1]{command,scope,timeout_seconds}:
+tests[2]{command,scope,timeout_seconds}:
+  "node -e \"const s=require('./package.json').scripts; const c=require('fs').readFileSync('.github/workflows/ci.yml').toString(); const n=(c.match(/run: npm run changelog:check/g)||[]).length; if(s['changelog:check']!=='npm run changelog:full -- --check') throw new Error('changelog:check is not replace-mode'); if(s['changelog:full:check']) throw new Error('duplicate alias returned'); if(n!==1) throw new Error('changelog steps='+n)\"",project,60
   "npm run changelog:check",project,120
 docs[1]{path,scope,note}:
   .github/workflows/release.yml,project,"comment describing why release:check omits the changelog gate"
