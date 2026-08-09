@@ -7,6 +7,10 @@
 - Duplicate changelog verification steps ran the same replace-mode check twice in CI ([pm-context-btl1](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-btl1.toon))
 - The release merge-wait read branch protection which the workflow token can never read ([pm-context-vu89](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-vu89.toon))
 
+### Other
+
+- Adopt the canonical docstring gate so the documented surface cannot regress silently ([pm-context-ylx4](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-ylx4.toon))
+
 ## 2026.8.9 - 2026-08-09
 
 ### Fixed
