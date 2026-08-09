@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Release changelog generate and check derived the section name from two different sources ([pm-context-cilu](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-cilu.toon))
+
 ### Other
 
 - Adopt pm CLI 2026.8.7 and protect extension assets during multi-agent merges ([pm-context-5njx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-5njx.toon))
