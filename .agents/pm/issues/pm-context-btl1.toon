@@ -1,0 +1,35 @@
+id: pm-context-btl1
+title: Duplicate changelog verification steps ran the same replace-mode check twice in CI
+description: "changelog:check and changelog:full:check resolved to the identical command after changelog:check was aligned to replace mode, and CI ran both as separate steps."
+type: Issue
+status: closed
+priority: 2
+tags[3]: changelog,ci,cleanup
+created_at: "2026-08-09T20:03:45.040Z"
+updated_at: "2026-08-09T21:37:28.216Z"
+deadline: "2026-08-10T00:00:00.000Z"
+closed_at: "2026-08-09T20:04:11.906Z"
+completed_at: "2026-08-09T20:04:11.906Z"
+author: claude
+estimated_minutes: 20
+acceptance_criteria: "CI verifies the changelog exactly once, and no script alias resolves to a duplicate of another"
+resolution: fixed
+expected_result: "CI runs one changelog verification step and npm run changelog:check exits 0"
+actual_result: "The duplicate step and alias are gone and npm run changelog:check reports the changelog is up to date"
+dependencies[1]{id,kind,created_at,author,source_kind,author_source}:
+  pm-context-pmc-s2bk,related,"2026-08-09T20:03:45.040Z",claude,"cli:create:dep",asserted
+comments[1]{created_at,author,text}:
+  "2026-08-09T20:03:45.040Z",claude,"Removed the redundant alias rather than the step so release:check keeps the fleet-standard changelog:check name"
+notes[1]{created_at,author,text}:
+  "2026-08-09T20:03:45.040Z",claude,"pm-context release.yml already generated and checked in replace mode,so only the PR-time scripts were inconsistent"
+learnings[1]{created_at,author,text}:
+  "2026-08-09T20:03:45.040Z",claude,"When two script aliases converge onto one command,the stale comments that justified the split are the last thing to be noticed and should be rewritten in the same change"
+files[1]{path,scope,note}:
+  .github/workflows/ci.yml,project,duplicate verification step removed
+tests[2]{command,scope,timeout_seconds}:
+  "node -e \"const s=require('./package.json').scripts; const c=require('fs').readFileSync('.github/workflows/ci.yml').toString(); const n=(c.match(/run: npm run changelog:check/g)||[]).length; if(s['changelog:check']!=='npm run changelog:full -- --check') throw new Error('changelog:check is not replace-mode'); if(s['changelog:full:check']) throw new Error('duplicate alias returned'); if(n!==1) throw new Error('changelog steps='+n)\"",project,60
+  "npm run changelog:check",project,120
+docs[1]{path,scope,note}:
+  .github/workflows/release.yml,project,"comment describing why release:check omits the changelog gate"
+close_reason: "Removed the duplicate changelog:full:check alias and its CI step, leaving a single replace-mode changelog gate"
+body: "changelog:check previously ran the prepend-mode generator with --check while CHANGELOG.md is generated in replace mode, so the gate could not be satisfied. Aligning it to changelog:full made it byte-identical to the existing changelog:full:check alias, leaving CI with two steps running the same command."
