@@ -1,13 +1,15 @@
 # Changelog
 
-## Unreleased
+## 2026.8.9 - 2026-08-09
 
 ### Fixed
 
+- Release workflow publishes npm before advancing protected main (GH006 desync) ([pm-context-b7ub](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-b7ub.toon))
 - Release changelog generate and check derived the section name from two different sources ([pm-context-cilu](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-cilu.toon))
 
 ### Other
 
+- Restore the 2026.8.9 release on main to match npm ([pm-context-1fqt](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-1fqt.toon))
 - Adopt pm CLI 2026.8.7 and protect extension assets during multi-agent merges ([pm-context-5njx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-5njx.toon))
 
 ## 2026.8.7 - 2026-08-07
