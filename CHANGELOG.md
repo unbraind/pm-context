@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Duplicate changelog verification steps ran the same replace-mode check twice in CI ([pm-context-btl1](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-btl1.toon))
 - The release merge-wait read branch protection which the workflow token can never read ([pm-context-vu89](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-vu89.toon))
 
 ## 2026.8.9 - 2026-08-09

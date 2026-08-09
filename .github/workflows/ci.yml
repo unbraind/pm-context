@@ -85,11 +85,8 @@ jobs:
       - name: Verify npm package contents
         run: npm run pack:dry-run
 
-      - name: Verify generated changelog (pending section)
+      - name: Verify generated changelog
         run: npm run changelog:check
-
-      - name: Verify full changelog history
-        run: npm run changelog:full:check
 
       - name: Verify Bun can install the package graph
         run: bun install --no-save
