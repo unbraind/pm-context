@@ -6,7 +6,7 @@ status: closed
 priority: 0
 tags[5]: branch-protection,github-actions,production-readiness,release,transaction-safety
 created_at: "2026-08-09T12:47:22.193Z"
-updated_at: "2026-08-09T13:14:54.605Z"
+updated_at: "2026-08-09T13:53:19.423Z"
 closed_at: "2026-08-09T13:14:54.590Z"
 completed_at: "2026-08-09T13:14:54.590Z"
 claim_principal: pi-agent
@@ -16,9 +16,14 @@ risk: critical
 resolution: "Protected-branch-compatible release PR transaction ported from pm-changelog (pmc-84ow): pull-requests:write added, Merge-through-PR + Verify-merged steps inserted before Publish, Push release tag is tag-only. main now advances before npm publish."
 expected_result: git main contains the release commit before npm publish runs; a rejected push can no longer desync npm from git.
 actual_result: "Workflow reordered and validated locally; base_sha added to Decide; Verify step diffs package.json package-lock.json manifest.json index.ts dist CHANGELOG.md. release:check exit 0."
-notes[2]{created_at,author,text}:
-  "2026-08-09T13:14:13.130Z",pi-agent,"Diagnosis: .github/workflows/release.yml ran 'Publish npm package' (line ~149) BEFORE 'Push release tag and main' (git push origin HEAD:main). On 2026-08-09 ~04:40 the daily release published pm-context@2026.8.9 to npm, then the direct HEAD:main push was rejected by protected-branch policy (GH006), leaving npm at 2026.8.9 while git main stayed at 2026.8.7 with no v2026.08.09 tag. Because npm is immutable, any push failure permanently desyncs npm from git."
-  "2026-08-09T13:14:13.685Z",pi-agent,"Fix (ported from pm-changelog release.yml / pmc-84ow): added pull-requests:write; added base_sha output to 'Decide release'; inserted 'Merge release metadata through protected PR' (pushes release/<ver>, opens/reuses a PR, merges via API with merge_method=rebase and sha=<release_commit> pinned) and 'Verify merged release' (refetches origin/main, asserts merged SHA + package version, re-runs release:check, diffs package.json package-lock.json manifest.json index.ts dist CHANGELOG.md); replaced 'Push release tag and main' with a tag-only 'Push release tag'. Invariant now enforced: git main contains the release commit BEFORE npm publish runs."
+notes[2]:
+  - created_at: "2026-08-09T13:14:13.130Z"
+    author: pi-agent
+    text: "Diagnosis: .github/workflows/release.yml ran 'Publish npm package' (line ~149) BEFORE 'Push release tag and main' (git push origin HEAD:main). On 2026-08-09 ~04:40 UTC the daily release published pm-context@2026.8.9 to npm, then the direct HEAD:main push was rejected by protected-branch policy (GH006), leaving npm at 2026.8.9 while git main stayed at 2026.8.7 with no v2026.08.09 tag. Because npm is immutable, any push failure permanently desyncs npm from git."
+    edited_at: "2026-08-09T13:53:19.423Z"
+  - created_at: "2026-08-09T13:14:13.685Z"
+    author: pi-agent
+    text: "Fix (ported from pm-changelog release.yml / pmc-84ow): added pull-requests:write; added base_sha output to 'Decide release'; inserted 'Merge release metadata through protected PR' (pushes release/<ver>, opens/reuses a PR, merges via API with merge_method=rebase and sha=<release_commit> pinned) and 'Verify merged release' (refetches origin/main, asserts merged SHA + package version, re-runs release:check, diffs package.json package-lock.json manifest.json index.ts dist CHANGELOG.md); replaced 'Push release tag and main' with a tag-only 'Push release tag'. Invariant now enforced: git main contains the release commit BEFORE npm publish runs."
 files[1]{path,scope,note}:
   .github/workflows/release.yml,project,Reordered to merge-through-PR + verify + tag-only push
 tests[1]{command,scope,note}:
