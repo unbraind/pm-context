@@ -17,10 +17,12 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { after } from "node:test";
+
+import { checkExtensionManifestCompatibility } from "@unbrained/pm-cli/sdk";
 
 import {
   CommandError,
@@ -82,9 +84,37 @@ function mutatedEnvelope(mutate: (env: Record<string, unknown>) => void): Record
   return env;
 }
 
+/** A seam plus the SDK list request it captured, so the request itself can be asserted. */
+interface CapturingSeam {
+  /** The seam to hand to `readPmItems` in place of the real SDK list action. */
+  readonly seam: PmListAction;
+  /** The options object of the last call, or `undefined` when the seam was never invoked. */
+  request: Record<string, unknown> | undefined;
+}
+
+/**
+ * Seam resolving a canned envelope as the SDK list result, recording the request.
+ *
+ * The receipt check catches a truncated answer after the fact; `noTruncate` and
+ * `strictRead` are what stop the CLI from producing one in the first place.
+ * Capturing the request lets the happy-path test pin that contract, so dropping
+ * either flag fails here rather than silently reverting to the read that
+ * returned 10 of 682 items.
+ */
+function capturingSeamFor(envelope: Record<string, unknown>): CapturingSeam {
+  const captured: CapturingSeam = {
+    seam: (async (options: Record<string, unknown>) => {
+      captured.request = options;
+      return envelope;
+    }) as unknown as PmListAction,
+    request: undefined,
+  };
+  return captured;
+}
+
 /** Seam resolving a canned envelope as the SDK list result. */
 function seamFor(envelope: Record<string, unknown>): PmListAction {
-  return (async () => envelope) as unknown as PmListAction;
+  return capturingSeamFor(envelope).seam;
 }
 
 test("real list-all envelope baseline is complete with all items", { skip: !hasPmCli() }, async () => {
@@ -153,7 +183,13 @@ test("readPmItems refuses a result with completeness.status partial", { skip: !h
 
 test("readPmItems refuses a result with omission_receipt.has_omissions=true", { skip: !hasPmCli() }, async () => {
   const env = mutatedEnvelope((e) => {
-    (e.omission_receipt as Record<string, unknown>).has_omissions = true;
+    // The baseline above accepts an absent `omission_receipt`, so the mutation
+    // has to create it: assigning through `undefined` would throw a TypeError
+    // here, outside `assert.rejects`, and the test would report that instead of
+    // the refusal it exists to prove.
+    const receipt = (e.omission_receipt ?? {}) as Record<string, unknown>;
+    receipt.has_omissions = true;
+    e.omission_receipt = receipt;
   });
   await assert.rejects(
     () => readPmItems(realEnvelope().pmRoot, seamFor(env)),
@@ -168,11 +204,21 @@ test("readPmItems refuses a result with omission_receipt.has_omissions=true", { 
 
 test("happy path: a complete envelope flows every item through unchanged", { skip: !hasPmCli() }, async () => {
   const env = mutatedEnvelope(() => { /* unmutated */ });
-  const items = await readPmItems(realEnvelope().pmRoot, seamFor(env));
+  const capturing = capturingSeamFor(env);
+  const items = await readPmItems(realEnvelope().pmRoot, capturing.seam);
   assert.deepStrictEqual(
     items.map((it) => it.title).sort(),
     ["Envelope Alpha", "Envelope Beta", "Envelope Gamma"],
   );
+  // The whole request, not a subset: an added option that changes what the CLI
+  // returns has to be considered here rather than slipping through unasserted.
+  assert.deepStrictEqual(capturing.request, {
+    full: true,
+    includeBody: true,
+    excludeTerminal: false,
+    noTruncate: true,
+    strictRead: true,
+  });
 });
 
 test("assertListResultComplete rejects a result with no completeness receipt", () => {
@@ -275,5 +321,57 @@ test("readPmItems classifies non-Error rejections from the list action", async (
   await assert.rejects(
     () => readPmItems("/does/not/matter", throwing),
     /Could not read pm items via SDK list: tracker exploded/,
+  );
+});
+
+/**
+ * `package.json` and `manifest.json` state the same host-compatibility fact to
+ * two different installers: npm reads the `peerDependencies` floor, the pm host
+ * reads `manifest.json`'s `pm_min_version` when it loads the extension. Nothing
+ * bound them, and this package had drifted furthest of all: its manifest carried
+ * a `compatibility: { pm: "..." }` block the host's version gate never reads, so
+ * `checkExtensionManifestCompatibility` returned `compatible: true` for every
+ * host back to 2026.7.1 — including the 2026.8.14 release whose truncated
+ * `list-all` is the exact defect this file's refusals exist to catch. The floor
+ * is now declared in the field the gate actually reads, and bound here.
+ */
+test("the manifest host floor matches the package peer floor", () => {
+  const manifest = JSON.parse(
+    readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
+  ) as { pm_min_version?: string };
+  const pkg = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { peerDependencies?: Record<string, string> };
+  const peer = pkg.peerDependencies?.["@unbrained/pm-cli"] ?? "";
+  assert.match(peer, /^>=\d+\.\d+\.\d+$/, "the peer declaration must be a concrete >= floor");
+  assert.equal(
+    manifest.pm_min_version,
+    peer.replace(/^>=/, ""),
+    `manifest.json pm_min_version "${manifest.pm_min_version}" must equal the @unbrained/pm-cli peer floor "${peer}": they are the same claim to two different installers`,
+  );
+});
+
+/**
+ * The floor above is only worth stating if the host actually enforces it. This
+ * runs the SDK's own gate — the author-time inverse of the loader's runtime
+ * check — against the manifest bytes on disk, so a floor moved back into a field
+ * the gate ignores fails here instead of shipping as an unenforced claim.
+ */
+test("the pm host gate refuses every version below the declared floor", () => {
+  const manifest = JSON.parse(
+    readFileSync(new URL("../manifest.json", import.meta.url), "utf8"),
+  ) as Record<string, unknown>;
+  const below = checkExtensionManifestCompatibility(manifest, { pmVersion: "2026.8.14" });
+  assert.equal(below.compatible, false, "the known-bad 2026.8.14 host must be refused");
+  assert.deepStrictEqual(below.findings.map((f) => f.code), ["pm_min_version_unmet"]);
+  assert.equal(
+    checkExtensionManifestCompatibility(manifest, { pmVersion: "2026.8.15" }).compatible,
+    true,
+    "the declared floor itself must load",
+  );
+  assert.equal(
+    checkExtensionManifestCompatibility(manifest, { pmVersion: "2027.1.1" }).compatible,
+    true,
+    "a floor must not reject later hosts: that is what an exact pin would do",
   );
 });
