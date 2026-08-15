@@ -17,10 +17,10 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { after } from "node:test";
 
 import {
   CommandError,
@@ -69,6 +69,9 @@ function realEnvelope(): EnvelopeFixture {
   );
   assert.strictEqual(read.status, 0, `pm list-all failed: ${read.stderr}`);
   cached = { pmRoot, envelope: JSON.parse(read.stdout) as Record<string, unknown> };
+  // One captured fixture serves every test; tear the workspace down once the
+  // whole file has run so nothing leaks into /tmp across local runs.
+  after(() => rmSync(root, { recursive: true, force: true }));
   return cached;
 }
 
