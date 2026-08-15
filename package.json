@@ -48,11 +48,11 @@
     "url": "https://github.com/unbraind/pm-context/issues"
   },
   "peerDependencies": {
-    "@unbrained/pm-cli": ">=2026.8.7"
+    "@unbrained/pm-cli": ">=2026.8.15"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "@unbrained/pm-cli": "^2026.8.7",
+    "@unbrained/pm-cli": "2026.8.15",
     "c8": "^12.0.0",
     "pm-changelog": "^2026.8.7",
     "pm-ops": "2026.8.8",

@@ -1,4 +1,6 @@
 import type { ExtensionApi, RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
+import { list as pmList } from "@unbrained/pm-cli/sdk/core";
+import type { ListResult } from "@unbrained/pm-cli/sdk/query";
 import type { ContextRelevanceReport } from "@unbrained/pm-cli/sdk/query";
 /**
  * Runtime stand-in for the SDK's `defineExtension`.
@@ -278,16 +280,77 @@ export declare function renderAgentHandoff(pack: ContextPack, options?: {
     compress?: boolean;
 }): string;
 /**
+ * Runtime shape of the SDK list result's omission receipt.
+ *
+ * The engine populates `omission_receipt` on every list result (it is the same
+ * envelope the CLI serializes for `list-all --json`), but the declared
+ * `ListResult` type does not carry it — this local view reads it without
+ * weakening the SDK type.
+ */
+interface ListOmissionReceipt {
+    /** True when field groups were dropped from the projection. */
+    has_omissions?: boolean;
+    /** Count of dropped groups. */
+    omitted_field_group_count?: number;
+    /** Names of the dropped groups. */
+    omitted_field_groups?: string[];
+}
+/** A list result widened only by the runtime-present omission receipt. */
+type ListResultWithReceipt = ListResult & {
+    omission_receipt?: ListOmissionReceipt;
+};
+/**
+ * Refuse an incomplete SDK `list-all` result instead of consuming it.
+ *
+ * Reading `.items` without consulting the result's completeness receipt is how
+ * this package once built a context pack from 10 of 682 workspace items and
+ * reported success: pm 2026.8.14 defaulted the list to a truncated answer and
+ * nothing here checked. Any one of four independent signals means the rows in
+ * `items` are NOT the whole workspace, so this throws (never returns a partial
+ * list, never logs and continues) naming the signal that tripped plus the
+ * `count`/`total` figures:
+ *
+ * - `truncated === true` — the row list was cut short (output budget, limit);
+ * - `has_more === true` — rows exist past the returned cursor boundary;
+ * - `completeness.status !== "complete"` — items/directories were unreadable
+ *   ("partial") or the corpus was never scanned ("unchecked"); either way the
+ *   answer is not attested complete;
+ * - `omission_receipt.has_omissions === true` — field groups were dropped from
+ *   the projection, so rows are present but degraded.
+ *
+ * Thrown errors are {@link CommandError} so the command runtime turns them into
+ * a clean nonzero exit. Paging is deliberately NOT attempted: a context pack
+ * silently built from a partial page is the failure mode this guard exists to
+ * prevent, so refusing loudly is simpler and safer.
+ *
+ * @param result - SDK list result (a result missing its receipt trips the
+ *                 completeness signal: an unverifiable answer is not complete).
+ * @throws {@link CommandError} naming the first tripped signal and the counts.
+ */
+export declare function assertListResultComplete(result: ListResultWithReceipt): void;
+/** Injectable seam over the SDK list action {@link readPmItems} uses. */
+export type PmListAction = typeof pmList;
+/**
  * Read every pm item (full metadata + body) in-process through the SDK.
  *
  * Replaces the previous `spawnSync("pm", ["list-all", "--json", "--include-body"])`
  * shell-out with the typed {@link list} action from `@unbrained/pm-cli/sdk/core`.
  * `list-all` is the SDK alias for `list` with `excludeTerminal: false`; passing
  * `full: true` + `includeBody: true` reproduces the full-metadata-with-body
- * projection the shell-out parsed, including the CLI's default truncation
- * semantics, so the downstream pack shape remains compatible.
+ * projection the shell-out parsed. `noTruncate: true` deliberately overrides any
+ * truncating limit and `strictRead: true` makes unreadable corpus entries a hard
+ * SDK error, and the returned receipt is STILL verified by
+ * {@link assertListResultComplete} — the 2026.8.14 truncated-default regression
+ * is exactly the silently-partial read this package refuses to reintroduce, so
+ * the guard does not trust the request options alone. Being an in-process SDK
+ * action (no child process), there is no spawn stdout buffer to size here; the
+ * completeness receipt is the over-run guard.
+ *
+ * @param pmRoot - Tracker storage root to read.
+ * @param list - Injectable SDK list action (tests substitute a canned real
+ *               result); defaults to the real {@link pmList}.
  */
-export declare function readPmItems(pmRoot: string): Promise<PmItem[]>;
+export declare function readPmItems(pmRoot: string, list?: PmListAction): Promise<PmItem[]>;
 /** Rank options forwarded to the SDK relevance engine. */
 export interface SdkRankOptions {
     /** Workspace lifecycle registry, including custom in-progress aliases. */

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A truncated list-all answer is consumed as if it were complete ([pm-context-kfdx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-kfdx.toon))
+
 ## 2026.8.10 - 2026-08-10
 
 ### Fixed
