@@ -1,0 +1,13 @@
+id: pm-context-kfdx
+title: A truncated list-all answer is consumed as if it were complete
+description: "readPmItems reads the SDK list (list-all alias) result's .items without consulting the result's completeness receipt (truncated / has_more / completeness.status / omission_receipt). Verified on this host against the 682-item workspace: pm 2026.8.14 returned 10 items with truncated=true, and a context pack built from ten items reported success while missing 98% of the workspace. 2026.8.15 fixes the default, but truncated can still go true under an output budget and completeness.status can go partial when items are unreadable — each must refuse loudly instead of producing a partial pack that reports success. Related: @unbrained/pm-cli resolves through floating ranges (^2026.8.7 dev, >=2026.8.7 peer), which is how the 2026.8.14 regression reached this package with no diff to review."
+type: Issue
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-08-15T10:39:24.689Z"
+updated_at: "2026-08-15T10:52:22.245Z"
+author: pi-agent
+comments[1]{created_at,author,text}:
+  "2026-08-15T10:52:22.245Z",pi-agent,"Wired all four refusal signals into readPmItems (the single list-all data path; the SDK list action is the list-all alias): truncated===true, has_more===true, completeness.status!==complete ('partial' and 'unchecked' both trip; a missing receipt also trips), omission_receipt.has_omissions===true. Each refusal is a CommandError naming the tripped signal and the count-vs-total figures; no partial list, no warn-and-continue. The list call now also passes noTruncate:true and strictRead:true so the engine itself refuses instead of degrading. Chose REFUSAL over a paging loop. No spawnSync exists on this path (in-process SDK action), so there is no spawn buffer to size; the completeness receipt is the over-run guard.\n\nRevert-proof (removed only the assertListResultComplete(result) call, rebuilt, ran the new tests): all four refusal tests failed with 'AssertionError [ERR_ASSERTION]: Missing expected rejection'; happy-path and real-CLI baseline tests still passed. Fix restored; full suite 215/215.\n\nTests drive the refusal from a REAL pm list-all --json envelope captured from the CLI (temp 3-item workspace), one field mutated each, injected through the readPmItems list-action seam defaulting to the real SDK action. Exact-pin: devDependencies ^2026.8.7 -> 2026.8.15 and peerDependencies >=2026.8.7 -> 2026.8.15; node -p resolves 2026.8.15 after npm ci. Coverage 100/100/100 (lines/branches/functions) — thresholds unchanged."
+body: ""
