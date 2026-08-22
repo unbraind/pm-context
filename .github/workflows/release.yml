@@ -133,6 +133,10 @@ jobs:
             --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm
             --respect-item-release
             --pm-bin ./node_modules/.bin/pm
+            --pm-arg=--output-budget
+            --pm-arg=unbounded
+            --pm-arg=--output-limit
+            --pm-arg=unbounded
           )
           ./node_modules/.bin/pm-changelog "${common[@]}" --mode replace --output CHANGELOG.md --github-step-summary
           ./node_modules/.bin/pm-changelog "${common[@]}" --mode replace --output CHANGELOG.md --check
