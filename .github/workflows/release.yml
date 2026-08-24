@@ -283,7 +283,7 @@ jobs:
           # (--all-release-tags), so generate and check derive the section name
           # from one source and cannot disagree. Before this fix the generate
           # used --until-release-tag (no tag exists yet, so it wrote "##
-          # Unreleased") while the check used --release-version-from-package
+          # Unreleased") while the check used --release-version-from-package --date-from-version
           # (which derived "## <version> - <date>"), so the check always rejected
           # the generate output and the release could not pass. Mirrors the
           # pm-changelog release workflow, which passes the pending tag
@@ -324,7 +324,7 @@ jobs:
           # release:check deliberately omits changelog:check. At release time
           # package.json is already bumped to the pending version while the
           # release tag is not pushed until the final step, so changelog:check
-          # (which derives its heading via --release-version-from-package) would
+          # (which derives its heading via --release-version-from-package --date-from-version) would
           # disagree with the tag-explicit generate step above. That generate and
           # its paired --check are the release-time authority. PR-time changelog
           # coverage lives in ci.yml. Mirrors pm-changelog's release workflow,
