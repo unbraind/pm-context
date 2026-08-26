@@ -1389,7 +1389,7 @@ function setupCommands(api) {
 const defineExtension = (module) => module;
 export default defineExtension({
     name: "pm-context",
-    version: "2026.8.25",
+    version: "2026.8.26",
     description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
     activate(api) {
         setupCommands(api);
