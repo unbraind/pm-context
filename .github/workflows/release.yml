@@ -292,6 +292,7 @@ jobs:
             --pm-root .agents/pm
             --all-release-tags
             --version "$RELEASE_TAG"
+            --date-from-version
             --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm
             --respect-item-release
             --pm-bin ./node_modules/.bin/pm
