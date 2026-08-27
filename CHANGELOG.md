@@ -6,6 +6,10 @@
 
 - changelog scripts read the pm workspace with default budgets instead of canonical complete reads ([pm-context-8th2](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-8th2.toon))
 
+### Security
+
+- The identity gate deadlocks the one remediation its own failure message prescribes ([pm-context-nfxp](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nfxp.toon))
+
 ### Other
 
 - Alert on daily release failure and require merge drivers in CI ([pm-context-qu0a](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-qu0a.toon))
