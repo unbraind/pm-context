@@ -20,11 +20,12 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck",
     "verify:release-workflow": "node .agents/pm/verify-release-yaml.mjs",
+    "verify:release-publish-attestation": "node scripts/verify-release-publish-attestation.ts",
     "audit:prod": "node --input-type=module -e \"import { spawnSync } from 'node:child_process'; import { devNull } from 'node:os'; const env = { ...process.env, npm_config_userconfig: devNull, NPM_CONFIG_USERCONFIG: devNull }; for (const key of Object.keys(env)) if (key.toLowerCase() === 'npm_config_allow_scripts') delete env[key]; const win = process.platform === 'win32'; const r = spawnSync(win ? 'npm.cmd' : 'npm', ['audit', '--omit=dev', '--ignore-scripts'], { stdio: 'inherit', env, shell: win }); process.exit(r.status ?? 1);\"",
     "pack:dry-run": "npm pack --dry-run",
     "changelog:full": "pm-changelog --pm-root .agents/pm --mode replace --output CHANGELOG.md --all-release-tags --release-version-from-package --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm --respect-item-release --pm-bin ./node_modules/.bin/pm --pm-arg=--output-budget --pm-arg=unbounded --pm-arg=--output-limit --pm-arg=unbounded",
     "changelog:check": "npm run changelog:full -- --check",
-    "release:check": "npm run typecheck && npm run verify:release-workflow && npm run docstring && npm run build && npm run coverage && npm run audit:prod && npm run pack:dry-run",
+    "release:check": "npm run typecheck && npm run verify:release-workflow && npm run docstring && npm run build && npm run coverage && npm run audit:prod && npm run pack:dry-run && npm run verify:release-publish-attestation",
     "prepublishOnly": "npm run release:check",
     "prepare": "node scripts/prepare-merge-driver.mjs",
     "merge:install": "pm merge install",
@@ -82,7 +83,8 @@
     "sources": [
       ".",
       "scripts/coverage-gate.ts",
-      "scripts/docstring-gate.ts"
+      "scripts/docstring-gate.ts",
+      "scripts/verify-release-publish-attestation.ts"
     ],
     "tests": [
       "test/*.test.ts"
