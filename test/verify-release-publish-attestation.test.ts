@@ -192,7 +192,7 @@ test("npm run publish is a script runner, not a publish", () => {
   assert.equal(isPublishCommand(onlyCommand("npm --access public publish")), true, "a flag value is not the subcommand");
   assert.equal(isPublishCommand(onlyCommand("npm -- npm publish")), true, "the option terminator is ignored while locating publish");
   assert.equal(isPublishCommand(onlyCommand("npm --ignore-scripts publish")), true);
-  for (const optionValue of ["npm --tag run publish --ignore-scripts", "npm --workspace run publish --ignore-scripts"]) {
+  for (const optionValue of ["npm --tag run publish --ignore-scripts", "npm --workspace run publish --ignore-scripts", "npm --no-fund publish --ignore-scripts"]) {
     assert.equal(isPublishCommand(onlyCommand(optionValue)), true, optionValue);
     assert.equal(
       auditPublishAttestation([{ file: "release.yml", text: `          ${ATTESTED}\n          ${optionValue}` }]).failures.length,

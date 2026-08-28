@@ -6,7 +6,7 @@ status: closed
 priority: 1
 tags: []
 created_at: "2026-08-28T19:55:04.883Z"
-updated_at: "2026-08-28T19:59:49.623Z"
+updated_at: "2026-08-28T20:08:56.494Z"
 closed_at: "2026-08-28T19:59:49.593Z"
 completed_at: "2026-08-28T19:59:49.593Z"
 claim_principal: pi-agent
@@ -14,8 +14,9 @@ author: pi-agent
 resolution: Fixed scanner regressions and recorded provenance normalization append-only.
 expected_result: "Every reachable publish is audited, and provenance history corrections preserve the original event records and chain."
 actual_result: The focused regression suite and release gate pass; history chain drift is zero and correction events enumerate all legacy role removals.
-notes[1]{created_at,author,text}:
+notes[2]{created_at,author,text}:
   "2026-08-28T19:55:22.103Z",pi-agent,"Decision: fixed the five scanner/verifier findings with regression tests. The seven history streams were restored byte-for-byte to their prior events and each received a non-empty history_repair context listing every removed role observation by event index; the old event provenance remains preserved for replay and audit. Health still reports the legacy domain warning by design, while history drift and chain validation pass."
+  "2026-08-28T20:08:56.494Z",pi-agent,"Follow-up finding fixed after the next Greptile round: negated npm Boolean options such as no-fund are now recognized generically, so their following publish token is not consumed as an option value. The regression fixture fails when this rule is removed."
 files[10]{path,scope,note}:
   .agents/pm/history/pm-context-6rua.jsonl,project,Append-only provenance correction
   .agents/pm/history/pm-context-7yrb.jsonl,project,Append-only provenance correction

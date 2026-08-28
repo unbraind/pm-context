@@ -209,7 +209,8 @@ export function isPublishCommand(command: ShellCommand): boolean {
     if (token.value === "--") continue;
     if (token.value.startsWith("-")) {
       const option = token.value.split("=", 1)[0]!;
-      optionValue = !token.value.includes("=") && !NPM_BOOLEAN_OPTIONS.has(option);
+      const boolean = NPM_BOOLEAN_OPTIONS.has(option) || option.startsWith("--no-");
+      optionValue = !token.value.includes("=") && !boolean;
     }
   }
   return false;
