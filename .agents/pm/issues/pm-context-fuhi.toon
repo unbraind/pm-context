@@ -1,19 +1,20 @@
 id: pm-context-fuhi
-title: A failed provenance publish silently falls back to an unattested one
+title: Refuse the unattested publish fallback after provenance failure
 description: "After three failed provenance publish attempts the release step called npm publish without --provenance and reported success. The only signal was a GitHub warning annotation. A transient registry failure therefore downgrades the package's supply-chain attestation permanently for that version, and consumers cannot tell an unattested publish caused by a 404 storm apart from one that never had provenance at all."
 type: Issue
 status: closed
 priority: 1
 tags[3]: "area:release","area:supply-chain","type:defect"
 created_at: "2026-08-28T06:33:31.348Z"
-updated_at: "2026-08-28T19:55:22.698Z"
+updated_at: "2026-08-28T20:15:10.123Z"
 closed_at: "2026-08-28T06:33:36.828Z"
 completed_at: "2026-08-28T06:33:36.828Z"
 author: codex
 acceptance_criteria: The release step has no publish path that omits --provenance; three provenance attempts are made; a version that landed despite a reported error is reconciled instead of republished; exhausting the attempts fails the job rather than publishing unattested; the workflow YAML parses and every bash run script passes bash -n.
-comments[2]{created_at,author,text}:
+comments[3]{created_at,author,text}:
   "2026-08-28T06:33:31.348Z",codex,"Non-vacuity proof:\nTest A (restore fallback): exit 1 — FAIL - .github/workflows/release.yml: a publish invocation does not enable --provenance, so it would publish an unattested artifact: npm publish --access public --ignore-scripts / verify-release-publish-attestation: 1 failure(s).\nTest B (--provenance=false): exit 1 — FAIL - .github/workflows/release.yml: a publish invocation does not enable --provenance, so it would publish an unattested artifact: npm publish --access public --provenance=false --ignore-scripts / verify-release-publish-attestation: 1 failure(s).\nTest C (clean tree): exit 0 — ok - .github/workflows/release.yml: 1 publish invocation(s), each carrying --provenance / verify-release-publish-attestation: every publish invocation is attested.\n\nGate table:\ntypecheck: 0, coverage: 100/100/100, verify:release-publish-attestation: 0"
   "2026-08-28T19:55:22.698Z",pi-agent,"PR review follow-up: fixed option values before runner words, evaluator recursion behind wrapper candidates, multiline substitution quote state, corepack forwarding, and unreadable executable-shaped paths. Added revert-sensitive tests. Restored seven history streams append-only and recorded explicit correction events; no prior event was rewritten."
+  "2026-08-28T20:15:10.123Z",pi-agent,"Follow-up review: the release-note title now describes the refusal behavior rather than the historical defect; the negated-option, composite-action, and pipe-and-evaluator fixtures are being added in the same review cycle."
 files[1]{path,scope,note}:
   .github/workflows/release.yml,project,publish step refuses to downgrade attestation and reconciles a late-landing version
 tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref},note}:

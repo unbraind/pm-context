@@ -5,13 +5,13 @@
 ### Fixed
 
 - Preserve append-only provenance history during review repair ([pm-context-9xfx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-9xfx.toon))
-- An affinity tiebreak test reads the clock twice, so it decides on millisecond skew rather than on the tiebreak ([pm-context-hxj5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-hxj5.toon))
+- Make the affinity tiebreak test use one shared instant ([pm-context-hxj5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-hxj5.toon))
 
 ## 2026.8.28 - 2026-08-28
 
 ### Fixed
 
-- A failed provenance publish silently falls back to an unattested one ([pm-context-fuhi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-fuhi.toon))
+- Refuse the unattested publish fallback after provenance failure ([pm-context-fuhi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-fuhi.toon))
 - changelog scripts read the pm workspace with default budgets instead of canonical complete reads ([pm-context-8th2](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-8th2.toon))
 
 ### Security
