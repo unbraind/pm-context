@@ -190,7 +190,16 @@ test("npm run publish is a script runner, not a publish", () => {
   assert.equal(isPublishCommand(onlyCommand("npm ci")), false);
   assert.equal(isPublishCommand(onlyCommand("npm exec publish")), false, "exec runs a binary, it does not publish");
   assert.equal(isPublishCommand(onlyCommand("npm --access public publish")), true, "a flag value is not the subcommand");
+  assert.equal(isPublishCommand(onlyCommand("npm -- npm publish")), true, "the option terminator is ignored while locating publish");
   assert.equal(isPublishCommand(onlyCommand("npm --ignore-scripts publish")), true);
+  for (const optionValue of ["npm --tag run publish --ignore-scripts", "npm --workspace run publish --ignore-scripts"]) {
+    assert.equal(isPublishCommand(onlyCommand(optionValue)), true, optionValue);
+    assert.equal(
+      auditPublishAttestation([{ file: "release.yml", text: `          ${ATTESTED}\n          ${optionValue}` }]).failures.length,
+      1,
+      optionValue,
+    );
+  }
 });
 
 test("finding no publish at all fails, because an empty scan and a clean tree look identical", () => {
@@ -239,6 +248,7 @@ test("an unattested publish smuggled through an interpreter or a substitution is
     `eval '${UNATTESTED}'`,
     `bash -c "${UNATTESTED}"`,
     `sh -c '${UNATTESTED}'`,
+    `sudo -u root bash -c '${UNATTESTED}'`,
     `output=$(${UNATTESTED})`,
     "output=`npm publish --access public`",
     `echo hi && eval "${UNATTESTED}"`,
@@ -272,6 +282,14 @@ test("a publisher other than npm is refused rather than searched for a flag it h
     assert.equal(result.failures.length, 1, publisher);
     assert.match(result.failures[0]!, new RegExp(`\\\`${publisher} publish\\\``));
   }
+});
+
+test("corepack is a wrapper, so its forwarded foreign publish is refused", () => {
+  const source = { file: "release.yml", text: `          ${ATTESTED}\n          corepack pnpm publish --access public` };
+  assert.equal(publishInvocationsIn(source).length, 2, "the direct and forwarded publishes are both found");
+  const failures = auditPublishAttestation([source]).failures;
+  assert.equal(failures.length, 1);
+  assert.match(failures[0]!, /`pnpm publish`/);
 });
 
 test("npm accepts a boolean value as a separate word, and so must this", () => {
@@ -371,15 +389,16 @@ test("unterminated and nested substitutions terminate instead of reading past th
   assert.deepEqual(words("a $(echo \\) x) b"), [["a", "", "b"], ["echo", ")", "x"]], "an escaped paren does not close the substitution");
 });
 
-test("a tracked path that cannot be opened is skipped rather than taking the gate down", () => {
+test("an unreadable executable-shaped path is skipped rather than taking the gate down", () => {
   const root = trackedFixture({
     ".github/workflows/release.yml": `          ${ATTESTED}`,
   });
   try {
-    symlinkSync("nowhere-at-all", join(root, "dangling"));
-    execFileSync("git", ["add", "dangling"], { cwd: root });
-    assert.ok(!trackedPublishSources(root).includes("dangling"), "an unreadable tracked file is not a publish source");
-    assert.deepEqual(verify(root).failures, [], "and it does not fail the gate either");
+    mkdirSync(join(root, "scripts"), { recursive: true });
+    symlinkSync("nowhere-at-all", join(root, "scripts/ship.sh"));
+    execFileSync("git", ["add", "scripts/ship.sh"], { cwd: root });
+    assert.ok(trackedPublishSources(root).includes("scripts/ship.sh"), "the path shape is still a source");
+    assert.deepEqual(verify(root).failures, [], "the explicit unreadable-source skip policy keeps the gate healthy");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -682,6 +701,18 @@ test("a quoted parenthesis inside a substitution is a literal, not its delimiter
     text: '          npm publish --provenance\n          x=$(echo ")" && npm publish)\n',
   }]);
   assert.equal(result.failures.length, 1);
+});
+
+test("a quoted parenthesis after a newline remains inside its substitution", () => {
+  const result = auditPublishAttestation([{
+    file: "release.yml",
+    text: [
+      "          npm publish --provenance",
+      "          message=\"$(echo 'literal",
+      "          )' && npm publish)\"",
+    ].join("\n"),
+  }]);
+  assert.equal(result.failures.length, 1, "the publish after the multiline quoted parenthesis must be audited");
 });
 
 test("one package script cannot continue into the next", () => {

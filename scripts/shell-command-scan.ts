@@ -87,6 +87,7 @@ const COMMAND_PREFIXES = new Set([
   "npx",
   "bunx",
   "pnpx",
+  "corepack",
   // Shell keywords introduce a command rather than being one. `if npm publish`
   // runs npm; a scan that reads `if` as the program audits nothing.
   "if",
@@ -174,13 +175,10 @@ function readSubstitution(text: string, start: number): { inner: string; end: nu
     const character = text[index]!;
     if (character === "\\") index += 2;
     else {
-      // Quote state is bounded to one line. A workflow's prose carries
-      // apostrophes -- "GitHub's", "workflow's" -- inside double-quoted
-      // messages, and letting an unbalanced one persist across lines makes
-      // every later parenthesis look quoted, so the substitution runs on and
-      // swallows unrelated commands.
-      if (character === "\n") { single = false; double = false; }
-      else if (character === "'" && !double) single = !single;
+      // Quote state follows shell semantics across line breaks. A quoted
+      // parenthesis after a newline is still literal, so resetting either
+      // state here would truncate the substitution and hide later commands.
+      if (character === "'" && !double) single = !single;
       else if (character === '"' && !single) double = !double;
       else if (!single && !double && character === "(") depth += 1;
       else if (!single && !double && character === ")") depth -= 1;
@@ -321,16 +319,22 @@ export function tokenizeCommands(text: string, depth = 0): ShellCommand[] {
 
   for (const body of nested) commands.push(...tokenizeCommands(body, depth + 1));
   for (const found of [...commands]) {
-    const name = commandName(found);
-    if (name === undefined || !SHELL_EVALUATORS.has(name)) continue;
-    // The shell joins an evaluator's words with a space and evaluates the
-    // result, so `eval "npm pub" "lish"` runs a publish that scanning each
-    // argument on its own never sees.
-    const payload = found.slice(1)
-      .filter((argument) => !argument.value.startsWith("-"))
-      .map((argument) => argument.value);
-    for (const body of new Set([...payload, payload.join(" ")])) {
-      commands.push(...tokenizeCommands(body, depth + 1));
+    // A wrapper option can make the first reading point at its value rather
+    // than the real evaluator: `sudo -u root bash -c 'npm publish'`. Audit
+    // every possible reading so evaluator recursion cannot be skipped by the
+    // same ambiguity that commandCandidates exists to close.
+    for (const candidate of commandCandidates(found)) {
+      const name = commandName(candidate);
+      if (name === undefined || !SHELL_EVALUATORS.has(name)) continue;
+      // The shell joins an evaluator's words with a space and evaluates the
+      // result, so `eval "npm pub" "lish"` runs a publish that scanning each
+      // argument on its own never sees.
+      const payload = candidate.slice(1)
+        .filter((argument) => !argument.value.startsWith("-"))
+        .map((argument) => argument.value);
+      for (const body of new Set([...payload, payload.join(" ")])) {
+        commands.push(...tokenizeCommands(body, depth + 1));
+      }
     }
   }
   return commands;

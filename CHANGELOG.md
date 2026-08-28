@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Preserve append-only provenance history during review repair ([pm-context-9xfx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-9xfx.toon))
 - An affinity tiebreak test reads the clock twice, so it decides on millisecond skew rather than on the tiebreak ([pm-context-hxj5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-hxj5.toon))
 
 ## 2026.8.28 - 2026-08-28
