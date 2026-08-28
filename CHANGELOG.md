@@ -4,8 +4,6 @@
 
 ### Fixed
 
-- A failed provenance publish silently falls back to an unattested one ([pm-context-md5j](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-md5j.toon))
-- A failed provenance publish silently falls back to an unattested one ([pm-context-zd5e](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-zd5e.toon))
 - A failed provenance publish silently falls back to an unattested one ([pm-context-fuhi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-fuhi.toon))
 - changelog scripts read the pm workspace with default budgets instead of canonical complete reads ([pm-context-8th2](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-8th2.toon))
 
