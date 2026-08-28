@@ -1303,12 +1303,20 @@ test("context-usage with --by sorts affinity entries with equal values by id", a
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
     // Seed two items with identical serve+touch patterns so they get equal affinity.
     // The sort tiebreaker (a[0].localeCompare(b[0])) should order them by id.
+    //
+    // Both touches must carry the SAME instant, not two instants five minutes
+    // ago. Calling the helper twice reads the clock twice, and affinity is
+    // decayed by age, so a millisecond of skew between the two reads makes the
+    // values differ by a hair and the sort orders by value rather than by id.
+    // The test then passes or fails on whether both calls landed in the same
+    // millisecond, which is why it passed locally and failed on CI.
+    const touchedAt = recentIso(5);
     writeFileSync(
       join(initialized.path, "runtime", "context-usage.jsonl"),
       [
         JSON.stringify({ kind: "serve", at: recentIso(10), author: "a", surface: "context", profile: "context", rows: [{ id: "x-2", rank: 1, included: true }, { id: "x-1", rank: 2, included: true }] }),
-        JSON.stringify({ kind: "touch", at: recentIso(5), author: "a", item_id: "x-1", intent: "update" }),
-        JSON.stringify({ kind: "touch", at: recentIso(5), author: "a", item_id: "x-2", intent: "update" }),
+        JSON.stringify({ kind: "touch", at: touchedAt, author: "a", item_id: "x-1", intent: "update" }),
+        JSON.stringify({ kind: "touch", at: touchedAt, author: "a", item_id: "x-2", intent: "update" }),
       ].join("\n") + "\n",
       "utf-8",
     );
