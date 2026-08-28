@@ -160,9 +160,21 @@ function isOperatorStart(character: string): boolean {
  */
 function readSubstitution(text: string, start: number): { inner: string; end: number } {
   if (text[start] === "`") {
-    const close = text.indexOf("`", start + 1);
-    if (close === -1) return { inner: text.slice(start + 1), end: text.length };
-    return { inner: text.slice(start + 1, close), end: close + 1 };
+    let index = start + 1;
+    while (index < text.length) {
+      if (text[index] === "\\") {
+        index += 2;
+        continue;
+      }
+      if (text[index] === "`") {
+        return {
+          inner: text.slice(start + 1, index).replace(/\\`/g, "`"),
+          end: index + 1,
+        };
+      }
+      index += 1;
+    }
+    return { inner: text.slice(start + 1), end: text.length };
   }
   // A parenthesis inside quotes is a literal, not a delimiter. Counting it
   // closes the substitution early and truncates the body, so

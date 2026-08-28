@@ -374,6 +374,17 @@ test("a substitution inside double quotes is scanned, because the shell runs it 
   }
 });
 
+test("escaped nested legacy backticks are scanned as shell substitutions", () => {
+  const source = {
+    file: "release.yml",
+    text: [
+      `          ${ATTESTED}`,
+      "          message=\"`echo \\`npm publish\\``\"",
+    ].join("\n"),
+  };
+  assert.equal(auditPublishAttestation([source]).failures.length, 1, "the nested publish must not be absorbed into the assignment");
+});
+
 test("unterminated and nested substitutions terminate instead of reading past the end", () => {
   // A substitution's OUTPUT is not knowable here, so it contributes an empty
   // word to the command that contained it while its body is scanned as
