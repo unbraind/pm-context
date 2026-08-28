@@ -872,6 +872,8 @@ test("an assignment the shell never makes is not indexed", () => {
     "a name inside a quoted argument is not an assignment");
   assert.equal(shellScalars("NPM=npm$SUFFIX\n").get("NPM"), undefined,
     "a value continuing into an expansion is not a literal, and must not be indexed by its prefix");
+  assert.equal(shellScalars('"NPM=npm" publish\n').get("NPM"), undefined,
+    "quoting the whole word makes it a command name, not a binding");
 
   // The bypass, end to end: without the fix this audit returns no failures.
   const result = auditPublishAttestation([{
@@ -885,11 +887,30 @@ test("an assignment the shell never makes is not indexed", () => {
   assert.match(result.failures[0]!, /does not enable --provenance/);
 });
 
-test("a real assignment is still indexed, and only in command-leading position", () => {
+test("a scalar is taken only from a line that is exactly one literal assignment", () => {
   assert.equal(shellScalars("NPM=npm\n").get("NPM"), "npm");
   assert.equal(shellScalars('CMD="npm publish"\n').get("CMD"), "npm publish");
-  assert.equal(shellScalars("FOO=bar npm publish\n").get("FOO"), "bar",
-    "a leading assignment binds for the command that follows it");
-  assert.equal(shellScalars("npm publish FOO=bar\n").get("FOO"), undefined,
-    "past the command name an assignment-shaped word is an argument");
+  assert.equal(shellScalars("OTHER='npm publish --provenance'\n").get("OTHER"), "npm publish --provenance");
+  assert.equal(shellScalars("NPM=npm\\ publish\n").get("NPM"), "npm publish",
+    "an escape is honoured, so one word can still hold a command");
+
+  // A command-scoped assignment binds only for the command it precedes; the
+  // shell does not keep it afterwards, so neither may this map. Storing it
+  // rewrote a LATER unattested publish into an attested-looking one.
+  assert.equal(shellScalars("FLAG=--provenance some-command\n").get("FLAG"), undefined,
+    "a temporary assignment does not outlive its command");
+  assert.equal(shellScalars("$(FLAG=--provenance)\n").get("FLAG"), undefined,
+    "a binding made inside a subshell is not visible to the outer shell");
+  assert.equal(shellScalars("NPM=npm$(printf foo)\n").get("NPM"), undefined,
+    "a literal prefix in front of a substitution is not the value");
+
+  // Both leaks were false passes end to end, not merely wrong map entries.
+  for (const text of [
+    ["          FLAG=--provenance some-command", "          npm publish --access public $FLAG"],
+    ["          $(FLAG=--provenance)", "          npm publish --access public $FLAG"],
+  ]) {
+    const result = auditPublishAttestation([{ file: "release.yml", text: text.join("\n") }]);
+    assert.equal(result.failures.length, 1, `a publish flagged only by ${text[0]!.trim()} is unattested`);
+    assert.match(result.failures[0]!, /does not enable --provenance/);
+  }
 });
