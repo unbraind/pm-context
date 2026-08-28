@@ -566,9 +566,9 @@ export function bashArrays(text: string): Map<string, string> {
   return arrays;
 }
 
-/** A whole line that is exactly one assignment carrying a fully literal value. */
+/** A line opening with one assignment of a fully literal value, ending there or at a `;`. */
 const STANDALONE_ASSIGNMENT =
-  /^[ \t]*([A-Za-z_][A-Za-z0-9_]*)=(?:"((?:\\.|[^"\\$`])*)"|'([^']*)'|((?:\\.|[^\s;&|"'`$()\\])+))[ \t]*$/;
+  /^[ \t]*([A-Za-z_][A-Za-z0-9_]*)=(?:"((?:\\.|[^"\\$`])*)"|'([^']*)'|((?:\\.|[^\s;&|"'`$()\\])+))[ \t]*(?:;|$)/;
 
 /**
  * Index scalar assignments so a command held in a variable can be audited.
@@ -578,8 +578,13 @@ const STANDALONE_ASSIGNMENT =
  * assignment is where the command actually is. `NPM=npm` followed by
  * `$NPM publish` hides one the same way, so unquoted values are indexed too.
  *
- * A name is taken only from a line that is EXACTLY one assignment with a fully
- * literal value. That single rule is what keeps the scan from inventing
+ * A name is taken only where a line OPENS with one assignment carrying a fully
+ * literal value and holds nothing else before its end or a `;`. `NPM=npm; cmd`
+ * therefore binds, because the semicolon ends the assignment and the shell keeps
+ * it afterwards, while `NPM=npm cmd` does not, because that binding lasts only
+ * for the command it precedes. Requiring the line to OPEN with the assignment is
+ * what keeps a `;` inside a comment from exposing one. That single rule keeps
+ * the scan from inventing
  * bindings the shell never makes, each of which let an unattested publish
  * borrow a flag and pass the gate:
  *

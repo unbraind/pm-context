@@ -893,6 +893,10 @@ test("a scalar is taken only from a line that is exactly one literal assignment"
   assert.equal(shellScalars("OTHER='npm publish --provenance'\n").get("OTHER"), "npm publish --provenance");
   assert.equal(shellScalars("NPM=npm\\ publish\n").get("NPM"), "npm publish",
     "an escape is honoured, so one word can still hold a command");
+  assert.equal(shellScalars('NPM=npm; "$NPM" publish\n').get("NPM"), "npm",
+    "a semicolon ends the assignment, and the shell keeps the binding after it");
+  assert.equal(shellScalars("# a; FLAG=--provenance\n").get("FLAG"), undefined,
+    "a semicolon inside a comment does not expose an assignment");
 
   // A command-scoped assignment binds only for the command it precedes; the
   // shell does not keep it afterwards, so neither may this map. Storing it
