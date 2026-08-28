@@ -1,0 +1,39 @@
+id: pm-context-9xfx
+title: Preserve append-only provenance history during review repair
+description: "A review correction must retain every original provenance-bearing history event and append an explicit, replayable record of the normalization instead of rewriting prior audit history."
+type: Issue
+status: closed
+priority: 1
+tags: []
+created_at: "2026-08-28T19:55:04.883Z"
+updated_at: "2026-08-28T20:43:16.704Z"
+closed_at: "2026-08-28T19:59:49.593Z"
+completed_at: "2026-08-28T19:59:49.593Z"
+claim_principal: pi-agent
+author: pi-agent
+resolution: Fixed scanner regressions and recorded provenance normalization append-only.
+expected_result: "Every reachable publish is audited, and provenance history corrections preserve the original event records and chain."
+actual_result: The focused regression suite and release gate pass; history chain drift is zero and correction events enumerate all legacy role removals.
+notes[5]{created_at,author,text}:
+  "2026-08-28T19:55:22.103Z",pi-agent,"Decision: fixed the five scanner/verifier findings with regression tests. The seven history streams were restored byte-for-byte to their prior events and each received a non-empty history_repair context listing every removed role observation by event index; the old event provenance remains preserved for replay and audit. Health still reports the legacy domain warning by design, while history drift and chain validation pass."
+  "2026-08-28T20:08:56.494Z",pi-agent,"Follow-up finding fixed after the next Greptile round: negated npm Boolean options such as no-fund are now recognized generically, so their following publish token is not consumed as an option value. The regression fixture fails when this rule is removed."
+  "2026-08-28T20:25:49.240Z",pi-agent,"Second review follow-up fixed: the complete npm Boolean option set is now represented, and unknown negated options are handled as Boolean flags. The positive fund form was reproduced, covered by a regression test, and no longer hides publish."
+  "2026-08-28T20:34:03.227Z",pi-agent,"Third review follow-up fixed: foreground-scripts and strict-npmrc were missing from the Boolean option inventory; both are now included. The Boolean inventory was cross-checked against the installed npm definition table, and the foreground-scripts regression remains visible to the audit."
+  "2026-08-28T20:43:16.704Z",pi-agent,"Fourth review follow-up fixed: legacy backtick parsing now skips escaped delimiters and restores nested backtick syntax to the payload scanner. A nested message substitution containing npm publish is covered and fails the audit without provenance."
+files[10]{path,scope,note}:
+  .agents/pm/history/pm-context-6rua.jsonl,project,Append-only provenance correction
+  .agents/pm/history/pm-context-7yrb.jsonl,project,Append-only provenance correction
+  .agents/pm/history/pm-context-b7ub.jsonl,project,Append-only provenance correction
+  .agents/pm/history/pm-context-btl1.jsonl,project,Append-only provenance correction
+  .agents/pm/history/pm-context-jjbl.jsonl,project,Append-only provenance correction
+  .agents/pm/history/pm-context-vu89.jsonl,project,Append-only provenance correction
+  .agents/pm/history/pm-context-ylx4.jsonl,project,Append-only provenance correction
+  scripts/shell-command-scan.ts,project,Shell tokenizer fixes for wrapper recursion and multiline substitution quotes
+  scripts/verify-release-publish-attestation.ts,project,Publish option parsing and unreadable-source handling
+  test/verify-release-publish-attestation.test.ts,project,Regression coverage for every unresolved verifier finding
+tests[3]{command,path,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  npm run coverage,test/verify-release-publish-attestation.test.ts,project,900,pi-agent,"2026-08-28T19:59:02.227Z",local_mutation,fix/refuse-unattested-publish-fallback
+  ./node_modules/.bin/pm validate --check-history-drift --strict-exit --counts,.agents/pm/history,project,120,pi-agent,"2026-08-28T19:59:02.758Z",local_mutation,fix/refuse-unattested-publish-fallback
+  ./node_modules/.bin/pm health --strict-exit --skip-vectors --brief,.agents/pm,project,120,pi-agent,"2026-08-28T19:59:03.374Z",local_mutation,fix/refuse-unattested-publish-fallback
+close_reason: "Fixed in fix/refuse-unattested-publish-fallback; npm run release:check passed, npm run coverage passed at 100/100/100, and pm validate --check-history-drift --strict-exit --counts passed. The seven prior history records were restored unchanged and each received an explicit append-only correction event."
+body: ""

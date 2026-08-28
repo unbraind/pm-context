@@ -1,0 +1,26 @@
+id: pm-context-hxj5
+title: Make the affinity tiebreak test use one shared instant
+description: "The test seeds two items with identical serve and touch patterns so their affinity values are equal and the id tiebreak decides the order. It builds the two touch events with two separate calls to a helper that reads Date.now each time. Affinity is decayed by age, so when the two reads land in different milliseconds the values are no longer equal, the sort orders by value instead of by id, and the assertion fails with x-2 before x-1. Measured rather than assumed: two consecutive reads differ in about one attempt in a thousand, which is why the test passes locally and fails intermittently on CI. The premise of the test is that the two events share an instant, so the instant is now computed once and reused."
+type: Issue
+status: closed
+priority: 2
+tags[2]: "area:testing","type:defect"
+created_at: "2026-08-28T17:15:36.213Z"
+updated_at: "2026-08-28T20:15:09.168Z"
+closed_at: "2026-08-28T17:15:49.798Z"
+completed_at: "2026-08-28T17:15:49.798Z"
+author: claude
+tests[1]:
+  - command: "PM_PATH=/tmp/pmctx-flake PM_GLOBAL_PATH=/tmp/pmctx-flake-g node --test --test-name-pattern \"sorts affinity entries with equal values by id\" test/coverage-gaps.test.ts"
+    scope: project
+    provenance:
+      author: claude
+      created_at: "2026-08-28T17:15:49.320Z"
+      source_kind: local_mutation
+      source_ref: fix/refuse-unattested-publish-fallback
+    assert_stdout_regex[1]: pass 1
+    note: "the tiebreak decides, not the clock"
+docs[1]{path,scope,note}:
+  test/coverage-gaps.test.ts,project,the affinity tiebreak test
+close_reason: "The two touch events now share one instant, so their affinity values are provably equal and the id tiebreak is what the assertion measures. Ran five times locally, green each time; the skew that caused the failure was measured at roughly one in a thousand reads."
+body: ""
