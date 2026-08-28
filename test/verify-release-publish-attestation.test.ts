@@ -858,3 +858,38 @@ test("a publish routed through an unquoted scalar is audited, not hidden by an a
   assert.equal(result.failures.length, 1, "the variable-routed publish must be audited");
   assert.match(result.failures[0]!, /does not enable --provenance/);
 });
+
+test("an assignment the shell never makes is not indexed", () => {
+  // Scalars used to be read straight out of the raw text, which indexed three
+  // things the shell does not assign. The middle one is a gate bypass: a name
+  // defined only in a COMMENT was inlined into a later command, so an
+  // unattested publish borrowed `--provenance` from a comment and passed.
+  assert.equal(shellScalars("# FLAG=--provenance\nnpm publish $FLAG\n").get("FLAG"), undefined,
+    "a name in a comment is not an assignment");
+  assert.equal(shellScalars('# CMD="npm publish"\n').get("CMD"), undefined,
+    "quoting it in a comment does not make it an assignment either");
+  assert.equal(shellScalars('echo "config NPM=npm"\n').get("NPM"), undefined,
+    "a name inside a quoted argument is not an assignment");
+  assert.equal(shellScalars("NPM=npm$SUFFIX\n").get("NPM"), undefined,
+    "a value continuing into an expansion is not a literal, and must not be indexed by its prefix");
+
+  // The bypass, end to end: without the fix this audit returns no failures.
+  const result = auditPublishAttestation([{
+    file: "release.yml",
+    text: [
+      "          # FLAG=--provenance",
+      "          npm publish --access public $FLAG",
+    ].join("\n"),
+  }]);
+  assert.equal(result.failures.length, 1, "a publish flagged only from a comment is unattested");
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+});
+
+test("a real assignment is still indexed, and only in command-leading position", () => {
+  assert.equal(shellScalars("NPM=npm\n").get("NPM"), "npm");
+  assert.equal(shellScalars('CMD="npm publish"\n').get("CMD"), "npm publish");
+  assert.equal(shellScalars("FOO=bar npm publish\n").get("FOO"), "bar",
+    "a leading assignment binds for the command that follows it");
+  assert.equal(shellScalars("npm publish FOO=bar\n").get("FOO"), undefined,
+    "past the command name an assignment-shaped word is an argument");
+});

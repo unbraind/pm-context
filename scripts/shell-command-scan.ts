@@ -573,28 +573,53 @@ export function bashArrays(text: string): Map<string, string> {
  * invocation line can see, because the invocation line contains no publish. The
  * assignment is where the command actually is.
  *
- * Only literal single- or double-quoted values are indexed. An unquoted value
- * cannot hold a space and so cannot hold a command, and a value built from
- * other variables is not resolvable without evaluating the script, which this
- * module deliberately does not do.
+ * Assignments are read from tokenised commands rather than from the raw text.
+ * Scanning the text directly indexed things the shell never assigns: a name in
+ * a comment (`# FLAG=--provenance`), which then made an unattested publish look
+ * flagged, and a name inside a quoted argument (`echo "config NPM=npm"`). The
+ * tokeniser has already dropped comments and resolved quoting, so a word is
+ * only treated as an assignment where the shell would treat it as one.
+ *
+ * Only a leading word can assign: `FOO=bar npm publish` assigns, while
+ * `npm publish FOO=bar` passes an argument, so scanning stops at the first word
+ * that is not an assignment. A word that begins inside quotes is never an
+ * assignment, because quoting the name makes it a command rather than a binding.
+ *
+ * Unquoted values are indexed as well as quoted ones -- `NPM=npm` followed by
+ * `$NPM publish` is a publish that no scan of the invocation line can see.
  *
  * @param text - File contents with continuations already joined.
  * @returns Variable name mapped to the literal text it holds.
  */
 export function shellScalars(text: string): Map<string, string> {
   const scalars = new Map<string, string>();
-  for (const match of text.matchAll(/(?:^|[\s;&|])([A-Za-z_][A-Za-z0-9_]*)=(?:"([^"\n]*)"|'([^'\n]*)'|([^\s;&|"'`$()]+))/g)) {
-    // The alternation guarantees exactly one of the three value groups matched,
-    // so there is no fourth case to fall back to.
-    const value = match[2] ?? match[3] ?? match[4]!;
-    // Only a plain literal is inlined. A value carrying a substitution, a
-    // backtick, or a quote of its own changes how the line it lands in parses:
-    // inlining `pkg_name="$(node -p …)"` injects an unbalanced parenthesis into
-    // an unrelated command, and the scan then reports invocations that are not
-    // there while losing the one that is. That is a false verdict in both
-    // directions, which is worse than not resolving the variable at all.
-    if (/[$`"'()]/.test(value)) continue;
-    scalars.set(match[1]!, value);
+  for (const command of tokenizeCommands(text)) {
+    for (const word of command) {
+      // A word that opens with a quote is a command name, not a binding.
+      if (word.startsQuoted) break;
+      const assignment = /^([A-Za-z_][A-Za-z0-9_]*)=([\s\S]*)$/.exec(word.value);
+      // Past the first non-assignment word every remaining word is an argument.
+      if (assignment === null) break;
+      const value = assignment[2]!;
+      // An empty value is never inlined. The tokeniser consumes a substitution
+      // rather than keeping its text, so `SUBST="$(node -p 1)"` arrives here as
+      // an empty value that the literal guard below would happily accept -- and
+      // inlining it would ERASE `$SUBST` from the command it appears in, which
+      // turns "this scan does not understand the value" into "this command
+      // carries no flags". A genuinely empty assignment is left unresolved for
+      // the same reason: leaving the reference in place is the honest reading.
+      if (value === "") continue;
+      // Only a plain literal is inlined. A value carrying a substitution, a
+      // backtick, or a quote of its own changes how the line it lands in parses:
+      // inlining `pkg_name="$(node -p …)"` injects an unbalanced parenthesis into
+      // an unrelated command, and the scan then reports invocations that are not
+      // there while losing the one that is. That is a false verdict in both
+      // directions, which is worse than not resolving the variable at all.
+      // The tokeniser keeps `$SUFFIX` in `NPM=npm$SUFFIX` inside the word, so
+      // this guard sees the whole value rather than a truncated prefix of it.
+      if (/[$`"'()]/.test(value)) continue;
+      scalars.set(assignment[1]!, value);
+    }
   }
   return scalars;
 }
