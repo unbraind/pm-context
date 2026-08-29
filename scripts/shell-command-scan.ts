@@ -622,14 +622,28 @@ const STANDALONE_ASSIGNMENT =
  */
 export function shellScalars(text: string): Map<string, string> {
   const scalars = new Map<string, string>();
+  const controlClosers: string[] = [];
   let subshellDepth = 0;
   let quote: "'" | '"' | undefined;
   let escaped = false;
+  let heredoc: { delimiter: string; stripTabs: boolean } | undefined;
   for (const line of text.split("\n")) {
-    const atFileScope = subshellDepth === 0 && quote === undefined;
-    // Track grouping across lines before considering the next line. A binding
-    // inside `( ... )` or `$( ... )` dies with that subshell and must never be
-    // promoted into the file-global scalar map.
+    if (heredoc !== undefined) {
+      const candidate = heredoc.stripTabs ? line.replace(/^\t+/, "") : line;
+      if (candidate.replace(/\r$/, "") === heredoc.delimiter) heredoc = undefined;
+      continue;
+    }
+
+    const trimmed = line.trim();
+    const closer = controlClosers[controlClosers.length - 1];
+    if (closer !== undefined && new RegExp(`^${closer}(?:[\\s;#]|$)`).test(trimmed)) {
+      controlClosers.pop();
+    }
+    const atFileScope = subshellDepth === 0 && quote === undefined && controlClosers.length === 0;
+    let code = line;
+    // Track grouping across lines before considering the next line. Bindings in
+    // subshells, functions, and conditional bodies cannot be promoted into the
+    // file-global map because static scanning cannot prove those bodies ran.
     for (let index = 0; index < line.length; index += 1) {
       const character = line[index]!;
       if (escaped) {
@@ -646,11 +660,29 @@ export function shellScalars(text: string): Map<string, string> {
       }
       // A comment begins only at a shell word boundary. Its quotes and
       // parentheses are prose and must not change the scope of later lines.
-      if (character === "#" && (index === 0 || /[\s;&|(){}]/.test(line[index - 1]!))) break;
+      if (character === "#" && (index === 0 || /[\s;&|(){}]/.test(line[index - 1]!))) {
+        code = line.slice(0, index);
+        break;
+      }
       if (character === "'" || character === '"') quote = character;
       else if (character === "(") subshellDepth += 1;
       else if (character === ")") subshellDepth = Math.max(0, subshellDepth - 1);
     }
+
+    const heredocMatch = /<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/.exec(code);
+    if (heredocMatch !== null) {
+      heredoc = {
+        delimiter: heredocMatch[2] ?? heredocMatch[3] ?? heredocMatch[4]!,
+        stripTabs: heredocMatch[1] === "-",
+      };
+    }
+    if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(trimmed)) {
+      controlClosers.push("\\}");
+    } else {
+      const opener = /^(if|while|until|for|select|case)\b/.exec(trimmed)?.[1];
+      if (opener !== undefined) controlClosers.push(opener === "if" ? "fi" : opener === "case" ? "esac" : "done");
+    }
+
     if (!atFileScope) continue;
     const assignment = STANDALONE_ASSIGNMENT.exec(line);
     if (assignment === null) continue;
@@ -693,13 +725,7 @@ export function expandScalars(line: string, scalars: Map<string, string>): strin
     // Quote removal happens before parameter expansion: a backslash produced by
     // expansion is data, not syntax. Double it in the scanner input so the one
     // tokenisation pass preserves the shell's literal backslash.
-    if (value === undefined) return whole;
-    const escaped = value.replace(/\\/g, "\\\\");
-    // Static scope tracking cannot prove that a conditional or function body
-    // executed. A flag sourced only from a scalar therefore cannot establish
-    // attestation; neutralize enabling spellings while retaining the rest of
-    // the value so scalar-held commands are still discovered and audited.
-    return escaped.replace(/(^|[ \t])--provenance(?:=true)?(?=$|[ \t])/g, "$1--provenance-from-scalar");
+    return value?.replace(/\\/g, "\\\\") ?? whole;
   });
 }
 

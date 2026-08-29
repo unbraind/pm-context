@@ -956,6 +956,37 @@ test("a scalar from unexecuted control flow cannot establish attestation", () =>
   }
 });
 
+test("an unconditional file-scope scalar can carry the attestation flag", () => {
+  const text = "          FLAG=--provenance\n          npm publish $FLAG";
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 0);
+});
+
+test("unexecuted control flow does not create a phantom scalar-held publish", () => {
+  for (const declaration of [
+    ["          never_called() {", '            CMD="npm publish"', "          }"],
+    ["          if false; then", '            CMD="npm publish"', "          fi"],
+  ]) {
+    const text = ["          npm publish --provenance", ...declaration, "          $CMD"].join("\n");
+    assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 0, declaration[0]);
+  }
+});
+
+test("heredoc payload syntax does not change scalar scope", () => {
+  const text = [
+    "          npm publish --provenance",
+    "          (",
+    "            cat <<'PAYLOAD'",
+    "          )",
+    "          PAYLOAD",
+    "            FLAG=--provenance",
+    "          )",
+    "          npm publish $FLAG",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: "release.yml", text }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+});
+
 test("comment prose does not change scalar scope tracking", () => {
   const text = [
     "          # unmatched ( and quote '",

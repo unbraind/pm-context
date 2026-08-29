@@ -6,21 +6,23 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-08-29T04:45:11.664Z"
-updated_at: "2026-08-29T05:06:30.281Z"
-closed_at: "2026-08-29T04:46:18.500Z"
-completed_at: "2026-08-29T04:46:18.500Z"
+updated_at: "2026-08-29T05:14:25.615Z"
+closed_at: "2026-08-29T05:14:25.602Z"
+completed_at: "2026-08-29T05:14:25.602Z"
 claim_principal: pi-agent
 author: pi-agent
-comments[5]{created_at,author,text}:
+comments[6]{created_at,author,text}:
   "2026-08-29T04:45:17.227Z",pi-agent,"Confirmed all three findings. The assignment regex accepts adjacent hash prefixes, and textual scalar expansion can reinterpret operators and backslashes as scanner syntax."
   "2026-08-29T04:46:18.037Z",pi-agent,"Required whitespace before trailing # comments, rejected expansion values containing shell operators, decoded double-quoted escapes correctly, and protected expansion-produced backslashes. npm test passes (300 tests)."
   "2026-08-29T04:53:33.720Z",pi-agent,Follow-up review found multiline subshell scope leakage. shellScalars now tracks quote-aware parenthesis depth across lines and indexes assignments only at file scope; targeted regression passes.
   "2026-08-29T04:59:44.743Z",pi-agent,"Second follow-up: scope tracking now stops at an unquoted shell comment boundary, so comment prose cannot leak quote or parenthesis state. Audit-level regression passes."
   "2026-08-29T05:06:30.281Z",pi-agent,"Third follow-up: scalar-expanded attestation flags are now conservatively neutralized because static scope tracking cannot prove conditional/function execution; scalar-held commands remain expanded and audited. Full attestation verifier file passes (64 tests)."
+  "2026-08-29T05:14:25.142Z",pi-agent,"Final scope model tracks functions, conditional bodies, subshells, comments, and quoted/unquoted heredoc bodies. Restored unconditional scalar attestation and prevented phantom scalar commands. Post-fix linked verification passes."
 files[2]{path,scope}:
   scripts/shell-command-scan.ts,project
   test/verify-release-publish-attestation.test.ts,project
-tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   npm test,project,pi-agent,"2026-08-29T04:46:17.346Z",local_mutation,fix/index-unquoted-scalar-assignments
-close_reason: Scalar indexing no longer invents persistent assignments or attestation syntax.
+  "npm run verify:release-publish-attestation",project,pi-agent,"2026-08-29T05:14:01.702Z",local_mutation,fix/index-unquoted-scalar-assignments
+close_reason: Validated final scalar scanner scope and expansion semantics after all review follow-ups.
 body: ""
