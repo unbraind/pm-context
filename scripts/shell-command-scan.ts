@@ -676,7 +676,7 @@ export function shellScalars(text: string): Map<string, string> {
     }
 
     for (const start of heredocStarts) {
-      const match = /^<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/.exec(code.slice(start));
+      const match = /^<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([^\s;&|<>]+))/.exec(code.slice(start));
       if (match !== null) {
         heredocs.push({
           delimiter: match[2] ?? match[3] ?? match[4]!,
@@ -693,7 +693,7 @@ export function shellScalars(text: string): Map<string, string> {
       pendingFunction = true;
     } else {
       pendingFunction = false;
-      const opener = /^(if|while|until|for|select|case)\b/.exec(trimmed)?.[1];
+      const opener = /(?:^|[;&|][ \t]*)(if|while|until|for|select|case)\b/.exec(trimmed)?.[1];
       if (opener !== undefined) controlClosers.push(opener === "if" ? "fi" : opener === "case" ? "esac" : "done");
     }
 

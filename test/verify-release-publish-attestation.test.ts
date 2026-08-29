@@ -945,6 +945,7 @@ test("a scalar from unexecuted control flow cannot establish attestation", () =>
     ["          never_called() {", "            FLAG=--provenance", "          }"],
     ["          multiline()", "          {", "            FLAG=--provenance", "          }"],
     ["          if false; then", "            FLAG=--provenance", "          fi"],
+    ["          echo ready; if false; then", "            FLAG=--provenance", "          fi"],
   ]) {
     const text = [
       "          npm publish --provenance",
@@ -998,6 +999,17 @@ test("heredoc payload syntax does not change scalar scope", () => {
   const result = auditPublishAttestation([{ file: "release.yml", text }]);
   assert.equal(result.failures.length, 1);
   assert.match(result.failures[0]!, /does not enable --provenance/);
+});
+
+test("a numeric heredoc delimiter keeps its payload as data", () => {
+  const text = [
+    "          npm publish --provenance",
+    "          cat <<123",
+    "          FLAG=--provenance",
+    "          123",
+    "          npm publish $FLAG",
+  ].join("\n");
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
 });
 
 test("multiple heredoc payloads all remain data", () => {
