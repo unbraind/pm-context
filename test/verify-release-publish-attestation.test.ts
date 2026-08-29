@@ -971,6 +971,18 @@ test("unexecuted control flow does not create a phantom scalar-held publish", ()
   }
 });
 
+test("quoted heredoc-like prose does not suppress later scalar expansion", () => {
+  const text = [
+    "          npm publish --provenance",
+    '          echo "<<EOF"',
+    "          NPM=npm",
+    "          $NPM publish",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: "release.yml", text }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+});
+
 test("heredoc payload syntax does not change scalar scope", () => {
   const text = [
     "          npm publish --provenance",

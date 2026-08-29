@@ -641,6 +641,7 @@ export function shellScalars(text: string): Map<string, string> {
     }
     const atFileScope = subshellDepth === 0 && quote === undefined && controlClosers.length === 0;
     let code = line;
+    let heredocStart: number | undefined;
     // Track grouping across lines before considering the next line. Bindings in
     // subshells, functions, and conditional bodies cannot be promoted into the
     // file-global map because static scanning cannot prove those bodies ran.
@@ -664,12 +665,17 @@ export function shellScalars(text: string): Map<string, string> {
         code = line.slice(0, index);
         break;
       }
+      if (character === "<" && line[index + 1] === "<" && line[index + 2] !== "<") {
+        heredocStart ??= index;
+      }
       if (character === "'" || character === '"') quote = character;
       else if (character === "(") subshellDepth += 1;
       else if (character === ")") subshellDepth = Math.max(0, subshellDepth - 1);
     }
 
-    const heredocMatch = /<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/.exec(code);
+    const heredocMatch = heredocStart === undefined
+      ? null
+      : /^<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/.exec(code.slice(heredocStart));
     if (heredocMatch !== null) {
       heredoc = {
         delimiter: heredocMatch[2] ?? heredocMatch[3] ?? heredocMatch[4]!,
