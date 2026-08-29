@@ -1,0 +1,23 @@
+id: pm-context-nhrm
+title: Close PR 84 scalar expansion review gaps
+description: Prevent assignment-prefix backtracking and preserve shell scalar semantics without inventing attestation flags.
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-29T04:45:11.664Z"
+updated_at: "2026-08-29T04:46:18.515Z"
+closed_at: "2026-08-29T04:46:18.500Z"
+completed_at: "2026-08-29T04:46:18.500Z"
+claim_principal: pi-agent
+author: pi-agent
+comments[2]{created_at,author,text}:
+  "2026-08-29T04:45:17.227Z",pi-agent,"Confirmed all three findings. The assignment regex accepts adjacent hash prefixes, and textual scalar expansion can reinterpret operators and backslashes as scanner syntax."
+  "2026-08-29T04:46:18.037Z",pi-agent,"Required whitespace before trailing # comments, rejected expansion values containing shell operators, decoded double-quoted escapes correctly, and protected expansion-produced backslashes. npm test passes (300 tests)."
+files[2]{path,scope}:
+  scripts/shell-command-scan.ts,project
+  test/verify-release-publish-attestation.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm test,project,pi-agent,"2026-08-29T04:46:17.346Z",local_mutation,fix/index-unquoted-scalar-assignments
+close_reason: Scalar indexing no longer invents persistent assignments or attestation syntax.
+body: ""

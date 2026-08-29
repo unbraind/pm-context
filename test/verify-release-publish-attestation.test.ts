@@ -906,6 +906,14 @@ test("a scalar is taken only from a line that is exactly one literal assignment"
   // an unattested publish exactly as being too loose does.
   assert.equal(shellScalars("CMD='npm publish \\--provenance'\n").get("CMD"), "npm publish \\--provenance",
     "single quotes make a backslash literal, so the value is not unescaped");
+  assert.equal(shellScalars(String.raw`CMD="npm publish \--provenance"` + "\n").get("CMD"), String.raw`npm publish \--provenance`,
+    "double quotes preserve a backslash before a non-special character");
+  assert.equal(shellScalars('FLAG="--provenance;:"\n').get("FLAG"), undefined,
+    "an expanded operator must not be reinterpreted as scanner syntax");
+  assert.equal(shellScalars("FLAG=--provenance#x some-command\n").get("FLAG"), undefined,
+    "an adjacent hash is value text, not a trailing-comment boundary");
+  assert.equal(shellScalars("FLAG=--provenance# some-command\n").get("FLAG"), undefined,
+    "backtracking before an adjacent hash must not expose a persistent assignment");
   assert.equal(shellScalars("# a; FLAG=--provenance\n").get("FLAG"), undefined,
     "a semicolon inside a comment does not expose an assignment");
 
@@ -919,13 +927,29 @@ test("a scalar is taken only from a line that is exactly one literal assignment"
   assert.equal(shellScalars("NPM=npm$(printf foo)\n").get("NPM"), undefined,
     "a literal prefix in front of a substitution is not the value");
 
-  // Both leaks were false passes end to end, not merely wrong map entries.
+  // These leaks were false passes end to end, not merely wrong map entries.
   for (const text of [
     ["          FLAG=--provenance some-command", "          npm publish --access public $FLAG"],
     ["          $(FLAG=--provenance)", "          npm publish --access public $FLAG"],
+    ["          FLAG=--provenance# some-command", "          npm publish --access public $FLAG"],
+    ['          FLAG="--provenance;:"', "          npm publish --access public $FLAG"],
   ]) {
     const result = auditPublishAttestation([{ file: "release.yml", text: text.join("\n") }]);
     assert.equal(result.failures.length, 1, `a publish flagged only by ${text[0]!.trim()} is unattested`);
+    assert.match(result.failures[0]!, /does not enable --provenance/);
+  }
+});
+
+test("quoted scalar backslashes remain data when the value is expanded", () => {
+  for (const assignment of [
+    String.raw`CMD='npm publish \--provenance'`,
+    String.raw`CMD="npm publish \--provenance"`,
+  ]) {
+    const result = auditPublishAttestation([{
+      file: "release.yml",
+      text: [`          npm publish ${ATTESTATION_FLAG}`, `          ${assignment}`, "          $CMD"].join("\n"),
+    }]);
+    assert.equal(result.failures.length, 1, assignment);
     assert.match(result.failures[0]!, /does not enable --provenance/);
   }
 });

@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- Close PR 84 scalar expansion review gaps ([pm-context-nhrm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nhrm.toon))
 - Preserve append-only provenance history during review repair ([pm-context-9xfx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-9xfx.toon))
 - Make the affinity tiebreak test use one shared instant ([pm-context-hxj5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-hxj5.toon))
 
