@@ -940,6 +940,19 @@ test("a scalar is taken only from a line that is exactly one literal assignment"
   }
 });
 
+test("comment prose does not change scalar scope tracking", () => {
+  const text = [
+    "          # unmatched ( and quote '",
+    "          NPM=npm",
+    "          npm publish --provenance",
+    "          $NPM publish",
+  ].join("\n");
+  assert.equal(shellScalars(text).get("NPM"), "npm");
+  const result = auditPublishAttestation([{ file: "release.yml", text }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+});
+
 test("a multiline subshell binding does not escape into the outer audit scope", () => {
   const text = [
     "          (",

@@ -630,7 +630,8 @@ export function shellScalars(text: string): Map<string, string> {
     // Track grouping across lines before considering the next line. A binding
     // inside `( ... )` or `$( ... )` dies with that subshell and must never be
     // promoted into the file-global scalar map.
-    for (const character of line) {
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index]!;
       if (escaped) {
         escaped = false;
         continue;
@@ -643,6 +644,9 @@ export function shellScalars(text: string): Map<string, string> {
         if (character === quote) quote = undefined;
         continue;
       }
+      // A comment begins only at a shell word boundary. Its quotes and
+      // parentheses are prose and must not change the scope of later lines.
+      if (character === "#" && (index === 0 || /[\s;&|(){}]/.test(line[index - 1]!))) break;
       if (character === "'" || character === '"') quote = character;
       else if (character === "(") subshellDepth += 1;
       else if (character === ")") subshellDepth = Math.max(0, subshellDepth - 1);
