@@ -622,7 +622,32 @@ const STANDALONE_ASSIGNMENT =
  */
 export function shellScalars(text: string): Map<string, string> {
   const scalars = new Map<string, string>();
+  let subshellDepth = 0;
+  let quote: "'" | '"' | undefined;
+  let escaped = false;
   for (const line of text.split("\n")) {
+    const atFileScope = subshellDepth === 0 && quote === undefined;
+    // Track grouping across lines before considering the next line. A binding
+    // inside `( ... )` or `$( ... )` dies with that subshell and must never be
+    // promoted into the file-global scalar map.
+    for (const character of line) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === "\\" && quote !== "'") {
+        escaped = true;
+        continue;
+      }
+      if (quote !== undefined) {
+        if (character === quote) quote = undefined;
+        continue;
+      }
+      if (character === "'" || character === '"') quote = character;
+      else if (character === "(") subshellDepth += 1;
+      else if (character === ")") subshellDepth = Math.max(0, subshellDepth - 1);
+    }
+    if (!atFileScope) continue;
     const assignment = STANDALONE_ASSIGNMENT.exec(line);
     if (assignment === null) continue;
     // Exactly one of the three value alternatives matches, so the last is the
