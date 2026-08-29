@@ -971,6 +971,20 @@ test("single-quoted scalar references remain literal", () => {
   assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
 });
 
+test("comment syntax cannot alter control scope", () => {
+  const text = [
+    "          hidden() { # }",
+    "            FLAG=--provenance",
+    "          }",
+    "          echo ready # ; if false; then",
+    "          NPM=npm",
+    "          npm publish --provenance",
+    "          npm publish $FLAG",
+    "          $NPM publish",
+  ].join("\n");
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 2);
+});
+
 test("a comment spelling is not mistaken for a scalar overwrite", () => {
   const text = "          NPM=npm; # NPM=other\n          npm publish --provenance\n          $NPM publish";
   assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);

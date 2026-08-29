@@ -637,11 +637,6 @@ export function shellScalars(text: string): Map<string, string> {
       continue;
     }
 
-    const trimmed = line.trim();
-    const closer = controlClosers[controlClosers.length - 1];
-    if (closer !== undefined && new RegExp(`^${closer}(?:[\\s;#]|$)`).test(trimmed)) {
-      controlClosers.pop();
-    }
     const atFileScope = subshellDepth === 0 && quote === undefined && !backtick && controlClosers.length === 0;
     let code = line;
     const heredocStarts: number[] = [];
@@ -690,22 +685,25 @@ export function shellScalars(text: string): Map<string, string> {
         });
       }
     }
-    const closesBrace = /}(?:[\s;#]|$)/.test(trimmed);
-    if (pendingFunction && /^\{(?:[\s;#]|$)/.test(trimmed)) {
+    const syntax = code.trim();
+    const closer = controlClosers[controlClosers.length - 1];
+    if (closer !== undefined && new RegExp(`^${closer}(?:[\\s;#]|$)`).test(syntax)) controlClosers.pop();
+    const closesBrace = /}(?:[\s;#]|$)/.test(syntax);
+    if (pendingFunction && /^\{(?:[\s;#]|$)/.test(syntax)) {
       if (!closesBrace) controlClosers.push("\\}");
       pendingFunction = false;
-    } else if (/^\{(?:[\s;#]|$)/.test(trimmed) && controlClosers.includes("\\}")) {
+    } else if (/^\{(?:[\s;#]|$)/.test(syntax) && controlClosers.includes("\\}")) {
       if (!closesBrace) controlClosers.push("\\}");
-    } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(trimmed)) {
+    } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(syntax)) {
       if (!closesBrace) controlClosers.push("\\}");
-    } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(trimmed)) {
+    } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(syntax)) {
       pendingFunction = true;
     } else {
       pendingFunction = false;
-      const opener = /(?:^|[;&|][ \t]*)(if|while|until|for|select|case)\b/.exec(trimmed)?.[1];
+      const opener = /(?:^|[;&|][ \t]*)(if|while|until|for|select|case)\b/.exec(syntax)?.[1];
       if (opener !== undefined) {
         const expected = opener === "if" ? "fi" : opener === "case" ? "esac" : "done";
-        if (!new RegExp(`\\b${expected}\\b`).test(trimmed)) controlClosers.push(expected);
+        if (!new RegExp(`\\b${expected}\\b`).test(syntax)) controlClosers.push(expected);
       }
     }
 
