@@ -6,9 +6,9 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-08-29T04:45:11.664Z"
-updated_at: "2026-08-29T05:59:50.347Z"
-closed_at: "2026-08-29T05:59:50.333Z"
-completed_at: "2026-08-29T05:59:50.333Z"
+updated_at: "2026-08-29T06:06:15.604Z"
+closed_at: "2026-08-29T06:06:15.587Z"
+completed_at: "2026-08-29T06:06:15.587Z"
 claim_principal: pi-agent
 author: pi-agent
 comments[8]{created_at,author,text}:
@@ -25,6 +25,6 @@ files[2]{path,scope}:
   test/verify-release-publish-attestation.test.ts,project
 tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   npm test,project,pi-agent,"2026-08-29T04:46:17.346Z",local_mutation,fix/index-unquoted-scalar-assignments
-  "npm run verify:release-publish-attestation",project,pi-agent,"2026-08-29T05:59:48.981Z",local_mutation,fix/index-unquoted-scalar-assignments
-close_reason: Validated comment-stripped control scope syntax.
+  "npm run verify:release-publish-attestation",project,pi-agent,"2026-08-29T06:06:14.338Z",local_mutation,fix/index-unquoted-scalar-assignments
+close_reason: Validated quoted closers and function-name parentheses.
 body: ""

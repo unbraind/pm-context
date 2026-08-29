@@ -944,6 +944,8 @@ test("a scalar from unexecuted control flow cannot establish attestation", () =>
   for (const declaration of [
     ["          never_called() {", "            FLAG=--provenance", "          }"],
     ["          multiline()", "          {", "            FLAG=--provenance", "          }"],
+    ["          function setup()", "          {", "            FLAG=--provenance", "          }"],
+    ['          if false; then echo "fi"', "            FLAG=--provenance", "          fi"],
     ["          if false; then", "            FLAG=--provenance", "          fi"],
     ["          echo ready; if false; then", "            FLAG=--provenance", "          fi"],
   ]) {

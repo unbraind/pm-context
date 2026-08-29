@@ -696,14 +696,14 @@ export function shellScalars(text: string): Map<string, string> {
       if (!closesBrace) controlClosers.push("\\}");
     } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(syntax)) {
       if (!closesBrace) controlClosers.push("\\}");
-    } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(syntax)) {
+    } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(syntax)) {
       pendingFunction = true;
     } else {
       pendingFunction = false;
       const opener = /(?:^|[;&|][ \t]*)(if|while|until|for|select|case)\b/.exec(syntax)?.[1];
       if (opener !== undefined) {
         const expected = opener === "if" ? "fi" : opener === "case" ? "esac" : "done";
-        if (!new RegExp(`\\b${expected}\\b`).test(syntax)) controlClosers.push(expected);
+        if (!new RegExp(`(?:^|[;&|][ \\t]*)${expected}(?:[ \\t;#]|$)`).test(syntax)) controlClosers.push(expected);
       }
     }
 
