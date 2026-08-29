@@ -943,6 +943,7 @@ test("a scalar is taken only from a line that is exactly one literal assignment"
 test("a scalar from unexecuted control flow cannot establish attestation", () => {
   for (const declaration of [
     ["          never_called() {", "            FLAG=--provenance", "          }"],
+    ["          multiline()", "          {", "            FLAG=--provenance", "          }"],
     ["          if false; then", "            FLAG=--provenance", "          fi"],
   ]) {
     const text = [
@@ -992,6 +993,21 @@ test("heredoc payload syntax does not change scalar scope", () => {
     "          PAYLOAD",
     "            FLAG=--provenance",
     "          )",
+    "          npm publish $FLAG",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: "release.yml", text }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+});
+
+test("multiple heredoc payloads all remain data", () => {
+  const text = [
+    "          npm publish --provenance",
+    "          cat <<ONE <<'TWO'",
+    "          harmless",
+    "          ONE",
+    "          FLAG=--provenance",
+    "          TWO",
     "          npm publish $FLAG",
   ].join("\n");
   const result = auditPublishAttestation([{ file: "release.yml", text }]);

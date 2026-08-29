@@ -626,11 +626,13 @@ export function shellScalars(text: string): Map<string, string> {
   let subshellDepth = 0;
   let quote: "'" | '"' | undefined;
   let escaped = false;
-  let heredoc: { delimiter: string; stripTabs: boolean } | undefined;
+  let pendingFunction = false;
+  const heredocs: Array<{ delimiter: string; stripTabs: boolean }> = [];
   for (const line of text.split("\n")) {
+    const heredoc = heredocs[0];
     if (heredoc !== undefined) {
       const candidate = heredoc.stripTabs ? line.replace(/^\t+/, "") : line;
-      if (candidate.replace(/\r$/, "") === heredoc.delimiter) heredoc = undefined;
+      if (candidate.replace(/\r$/, "") === heredoc.delimiter) heredocs.shift();
       continue;
     }
 
@@ -641,7 +643,7 @@ export function shellScalars(text: string): Map<string, string> {
     }
     const atFileScope = subshellDepth === 0 && quote === undefined && controlClosers.length === 0;
     let code = line;
-    let heredocStart: number | undefined;
+    const heredocStarts: number[] = [];
     // Track grouping across lines before considering the next line. Bindings in
     // subshells, functions, and conditional bodies cannot be promoted into the
     // file-global map because static scanning cannot prove those bodies ran.
@@ -666,25 +668,31 @@ export function shellScalars(text: string): Map<string, string> {
         break;
       }
       if (character === "<" && line[index + 1] === "<" && line[index + 2] !== "<") {
-        heredocStart ??= index;
+        heredocStarts.push(index);
       }
       if (character === "'" || character === '"') quote = character;
       else if (character === "(") subshellDepth += 1;
       else if (character === ")") subshellDepth = Math.max(0, subshellDepth - 1);
     }
 
-    const heredocMatch = heredocStart === undefined
-      ? null
-      : /^<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/.exec(code.slice(heredocStart));
-    if (heredocMatch !== null) {
-      heredoc = {
-        delimiter: heredocMatch[2] ?? heredocMatch[3] ?? heredocMatch[4]!,
-        stripTabs: heredocMatch[1] === "-",
-      };
+    for (const start of heredocStarts) {
+      const match = /^<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([A-Za-z_][A-Za-z0-9_]*))/.exec(code.slice(start));
+      if (match !== null) {
+        heredocs.push({
+          delimiter: match[2] ?? match[3] ?? match[4]!,
+          stripTabs: match[1] === "-",
+        });
+      }
     }
-    if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(trimmed)) {
+    if (pendingFunction && /^\{(?:[\s;#]|$)/.test(trimmed)) {
       controlClosers.push("\\}");
+      pendingFunction = false;
+    } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(trimmed)) {
+      controlClosers.push("\\}");
+    } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(trimmed)) {
+      pendingFunction = true;
     } else {
+      pendingFunction = false;
       const opener = /^(if|while|until|for|select|case)\b/.exec(trimmed)?.[1];
       if (opener !== undefined) controlClosers.push(opener === "if" ? "fi" : opener === "case" ? "esac" : "done");
     }
