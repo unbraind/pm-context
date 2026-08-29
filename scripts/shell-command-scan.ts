@@ -690,13 +690,14 @@ export function shellScalars(text: string): Map<string, string> {
         });
       }
     }
+    const closesBrace = /}(?:[\s;#]|$)/.test(trimmed);
     if (pendingFunction && /^\{(?:[\s;#]|$)/.test(trimmed)) {
-      controlClosers.push("\\}");
+      if (!closesBrace) controlClosers.push("\\}");
       pendingFunction = false;
     } else if (/^\{(?:[\s;#]|$)/.test(trimmed) && controlClosers.includes("\\}")) {
-      controlClosers.push("\\}");
+      if (!closesBrace) controlClosers.push("\\}");
     } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(trimmed)) {
-      controlClosers.push("\\}");
+      if (!closesBrace) controlClosers.push("\\}");
     } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(trimmed)) {
       pendingFunction = true;
     } else {
@@ -714,7 +715,7 @@ export function shellScalars(text: string): Map<string, string> {
     // Exactly one of the three value alternatives matches, so the last is the
     // only case left rather than a fallback that could be undefined.
     const name = assignment[1]!;
-    const remainder = line.slice(assignment[0].length);
+    const remainder = line.slice(assignment[0].length).replace(/[ \t]+#.*$/, "");
     if (new RegExp(`\\b${name}[ \\t]*=`).test(remainder)) {
       scalars.delete(name);
       continue;
