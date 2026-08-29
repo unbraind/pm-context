@@ -626,6 +626,7 @@ export function shellScalars(text: string): Map<string, string> {
   let subshellDepth = 0;
   let quote: "'" | '"' | undefined;
   let escaped = false;
+  let backtick = false;
   let pendingFunction = false;
   const heredocs: Array<{ delimiter: string; stripTabs: boolean }> = [];
   for (const line of text.split("\n")) {
@@ -641,7 +642,7 @@ export function shellScalars(text: string): Map<string, string> {
     if (closer !== undefined && new RegExp(`^${closer}(?:[\\s;#]|$)`).test(trimmed)) {
       controlClosers.pop();
     }
-    const atFileScope = subshellDepth === 0 && quote === undefined && controlClosers.length === 0;
+    const atFileScope = subshellDepth === 0 && quote === undefined && !backtick && controlClosers.length === 0;
     let code = line;
     const heredocStarts: number[] = [];
     // Track grouping across lines before considering the next line. Bindings in
@@ -661,6 +662,11 @@ export function shellScalars(text: string): Map<string, string> {
         if (character === quote) quote = undefined;
         continue;
       }
+      if (character === "`") {
+        backtick = !backtick;
+        continue;
+      }
+      if (backtick) continue;
       // A comment begins only at a shell word boundary. Its quotes and
       // parentheses are prose and must not change the scope of later lines.
       if (character === "#" && (index === 0 || /[\s;&|(){}]/.test(line[index - 1]!))) {
@@ -694,7 +700,10 @@ export function shellScalars(text: string): Map<string, string> {
     } else {
       pendingFunction = false;
       const opener = /(?:^|[;&|][ \t]*)(if|while|until|for|select|case)\b/.exec(trimmed)?.[1];
-      if (opener !== undefined) controlClosers.push(opener === "if" ? "fi" : opener === "case" ? "esac" : "done");
+      if (opener !== undefined) {
+        const expected = opener === "if" ? "fi" : opener === "case" ? "esac" : "done";
+        if (!new RegExp(`\\b${expected}\\b`).test(trimmed)) controlClosers.push(expected);
+      }
     }
 
     if (!atFileScope) continue;

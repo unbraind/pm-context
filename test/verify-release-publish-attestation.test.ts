@@ -958,6 +958,27 @@ test("a scalar from unexecuted control flow cannot establish attestation", () =>
   }
 });
 
+test("multiline backtick bindings do not escape substitution scope", () => {
+  const text = [
+    "          npm publish --provenance",
+    "          output=`",
+    "            FLAG=--provenance",
+    "          `",
+    "          npm publish $FLAG",
+  ].join("\n");
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
+});
+
+test("a completed single-line control does not suppress later scalar indexing", () => {
+  const text = [
+    "          if true; then echo ok; fi",
+    "          NPM=npm",
+    "          npm publish --provenance",
+    "          $NPM publish",
+  ].join("\n");
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
+});
+
 test("an unconditional file-scope scalar can carry the attestation flag", () => {
   const text = "          FLAG=--provenance\n          npm publish $FLAG";
   assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 0);
