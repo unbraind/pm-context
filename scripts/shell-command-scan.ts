@@ -693,7 +693,13 @@ export function expandScalars(line: string, scalars: Map<string, string>): strin
     // Quote removal happens before parameter expansion: a backslash produced by
     // expansion is data, not syntax. Double it in the scanner input so the one
     // tokenisation pass preserves the shell's literal backslash.
-    return value?.replace(/\\/g, "\\\\") ?? whole;
+    if (value === undefined) return whole;
+    const escaped = value.replace(/\\/g, "\\\\");
+    // Static scope tracking cannot prove that a conditional or function body
+    // executed. A flag sourced only from a scalar therefore cannot establish
+    // attestation; neutralize enabling spellings while retaining the rest of
+    // the value so scalar-held commands are still discovered and audited.
+    return escaped.replace(/(^|[ \t])--provenance(?:=true)?(?=$|[ \t])/g, "$1--provenance-from-scalar");
   });
 }
 
