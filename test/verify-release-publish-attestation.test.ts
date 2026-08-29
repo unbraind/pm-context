@@ -958,6 +958,24 @@ test("a scalar from unexecuted control flow cannot establish attestation", () =>
   }
 });
 
+test("nested brace groups do not end an outer function scope", () => {
+  const text = [
+    "          hidden() {", "            {", "              echo nested", "            }",
+    "            FLAG=--provenance", "          }", "          npm publish --provenance", "          npm publish $FLAG",
+  ].join("\n");
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
+});
+
+test("single-quoted scalar references remain literal", () => {
+  const text = "          FLAG=--provenance\n          npm publish --provenance\n          npm publish '$FLAG'";
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
+});
+
+test("a same-line scalar overwrite invalidates the earlier value", () => {
+  const text = "          FLAG=--provenance; FLAG=\n          npm publish --provenance\n          npm publish $FLAG";
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
+});
+
 test("multiline backtick bindings do not escape substitution scope", () => {
   const text = [
     "          npm publish --provenance",

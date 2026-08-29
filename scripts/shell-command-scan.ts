@@ -693,6 +693,8 @@ export function shellScalars(text: string): Map<string, string> {
     if (pendingFunction && /^\{(?:[\s;#]|$)/.test(trimmed)) {
       controlClosers.push("\\}");
       pendingFunction = false;
+    } else if (/^\{(?:[\s;#]|$)/.test(trimmed) && controlClosers.includes("\\}")) {
+      controlClosers.push("\\}");
     } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(trimmed)) {
       controlClosers.push("\\}");
     } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(trimmed)) {
@@ -711,6 +713,12 @@ export function shellScalars(text: string): Map<string, string> {
     if (assignment === null) continue;
     // Exactly one of the three value alternatives matches, so the last is the
     // only case left rather than a fallback that could be undefined.
+    const name = assignment[1]!;
+    const remainder = line.slice(assignment[0].length);
+    if (new RegExp(`\\b${name}[ \\t]*=`).test(remainder)) {
+      scalars.delete(name);
+      continue;
+    }
     const raw = assignment[2] ?? assignment[3] ?? assignment[4]!;
     // Unquoted escapes quote any following character. Double quotes are
     // narrower: the shell removes a backslash only before $, backtick, ", and
@@ -724,7 +732,7 @@ export function shellScalars(text: string): Map<string, string> {
     // scanner cannot preserve token identity for operators, so leave these
     // values unresolved rather than reinterpreting them as commands or flags.
     if (/[$`"'();&#|<>{}]/.test(value)) continue;
-    scalars.set(assignment[1]!, value);
+    scalars.set(name, value);
   }
   return scalars;
 }
@@ -743,7 +751,23 @@ export function shellScalars(text: string): Map<string, string> {
 export function expandScalars(line: string, scalars: Map<string, string>): string {
   // One of the two alternatives always captures the name, so there is no
   // nameless match to guard against.
-  return line.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (whole, braced?: string, bare?: string) => {
+  return line.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g, (whole, braced: string | undefined, bare: string | undefined, offset: number) => {
+    let single = false;
+    let double = false;
+    let escaped = false;
+    for (const character of line.slice(0, offset)) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === "\\" && !single) {
+        escaped = true;
+        continue;
+      }
+      if (character === "'" && !double) single = !single;
+      else if (character === '"' && !single) double = !double;
+    }
+    if (single) return whole;
     const value = scalars.get(braced ?? bare!);
     // Quote removal happens before parameter expansion: a backslash produced by
     // expansion is data, not syntax. Double it in the scanner input so the one
