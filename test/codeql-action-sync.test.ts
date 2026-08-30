@@ -34,4 +34,8 @@ test("Dependabot groups CodeQL action updates in the GitHub Actions entry", () =
   assert.deepEqual(githubActions?.groups?.["codeql-action"], {
     patterns: ["github/codeql-action*"],
   });
+  assert.deepEqual(githubActions?.groups?.["codeql-action-security"], {
+    "applies-to": "security-updates",
+    patterns: ["github/codeql-action*"],
+  });
 });
