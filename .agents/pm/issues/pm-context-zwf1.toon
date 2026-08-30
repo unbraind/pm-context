@@ -6,13 +6,14 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-08-30T15:38:18.740Z"
-updated_at: "2026-08-30T15:40:54.063Z"
+updated_at: "2026-08-30T15:44:53.217Z"
 closed_at: "2026-08-30T15:40:54.054Z"
 completed_at: "2026-08-30T15:40:54.054Z"
 claim_principal: pi-agent
 author: pi-agent
-comments[1]{created_at,author,text}:
+comments[2]{created_at,author,text}:
   "2026-08-30T15:39:45.403Z",pi-agent,"Updated init and analyze to the 4.37.9 commit cdf488f595d80d6e07e03d4674febd5ab45fa938, added the Dependabot codeql-action group, and added regression coverage. npm test passed 297 tests; npm run coverage passed at 100% statements, branches, functions, and lines; npm run docstring passed 47 of 47 declarations. Regression proof: replacing the fixed workflow SHA with the prior 4.37.8 SHA made test/codeql-action-sync.test.ts fail with exit 1, then restoring the fix made both tests pass."
+  "2026-08-30T15:44:53.217Z",pi-agent,"Review follow-up: the synchronization test now scans every workflow YAML file, rejects non-SHA references, compares revisions without pinning the current commit, and parses dependabot.yml so the group must belong to the github-actions update entry. npm test passed 297 tests. Regression proof: changing only analyze back to the prior SHA failed the test with exit 1; restoring the synchronized SHA passed."
 files[3]{path,scope}:
   .github/dependabot.yml,project
   .github/workflows/codeql.yml,project

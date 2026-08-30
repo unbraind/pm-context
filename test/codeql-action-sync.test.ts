@@ -1,24 +1,37 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import test from "node:test";
+import { parse } from "yaml";
 
-const workflow = readFileSync(new URL("../.github/workflows/codeql.yml", import.meta.url), "utf8");
+const workflowDirectory = new URL("../.github/workflows/", import.meta.url);
+const workflows = readdirSync(workflowDirectory)
+  .filter((file) => file.endsWith(".yml") || file.endsWith(".yaml"))
+  .map((file) => readFileSync(new URL(file, workflowDirectory), "utf8"))
+  .join("\n");
 const dependabot = readFileSync(new URL("../.github/dependabot.yml", import.meta.url), "utf8");
-const codeqlVersion = "cdf488f595d80d6e07e03d4674febd5ab45fa938";
 
-test("every CodeQL action uses the same current release", () => {
-  const references = [...workflow.matchAll(/github\/codeql-action\/([^@\s]+)@([a-f0-9]{40})/g)];
+test("every CodeQL action in every workflow uses the same pinned release", () => {
+  const references = [...workflows.matchAll(/github\/codeql-action\/([^@\s]+)@([^\s]+)/g)];
+  const actions = new Set(references.map((reference) => reference[1]));
+  const revisions = new Set(references.map((reference) => reference[2]));
 
-  assert.deepEqual(
-    references.map((reference) => reference[1]).sort(),
-    ["analyze", "init"],
-  );
-  assert.deepEqual(new Set(references.map((reference) => reference[2])), new Set([codeqlVersion]));
+  assert.ok(actions.has("init"), "a CodeQL init action must be configured");
+  assert.ok(actions.has("analyze"), "a CodeQL analyze action must be configured");
+  assert.equal(revisions.size, 1, "every CodeQL action must use the same revision");
+  assert.match([...revisions][0] ?? "", /^[a-f0-9]{40}$/, "the shared CodeQL revision must be a commit SHA");
 });
 
-test("Dependabot groups CodeQL action updates into one pull request", () => {
-  assert.match(
-    dependabot,
-    /package-ecosystem: ["']github-actions["'][\s\S]*?groups:\s*\n\s+codeql-action:\s*\n\s+patterns:\s*\n\s+- ["']github\/codeql-action\*["']/,
-  );
+test("Dependabot groups CodeQL action updates in the GitHub Actions entry", () => {
+  const config: unknown = parse(dependabot);
+  const updates = (config as {
+    updates?: Array<{
+      "package-ecosystem"?: unknown;
+      groups?: Record<string, unknown>;
+    }>;
+  }).updates;
+  const githubActions = updates?.find((update) => update["package-ecosystem"] === "github-actions");
+
+  assert.deepEqual(githubActions?.groups?.["codeql-action"], {
+    patterns: ["github/codeql-action*"],
+  });
 });
