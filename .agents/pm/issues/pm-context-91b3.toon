@@ -1,0 +1,21 @@
+id: pm-context-91b3
+title: Remove the unused changelog verifier test import
+description: DeepScan identified the unused main binding in the changelog verifier test; remove the dead import and re-run all gates.
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-30T15:40:57.183Z"
+updated_at: "2026-08-30T15:41:12.008Z"
+closed_at: "2026-08-30T15:41:11.992Z"
+completed_at: "2026-08-30T15:41:11.992Z"
+claim_principal: pi-agent
+author: pi-agent
+comments[1]{created_at,author,text}:
+  "2026-08-30T15:41:11.534Z",pi-agent,Removed the unused main import identified by DeepScan. npm test passes all 319 tests.
+files[1]{path,scope,note}:
+  test/verify-release-changelog-date.test.ts,project,Remove the unused binding
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm test,project,pi-agent,"2026-08-30T15:40:57.689Z",local_mutation,fix/stabilise-changelog-date-from-version
+close_reason: The test imports only executed verifier symbols and the complete suite passes.
+body: ""
