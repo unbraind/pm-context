@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Keep CodeQL actions versioned and updated as one unit ([pm-context-zwf1](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-zwf1.toon))
+
 ## 2026.8.29 - 2026-08-29
 
 ### Fixed
