@@ -1,0 +1,27 @@
+id: pm-context-o76d
+title: Rebase the changelog date verifier onto the current release workflow
+description: "Rebase PR 76 onto current main while preserving version-derived changelog dates, both release verifiers, and the current package and workflow behavior."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-30T15:34:39.913Z"
+updated_at: "2026-08-30T15:36:12.228Z"
+closed_at: "2026-08-30T15:36:12.212Z"
+completed_at: "2026-08-30T15:36:12.212Z"
+claim_principal: pi-agent
+author: pi-agent
+comments[1]{created_at,author,text}:
+  "2026-08-30T15:36:11.581Z",pi-agent,"Rebased onto origin/main. Resolved .gitignore by retaining main current transaction-journal policy; resolved .github/workflows/ci.yml by retaining both release verifiers; resolved package.json by retaining main current version/dependency/release-workflow gates plus the changelog-date verifier; resolved CHANGELOG.md by taking the requested rebase side and regenerating after close. Upgraded pm-changelog to 2026.8.29 and made the executable probe use 2026.1.2-2. npm run verify:release-changelog-date, npm test, and npm run release:check pass with 100% configured coverage. Regression proofs: removing --date-from-version made the verifier fail; installing pm-changelog 2026.8.17 while retaining the suffix probe also made it fail; both restored versions pass."
+files[6]{path,scope,note}:
+  .gitignore,project,Retain current transaction-journal ignore policy
+  .github/workflows/ci.yml,project,Run both release verifiers
+  package.json,project,Preserve current dependencies and both release gates
+  CHANGELOG.md,project,Regenerate after closing the tracking item
+  scripts/verify-release-changelog-date.ts,project,Substantive verifier
+  test/verify-release-changelog-date.test.ts,project,Regression coverage
+tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm test,project,pi-agent,"2026-08-30T15:34:48.855Z",local_mutation,fix/stabilise-changelog-date-from-version
+  "npm run release:check",project,pi-agent,"2026-08-30T15:34:48.855Z",local_mutation,fix/stabilise-changelog-date-from-version
+close_reason: Rebase conflicts are resolved and both unsuffixed and suffixed changelog date paths pass all gates.
+body: ""
