@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Adjacent operator after a control closer leaves stale scope, suppressing later assignments ([pm-context-nvxm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nvxm.toon))
+- Chained assignment followed by && or \|\| hides publishes from the attestation gate ([pm-context-99le](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-99le.toon))
+
 ## 2026.8.31 - 2026-08-31
 
 ### Fixed
@@ -8,13 +15,6 @@
 - Keep CodeQL actions versioned and updated as one unit ([pm-context-zwf1](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-zwf1.toon))
 - Pin pm-changelog 2026.8.30 before the next release ([pm-context-4w80](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-4w80.toon))
 - Rebase the changelog date verifier onto the current release workflow ([pm-context-o76d](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-o76d.toon))
-
-## 2026.8.29 - 2026-08-29
-
-### Fixed
-
-- Adjacent operator after a control closer leaves stale scope, suppressing later assignments ([pm-context-nvxm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nvxm.toon))
-- Chained assignment followed by && or \|\| hides publishes from the attestation gate ([pm-context-99le](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-99le.toon))
 
 ## 2026.8.29 - 2026-08-29
 
