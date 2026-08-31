@@ -1,0 +1,22 @@
+id: pm-context-e242
+title: "The heredoc-body, escaped-separator and backslash-delimiter bypasses are unpinned by any discriminating fixture"
+description: "pm-todos fixed five publish-attestation bypasses; three of the guards (heredoc bodies skip, escaped separators refused, <<\\\\EOF delimiter unquoted) are already present in this repository's own implementation but the canonical fixtures from the reference are not asserted here, so a revert of any of the three would pass the suite silently. Port the fixtures and prove each one goes red when its guard is reverted."
+type: Issue
+status: closed
+priority: 1
+tags[3]: scanner,security,supply-chain
+created_at: "2026-08-31T20:15:02.180Z"
+updated_at: "2026-08-31T20:33:56.752Z"
+closed_at: "2026-08-31T20:33:22.871Z"
+completed_at: "2026-08-31T20:33:22.871Z"
+author: pi-agent
+resolution: "Ported the pm-todos canonical fixtures for heredoc bodies, escaped separators and backslash-quoted delimiters as discriminating pins over the already-present guards"
+expected_result: Each pin passes against the guard and goes red when its guard is reverted
+actual_result: "Guards measured present pre-change (1 failure each); all three pins green; each revert reddened its pin (heredoc state removal, VALUE_SYNTAX drop, backslash kept) and was restored; 361/361; all gates green"
+files[2]{path,scope,note}:
+  scripts/shell-command-scan.ts,project,"guards pinned: heredoc body skip, decoded-value syntax refusal, backslash-stripped delimiter"
+  test/verify-release-publish-attestation.test.ts,project,canonical heredoc-body/escaped-separator/backslash-delimiter fixtures ported from the pm-todos reference
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref},note}:
+  npm run coverage,project,300,pi-agent,"2026-08-31T20:30:53.562Z",local_mutation,fix/index-unquoted-scalar-assignments,"full suite plus the enforced 100/100/100 gate: the heredoc-body, escaped-separator and backslash-delimiter pins run inside it"
+close_reason: "All three guards were already present in this repository's own implementation, measured behaviourally before any change: the heredoc-body fixture (cat <<EOF with FLAG=--provenance as payload, unquoted, <<-, and <<'EOF' forms) returned 1 failure; FLAG=--provenance\\\\; was refused (shellScalars map value undefined, audit 1 failure, including the double-quoted form that preserves the backslash); <<\\\\EOF and <<-\\\\EOF closed on their unquoted terminator so CMD=npm still bound and the $CMD publish was still audited (1 failure). So none of the three reproduced as fail-open here -- reported plainly rather than claimed as fixes. What was missing was the canonical reference fixtures themselves: no test in this repository pinned these three shapes, so a revert of any guard would have passed the suite silently.\n\nPorted the pm-todos canonical fixtures as pins (every unattested publish paired with a genuinely attested sibling, so a scan that stopped finding publishes fails the non-vacuity guard instead of passing).\n\nRevert-red on each guard, by hand against the full suite: removing heredoc state from the scalar index reddened the bypass-1 pin together with the existing heredoc payload tests (numeric delimiter, multiple payloads, payload scope) -- 0 failures where 1 required; dropping the decoded-value syntax refusal reddened the escaped-separator pins, with the map reading --provenance; and the audit returning 0 failures where 1 is required; keeping the backslash in the delimiter reddened exactly the bypass-4 pin (0 where 1) while the plain-delimiter heredoc pin stayed green, so that revert is precisely scoped. Restored after each.\n\nVerified: full suite 361/361 pass; npm run coverage thresholds met at 100/100/100 (the scanner file itself is outside the gate's configured sources, pre-existing; measured informally at 99.58/99.01 with only the six pre-existing uncovered lines in expandScalars, which were equally uncovered before this change); npm run typecheck; npm run docstring; npm run verify:release-publish-attestation green; ./node_modules/.bin/pm health --strict-exit exit 0. pm test --run collides with this repository's own pm-integration tests inside the linked-test sandbox (pre-existing, same collision recorded on pm-context-14gn); every linked command was executed directly and observed green."
+body: ""

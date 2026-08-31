@@ -979,6 +979,300 @@ function lineScalarBinding(line: string, name: string): ScalarBinding {
   return binding;
 }
 
+/** Where a line sits in the file's block nesting, as open frame serials. */
+export interface ScalarScope {
+  /**
+   * Serial numbers of the control blocks open around the line -- an `if`,
+   * `while`, `until`, `for`, `select` or `case` body, a function body, or a
+   * brace group -- outermost first. Every block instance gets its own serial,
+   * so two sibling blocks never share a frame however equally they nest: a
+   * binding made in one `if` body is invisible to a later `if` body at the
+   * same depth, which a mere depth count could not tell apart.
+   */
+  readonly control: readonly number[];
+  /**
+   * Serial numbers of the parenthesis groups open around the line, outermost
+   * first. A subshell inherits its parent's environment, so these frames never
+   * NARROW what a line may resolve -- a file-scope binding still reaches a
+   * command inside -- but a binding made inside one must not escape it, and
+   * two sibling subshells are as unrelated as two sibling `if` bodies.
+   */
+  readonly subshell: readonly number[];
+}
+
+/** One scalar binding event: the name, the value, and where and in which scope it was made. */
+export interface ScalarAssignment {
+  /** Variable name the line assigns. */
+  readonly name: string;
+  /**
+   * The literal value the line leaves the name bound to, or nothing when the
+   * line rebinds it to something this scanner cannot reproduce exactly. A
+   * refusal is an event rather than an absence, because the shell's own last
+   * write has already replaced any earlier binding: keeping the earlier value
+   * for later lines would be lending evidence the line removed.
+   */
+  readonly value: string | undefined;
+  /** Zero-based index of the line that makes the assignment. */
+  readonly line: number;
+  /** The block nesting the assignment sits inside, outermost first. */
+  readonly scope: ScalarScope;
+}
+
+/** One walk's output: the binding events, and each line's command scope. */
+interface ScalarWalk {
+  /** Every scalar binding event, in file order. */
+  readonly assignments: ScalarAssignment[];
+  /** The scope a command on each line runs in, one entry per line of the text. */
+  readonly scopes: ScalarScope[];
+}
+
+/**
+ * Walk the text once and record every scalar binding event with its position and scope.
+ *
+ * This is the walk `shellScalars` used to do inline, widened in two
+ * directions because a flat file-wide map fails open in both:
+ *
+ * - POSITION: each event carries the line that made it, so a consumer can
+ *   resolve a command against only the bindings at or above it. A binding
+ *   below a command must not resolve it -- the shell has not made it yet.
+ * - SCOPE: each event carries the frames open around it, and each line gets
+ *   the frames a command on it runs in. Bindings made inside a block are
+ *   still recorded -- a command in that same block must see them -- but they
+ *   carry the block's frames, so they cannot reach a command outside it.
+ *
+ * A command's scope is the nesting after its line's closers have run and
+ * before its openers take effect: a `fi` returns to the enclosing scope on
+ * its own line, and the head of an `if`/`while`/`for` runs in the scope that
+ * encloses the block it opens. A binding's scope is the nesting at its
+ * line's start, because `STANDALONE_ASSIGNMENT` only accepts a line that
+ * OPENS with the assignment -- no closer or opener of that line can precede
+ * the word being bound.
+ *
+ * Heredoc bodies are skipped entirely, as before: their lines are data the
+ * shell never evaluates, so an assignment-shaped line inside one
+ * establishes no binding, and no scope change either. A line that begins
+ * inside an unterminated quote or backtick span is prose and records
+ * nothing. Everything else -- the comment boundary, the closer/opener
+ * keyword tracking, the subshell parenthesis counting, the multiline
+ * function headers -- is the same state machine `shellScalars` grew, with
+ * its two stacks now carrying frame serials instead of bare counts.
+ *
+ * @param text - File contents with continuations already joined.
+ * @returns The binding events and the per-line command scopes of the walk.
+ */
+function walkScalarEvents(text: string): ScalarWalk {
+  const assignments: ScalarAssignment[] = [];
+  const scopes: ScalarScope[] = [];
+  const controlClosers: Array<{ closer: string; frame: number }> = [];
+  const subshells: number[] = [];
+  let quote: "'" | '"' | undefined;
+  let escaped = false;
+  let backtick = false;
+  let pendingFunction = false;
+  const heredocs: Array<{ delimiter: string; stripTabs: boolean }> = [];
+  let serial = 0;
+  let lineNumber = -1;
+  const openControl = (closer: string): void => {
+    serial += 1;
+    controlClosers.push({ closer, frame: serial });
+  };
+  const snapshot = (): ScalarScope => ({
+    control: controlClosers.map((entry) => entry.frame),
+    subshell: [...subshells],
+  });
+  for (const line of text.split("\n")) {
+    lineNumber += 1;
+    const heredoc = heredocs[0];
+    if (heredoc !== undefined) {
+      const candidate = heredoc.stripTabs ? line.replace(/^\t+/, "") : line;
+      if (candidate.replace(/\r$/, "") === heredoc.delimiter) heredocs.shift();
+      // Payload lines are data: they establish no binding and change no scope,
+      // so the frames frozen at the heredoc's opening are the scope they carry.
+      scopes.push(snapshot());
+      continue;
+    }
+
+    // A binding's scope is the nesting at its line's start. A line that begins
+    // inside an unterminated quote or backtick span is prose, not shell.
+    const lineScope = snapshot();
+    const prose = quote !== undefined || backtick;
+    let code = line;
+    const heredocStarts: number[] = [];
+    // Track grouping across lines before considering the next line. Bindings in
+    // subshells, functions, and conditional bodies are recorded WITH their
+    // frames now, because a command in the same frame must still resolve them;
+    // the frames are what keep them from reaching anything outside.
+    for (let index = 0; index < line.length; index += 1) {
+      const character = line[index]!;
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (character === "\\" && quote !== "'") {
+        escaped = true;
+        continue;
+      }
+      if (quote !== undefined) {
+        if (character === quote) quote = undefined;
+        continue;
+      }
+      if (character === "`") {
+        backtick = !backtick;
+        continue;
+      }
+      if (backtick) continue;
+      // A comment begins only at a shell word boundary. Its quotes and
+      // parentheses are prose and must not change the scope of later lines.
+      if (character === "#" && (index === 0 || /[\s;&|(){}]/.test(line[index - 1]!))) {
+        code = line.slice(0, index);
+        break;
+      }
+      if (character === "<" && line[index + 1] === "<" && line[index + 2] !== "<") {
+        heredocStarts.push(index);
+      }
+      if (character === "'" || character === '"') quote = character;
+      else if (character === "(") {
+        serial += 1;
+        subshells.push(serial);
+      } else if (character === ")") {
+        if (subshells.length > 0) subshells.pop();
+      }
+    }
+
+    for (const start of heredocStarts) {
+      const match = /^<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([^\s;&|<>]+))/.exec(code.slice(start));
+      if (match !== null) {
+        heredocs.push({
+          delimiter: match[2] ?? match[3] ?? match[4]!,
+          stripTabs: match[1] === "-",
+        });
+      }
+    }
+    const syntax = code.trim();
+    const closer = controlClosers[controlClosers.length - 1];
+    if (closer !== undefined && new RegExp(`^${closer.closer}(?:${SEPARATORS}|$)`).test(syntax)) controlClosers.pop();
+    // A command's scope: this line's closers have run, and its openers have
+    // not taken effect yet.
+    scopes.push(snapshot());
+    const closesBrace = new RegExp(`}(?:${SEPARATORS}|$)`).test(syntax);
+    if (pendingFunction && new RegExp(`^\\{(?:${SEPARATORS}|$)`).test(syntax)) {
+      if (!closesBrace) openControl("\\}");
+      pendingFunction = false;
+    } else if (new RegExp(`^\\{(?:${SEPARATORS}|$)`).test(syntax) && controlClosers.some((entry) => entry.closer === "\\}")) {
+      if (!closesBrace) openControl("\\}");
+    } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(syntax)) {
+      if (!closesBrace) openControl("\\}");
+    } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(syntax)) {
+      pendingFunction = true;
+    } else {
+      pendingFunction = false;
+      const opener = new RegExp(`(?:^|[${OPERATOR_CHARS}][ \\t]*)(if|while|until|for|select|case)\\b`).exec(syntax)?.[1];
+      if (opener !== undefined) {
+        const expected = opener === "if" ? "fi" : opener === "case" ? "esac" : "done";
+        if (!new RegExp(`(?:^|[${OPERATOR_CHARS}][ \\t]*)${expected}(?:${SEPARATORS}|$)`).test(syntax)) openControl(expected);
+      }
+    }
+
+    if (prose) continue;
+    const assignment = STANDALONE_ASSIGNMENT.exec(line);
+    if (assignment === null) continue;
+    // Exactly one of the three value alternatives matches, so the last is the
+    // only case left rather than a fallback that could be undefined.
+    const name = assignment[1]!;
+    const binding = lineScalarBinding(line, name);
+    if (binding.kind === "unset") continue;
+    assignments.push({
+      name,
+      value: binding.kind === "opaque" ? undefined : binding.value,
+      line: lineNumber,
+      scope: lineScope,
+    });
+  }
+  return { assignments, scopes };
+}
+
+/**
+ * List every scalar binding event in the text, each with its line and scope.
+ *
+ * Direct exposure of {@link walkScalarEvents}'s events, for consumers that
+ * need position and scope rather than a resolved map -- the audit resolves
+ * per line through `lineScalarViews`, and the suite pins events directly so
+ * a regression in WHAT is recorded is caught separately from one in how it
+ * is resolved.
+ *
+ * @param text - File contents with continuations already joined.
+ * @returns Every binding event in file order, refusals included.
+ */
+export function scalarAssignments(text: string): ScalarAssignment[] {
+  return walkScalarEvents(text).assignments;
+}
+
+/**
+ * Decide whether one scope encloses another.
+ *
+ * Enclosing means every frame of the binding's scope is still open, at the
+ * same nesting positions, around the command's scope: the command's own
+ * block, or any block it sits inside -- never a sibling block opened later,
+ * which shares the depth but not the frames, and never a block the binding
+ * was made inside that has since closed.
+ *
+ * @param binding - The scope a binding was made in.
+ * @param command - The scope a command runs in.
+ * @returns True when the binding's scope is the command's own or an enclosing one.
+ */
+function scopeEncloses(binding: ScalarScope, command: ScalarScope): boolean {
+  if (binding.control.length > command.control.length) return false;
+  if (binding.subshell.length > command.subshell.length) return false;
+  for (let index = 0; index < binding.control.length; index += 1) {
+    if (binding.control[index] !== command.control[index]) return false;
+  }
+  for (let index = 0; index < binding.subshell.length; index += 1) {
+    if (binding.subshell[index] !== command.subshell[index]) return false;
+  }
+  return true;
+}
+
+/**
+ * Resolve the scalar bindings each line of the text may expand against.
+ *
+ * One map per line, holding exactly the bindings a command on that line
+ * could see: made at or above it, in its own scope or an enclosing one, with
+ * the last applicable event per name winning and a refusal removing the
+ * name. Both halves of that sentence are security properties, measured as
+ * bypasses before they were written:
+ *
+ * - `at or above it`, NOT `strictly above`: `NPM=npm; "$NPM" publish` assigns
+ *   and runs on one line, and the shell binds the name before running the
+ *   rest of the line. Excluding the line's own event would leave `$NPM`
+ *   unexpanded and the publish unrecognised -- trading a fail-open for a
+ *   fail-silent miss of the same severity.
+ * - `own scope or an enclosing one`: a binding inside a block resolves the
+ *   commands in that block and everything nested in it, and nothing else.
+ *   Refusing it outright would blind the scan to the publish it routes;
+ *   crediting it file-wide would let an untaken branch attest a publish the
+ *   shell runs without the flag.
+ *
+ * @param text - File contents with continuations already joined.
+ * @returns One map per line of the text, index-aligned with `text.split("\n")`.
+ */
+export function lineScalarViews(text: string): Array<Map<string, string>> {
+  const { assignments, scopes } = walkScalarEvents(text);
+  const views: Array<Map<string, string>> = [];
+  let next = 0;
+  for (let index = 0; index < scopes.length; index += 1) {
+    while (next < assignments.length && assignments[next]!.line <= index) next += 1;
+    const visible = new Map<string, string>();
+    for (let position = 0; position < next; position += 1) {
+      const assignment = assignments[position]!;
+      if (!scopeEncloses(assignment.scope, scopes[index]!)) continue;
+      if (assignment.value === undefined) visible.delete(assignment.name);
+      else visible.set(assignment.name, assignment.value);
+    }
+    views.push(visible);
+  }
+  return views;
+}
+
 /**
  * Index scalar assignments so a command held in a variable can be audited.
  *
@@ -1030,110 +1324,40 @@ function lineScalarBinding(line: string, name: string): ScalarBinding {
  * unbalanced parenthesis into an unrelated command, and the scan then reports
  * invocations that are not there while losing the one that is -- a false
  * verdict in both directions, which is worse than not resolving the variable.
+ * A decoded value carrying any other shell syntax is refused for the same
+ * reason: `FLAG=--provenance\\;` passes the shell ONE argument that attests
+ * nothing, and inlining it would hand the tokeniser a command separator with
+ * an exact `--provenance` standing behind it.
+ *
+ * POSITION is load-bearing, and so is SCOPE. A file-wide map lets an
+ * assignment resolve a command written above it, so `npm publish $FLAG`
+ * followed later by `FLAG=--provenance` would read as attested even though the
+ * shell runs the publish with `$FLAG` unset; every event therefore carries
+ * the line that made it, and a line resolves against events at or above it
+ * only (`scalarAssignments`, `lineScalarViews`). And a binding made inside a
+ * block the shell may never enter -- an untaken `if` branch, an `else`, an
+ * uncalled function body, a subshell -- cannot attest a command outside it,
+ * because whether that binding exists is a property of the block, not of the
+ * file. Refusing such bindings outright is not the answer either: a binding
+ * in the SAME block still resolves the command it routes, an enclosing
+ * binding still attests a publish nested below it, and a subshell still
+ * inherits its parent's environment. So each event carries the frames that
+ * were open around it -- identified by serial number, so two sibling blocks
+ * never share a frame the way a mere depth count would let them -- and a
+ * line may resolve against an event only from its own scope or an enclosing
+ * one. This map is the flat file-scope projection of the same events: the
+ * bindings visible to a command at the end of the file, outside every block.
  *
  * @param text - File contents with continuations already joined.
- * @returns Variable name mapped to the literal text it holds.
+ * @returns Variable name mapped to the literal text it holds, for the file's
+ *          own scope only.
  */
 export function shellScalars(text: string): Map<string, string> {
   const scalars = new Map<string, string>();
-  const controlClosers: string[] = [];
-  let subshellDepth = 0;
-  let quote: "'" | '"' | undefined;
-  let escaped = false;
-  let backtick = false;
-  let pendingFunction = false;
-  const heredocs: Array<{ delimiter: string; stripTabs: boolean }> = [];
-  for (const line of text.split("\n")) {
-    const heredoc = heredocs[0];
-    if (heredoc !== undefined) {
-      const candidate = heredoc.stripTabs ? line.replace(/^\t+/, "") : line;
-      if (candidate.replace(/\r$/, "") === heredoc.delimiter) heredocs.shift();
-      continue;
-    }
-
-    const atFileScope = subshellDepth === 0 && quote === undefined && !backtick && controlClosers.length === 0;
-    let code = line;
-    const heredocStarts: number[] = [];
-    // Track grouping across lines before considering the next line. Bindings in
-    // subshells, functions, and conditional bodies cannot be promoted into the
-    // file-global map because static scanning cannot prove those bodies ran.
-    for (let index = 0; index < line.length; index += 1) {
-      const character = line[index]!;
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (character === "\\" && quote !== "'") {
-        escaped = true;
-        continue;
-      }
-      if (quote !== undefined) {
-        if (character === quote) quote = undefined;
-        continue;
-      }
-      if (character === "`") {
-        backtick = !backtick;
-        continue;
-      }
-      if (backtick) continue;
-      // A comment begins only at a shell word boundary. Its quotes and
-      // parentheses are prose and must not change the scope of later lines.
-      if (character === "#" && (index === 0 || /[\s;&|(){}]/.test(line[index - 1]!))) {
-        code = line.slice(0, index);
-        break;
-      }
-      if (character === "<" && line[index + 1] === "<" && line[index + 2] !== "<") {
-        heredocStarts.push(index);
-      }
-      if (character === "'" || character === '"') quote = character;
-      else if (character === "(") subshellDepth += 1;
-      else if (character === ")") subshellDepth = Math.max(0, subshellDepth - 1);
-    }
-
-    for (const start of heredocStarts) {
-      const match = /^<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|\\?([^\s;&|<>]+))/.exec(code.slice(start));
-      if (match !== null) {
-        heredocs.push({
-          delimiter: match[2] ?? match[3] ?? match[4]!,
-          stripTabs: match[1] === "-",
-        });
-      }
-    }
-    const syntax = code.trim();
-    const closer = controlClosers[controlClosers.length - 1];
-    if (closer !== undefined && new RegExp(`^${closer}(?:${SEPARATORS}|$)`).test(syntax)) controlClosers.pop();
-    const closesBrace = new RegExp(`}(?:${SEPARATORS}|$)`).test(syntax);
-    if (pendingFunction && new RegExp(`^\\{(?:${SEPARATORS}|$)`).test(syntax)) {
-      if (!closesBrace) controlClosers.push("\\}");
-      pendingFunction = false;
-    } else if (new RegExp(`^\\{(?:${SEPARATORS}|$)`).test(syntax) && controlClosers.includes("\\}")) {
-      if (!closesBrace) controlClosers.push("\\}");
-    } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(syntax)) {
-      if (!closesBrace) controlClosers.push("\\}");
-    } else if (/^(?:function[ \t]+[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?|[A-Za-z_][A-Za-z0-9_]*[ \t]*\([ \t]*\))[ \t]*$/.test(syntax)) {
-      pendingFunction = true;
-    } else {
-      pendingFunction = false;
-      const opener = new RegExp(`(?:^|[${OPERATOR_CHARS}][ \\t]*)(if|while|until|for|select|case)\\b`).exec(syntax)?.[1];
-      if (opener !== undefined) {
-        const expected = opener === "if" ? "fi" : opener === "case" ? "esac" : "done";
-        if (!new RegExp(`(?:^|[${OPERATOR_CHARS}][ \\t]*)${expected}(?:${SEPARATORS}|$)`).test(syntax)) controlClosers.push(expected);
-      }
-    }
-
-    if (!atFileScope) continue;
-    const assignment = STANDALONE_ASSIGNMENT.exec(line);
-    if (assignment === null) continue;
-    // Exactly one of the three value alternatives matches, so the last is the
-    // only case left rather than a fallback that could be undefined.
-    const name = assignment[1]!;
-    const binding = lineScalarBinding(line, name);
-    if (binding.kind === "unset") continue;
-    if (binding.kind === "opaque") {
-      scalars.delete(name);
-      continue;
-    }
-    scalars.set(name, binding.value);
+  for (const assignment of scalarAssignments(text)) {
+    if (assignment.scope.control.length > 0 || assignment.scope.subshell.length > 0) continue;
+    if (assignment.value === undefined) scalars.delete(assignment.name);
+    else scalars.set(assignment.name, assignment.value);
   }
   return scalars;
 }

@@ -30,7 +30,7 @@ import {
   expandArrays,
   expandScalars,
   joinContinuations,
-  shellScalars,
+  lineScalarViews,
   type ShellCommand,
   type SourceFile,
   tokenizeCommands,
@@ -343,6 +343,16 @@ export function attestationEnabled(command: ShellCommand): boolean {
  * a real terminator never matched, the heredoc swallowed the rest of the file,
  * and every assignment after it stayed unindexed (see `dedentRunBlocks`).
  *
+ * Scalars are resolved per line, not file-wide: each line expands against
+ * only the bindings made at or above it, in its own scope or an enclosing one
+ * (`lineScalarViews`). A file-wide map let an assignment written BELOW a
+ * command resolve it, so `npm publish $FLAG` above `FLAG=--provenance` read
+ * as attested although the shell runs the publish with `$FLAG` unset, and it
+ * let a binding confined to a block attest a publish outside it while
+ * blinding the scan to the publishes inside it. The `<=` in the resolution
+ * keeps `NPM=npm; "$NPM" publish` working: the shell binds before running
+ * the rest of the line, so the publish must be found, not left unexpanded.
+ *
  * @param source - The file's path and contents.
  * @returns The publish invocations found, in file order.
  */
@@ -352,10 +362,10 @@ export function publishInvocationsIn(source: SourceFile): PublishInvocation[] {
   else if (WORKFLOW_YAML.test(source.file)) raw = dedentRunBlocks(source.text);
   const text = joinContinuations(raw);
   const arrays = bashArrays(text);
-  const scalars = shellScalars(text);
+  const views = lineScalarViews(text);
   const expanded = text
     .split("\n")
-    .map((line) => expandScalars(expandArrays(line, arrays), scalars))
+    .map((line, index) => expandScalars(expandArrays(line, arrays), views[index]!))
     .join("\n");
   const found: PublishInvocation[] = [];
   for (const command of tokenizeCommands(expanded)) {

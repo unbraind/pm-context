@@ -10,6 +10,12 @@
 - Adjacent operator after a control closer leaves stale scope, suppressing later assignments ([pm-context-nvxm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nvxm.toon))
 - Chained assignment followed by && or \|\| hides publishes from the attestation gate ([pm-context-99le](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-99le.toon))
 
+### Security
+
+- The heredoc-body, escaped-separator and backslash-delimiter bypasses are unpinned by any discriminating fixture ([pm-context-e242](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-e242.toon))
+- A binding confined to a block blinds the scan to publishes inside that block ([pm-context-ze4v](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-ze4v.toon))
+- An assignment written below a command attests it, because scalar resolution is file-wide ([pm-context-6kcu](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-6kcu.toon))
+
 ## 2026.8.31 - 2026-08-31
 
 ### Fixed

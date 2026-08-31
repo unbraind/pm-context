@@ -938,6 +938,53 @@ test("a scalar is taken only from a line that is exactly one literal assignment"
     assert.equal(result.failures.length, 1, `a publish flagged only by ${text[0]!.trim()} is unattested`);
     assert.match(result.failures[0]!, /does not enable --provenance/);
   }
+
+  // pm-todos bypass 2: an escaped separator invents attestation. The shell
+  // passes `--provenance;` as ONE argument that attests nothing, but decoding
+  // the value to a literal `;` let the tokenizer read a command separator and
+  // keep an exact `--provenance` token, so the publish read as attested.
+  assert.equal(shellScalars("FLAG=--provenance\\;\n").get("FLAG"), undefined,
+    "an escaped separator cannot become scanner syntax after decoding");
+  const escapedSeparator = auditPublishAttestation([{
+    file: "release.yml",
+    text: "FLAG=--provenance\\;\nnpm publish $FLAG\nnpm publish --provenance\n",
+  }]);
+  assert.equal(escapedSeparator.failures.length, 1,
+    "an escaped separator in a value cannot leave an exact attestation token behind");
+  const escapedQuoted = auditPublishAttestation([{
+    file: "release.yml",
+    text: 'FLAG="--provenance\\;"\nnpm publish $FLAG\nnpm publish --provenance\n',
+  }]);
+  assert.equal(escapedQuoted.failures.length, 1,
+    "a preserved backslash before a separator cannot invent an attestation either");
+});
+
+test("an assignment below a command cannot attest it, and one on its own line still can", () => {
+  // pm-todos bypass 3: scalars resolved file-wide. The shell runs this publish
+  // with $FLAG unset, because the assignment is below it, but a file-wide map
+  // let the later binding resolve the earlier command: a measured false pass.
+  // Every fixture pairs the unattested publish with a genuinely attested one,
+  // so a scan that simply stopped finding publishes fails the non-vacuity
+  // guard instead of passing this.
+  const laterAssignment = auditPublishAttestation([{
+    file: "release.yml",
+    text: "npm publish $FLAG\nFLAG=--provenance\nnpm publish --provenance\n",
+  }]);
+  assert.equal(laterAssignment.failures.length, 1,
+    "an assignment below a publish does not attest it");
+  assert.match(laterAssignment.failures[0]!, /does not enable --provenance/);
+
+  // The mirror edge, named because a strict `<` would break it: `NPM=npm;
+  // \"$NPM\" publish` assigns and runs on one line, and the shell binds before
+  // running the rest of it, so the publish must still be FOUND (and flagged as
+  // the unattested invocation it is) rather than left unexpanded and missed.
+  const sameLine = auditPublishAttestation([{
+    file: "release.yml",
+    text: 'NPM=npm; "$NPM" publish\nnpm publish --provenance\n',
+  }]);
+  assert.equal(sameLine.failures.length, 1,
+    "an assignment earlier on the publish's own line still resolves it");
+  assert.match(sameLine.failures[0]!, /does not enable --provenance/);
 });
 
 test("a scalar from unexecuted control flow cannot establish attestation", () => {
@@ -958,6 +1005,89 @@ test("a scalar from unexecuted control flow cannot establish attestation", () =>
     assert.equal(result.failures.length, 1, declaration[0]);
     assert.match(result.failures[0]!, /does not enable --provenance/);
   }
+});
+
+test("a binding confined to a block neither attests outside it nor blinds the scan inside it", () => {
+  // pm-todos bypass 5, fail-open direction: a standalone assignment inside a
+  // block the shell may never enter cannot attest a publish outside it. Each
+  // case pairs the unattested publish with an attested sibling, so a scan that
+  // stopped finding publishes would fail the non-vacuity guard instead.
+  const outOfScope: ReadonlyArray<readonly [string, string]> = [
+    ["an untaken if branch", "if false; then\nFLAG=--provenance\nfi\n"],
+    ["an uncalled function body", "deploy() {\nFLAG=--provenance\n}\n"],
+    ["a subshell", "(\nFLAG=--provenance\n)\n"],
+    ["an else branch", "if true; then\n:\nelse\nFLAG=--provenance\nfi\n"],
+  ];
+  for (const [label, prelude] of outOfScope) {
+    const scoped = auditPublishAttestation([{
+      file: "release.yml",
+      text: `${prelude}npm publish $FLAG\nnpm publish --provenance\n`,
+    }]);
+    assert.equal(scoped.failures.length, 1,
+      `a binding confined to ${label} cannot attest a publish outside it`);
+  }
+
+  // The mirror direction: refusing a binding is also a way to go blind, and a
+  // scan that stops resolving $CMD stops finding the publish behind it. A
+  // binding in the same block must still resolve its command -- this publish
+  // is genuinely unattested, so it must be FOUND (1 failure), not missed.
+  const sameBlock = auditPublishAttestation([{
+    file: "release.yml",
+    text: "if true; then\nCMD=npm\n$CMD publish\nfi\nnpm publish --provenance\n",
+  }]);
+  assert.equal(sameBlock.failures.length, 1,
+    "a binding in the same block still resolves the command it routes");
+  assert.match(sameBlock.failures[0]!, /does not enable --provenance/);
+
+  // The same mirror inside a subshell: bindings made there resolve commands
+  // run there, and an outer binding still reaches in, because a subshell
+  // inherits its parent's environment.
+  const subshellRouted = auditPublishAttestation([{
+    file: "release.yml",
+    text: "(\nCMD=npm\n$CMD publish\n)\nnpm publish --provenance\n",
+  }]);
+  assert.equal(subshellRouted.failures.length, 1,
+    "a binding inside a subshell still resolves the command inside it");
+  const outerIntoSubshell = auditPublishAttestation([{
+    file: "release.yml",
+    text: "FLAG=--provenance\n(\nnpm publish $FLAG\n)\n",
+  }]);
+  assert.equal(outerIntoSubshell.failures.length, 0,
+    "an outer binding attests a publish inside a subshell, which inherits it");
+
+  // Enclosing bindings attest nested publishes, in control blocks and in
+  // subshells nested inside them.
+  const inScope: ReadonlyArray<readonly [string, string, number]> = [
+    ["an outer binding attests a publish nested below it",
+      "FLAG=--provenance\nif true; then\nnpm publish $FLAG\nfi\n", 0],
+    ["a binding two blocks up still attests",
+      "if true; then\nFLAG=--provenance\nif true; then\nnpm publish $FLAG\nfi\nfi\n", 0],
+    ["an outer binding attests a publish nested two blocks down",
+      "FLAG=--provenance\nif true; then\nif true; then\nnpm publish $FLAG\nfi\nfi\n", 0],
+  ];
+  for (const [label, text, expected] of inScope) {
+    const resolved = auditPublishAttestation([{ file: "release.yml", text }]);
+    assert.equal(resolved.failures.length, expected, label);
+  }
+
+  // A binding from a SIBLING block must not attest either. This is where this
+  // repository is deliberately stricter than the pm-todos reference, whose
+  // depth COUNT cannot tell two same-depth blocks apart and so credits the
+  // second block's publish with the first block's binding. The shell runs the
+  // second block with $FLAG unset, so the publish is unattested and must be
+  // flagged; frame identity, not depth, is what keeps the scope honest here.
+  const siblingBlock = auditPublishAttestation([{
+    file: "release.yml",
+    text: "if true; then\nFLAG=--provenance\nfi\nif true; then\nnpm publish $FLAG\nfi\nnpm publish --provenance\n",
+  }]);
+  assert.equal(siblingBlock.failures.length, 1,
+    "a binding from a sibling block cannot attest a publish in a later block");
+  const siblingSubshell = auditPublishAttestation([{
+    file: "release.yml",
+    text: "(\nFLAG=--provenance\n)\n(\nnpm publish $FLAG\n)\nnpm publish --provenance\n",
+  }]);
+  assert.equal(siblingSubshell.failures.length, 1,
+    "a binding from one subshell cannot attest a publish in the next");
 });
 
 test("nested brace groups do not end an outer function scope", () => {
@@ -1407,6 +1537,58 @@ test("an indented heredoc terminator in a plain shell script is not a terminator
   assert.equal(result.failures.length, 1);
   assert.match(result.failures[0]!, /does not enable --provenance/);
   assert.equal(shellScalars(text).get("FLAG"), undefined, "payload is data, not a scalar");
+});
+
+test("heredoc payload never invents a binding, whatever delimiter quoting it uses", () => {
+  // pm-todos bypass 1: a line such as FLAG=--provenance inside a heredoc is
+  // data the shell never evaluates, but a scalar index without heredoc state
+  // stored it and expanded it into a later `npm publish $FLAG` -- a measured
+  // false pass. Each form pairs the unattested publish with an attested
+  // sibling, so a scan that stopped finding publishes would fail the
+  // non-vacuity guard instead of passing this.
+  const bodies: ReadonlyArray<readonly [string, string]> = [
+    ["an unquoted delimiter", "cat <<EOF\nFLAG=--provenance\nEOF"],
+    ["a tab-stripping delimiter", "cat <<-EOF\n\tFLAG=--provenance\n\tEOF"],
+    ["a single-quoted delimiter", "cat <<'EOF'\nFLAG=--provenance\nEOF"],
+  ];
+  for (const [label, prelude] of bodies) {
+    const heredoc = auditPublishAttestation([{
+      file: "release.yml",
+      text: `${prelude}\nnpm publish $FLAG\nnpm publish --provenance\n`,
+    }]);
+    assert.equal(heredoc.failures.length, 1,
+      `assignment-shaped heredoc payload with ${label} is not a binding`);
+    assert.match(heredoc.failures[0]!, /does not enable --provenance/);
+  }
+
+  // The same terminator asserted positively: a scalar assigned AFTER the
+  // payload ends carries the attestation, so this fails when the terminator
+  // is not recognised and the flag stays payload.
+  const clean = auditPublishAttestation([{
+    file: "release.yml",
+    text: "cat <<EOF\nrelease notes prose\nEOF\nFLAG=--provenance\nnpm publish --access public $FLAG\n",
+  }]);
+  assert.equal(clean.failures.length, 0,
+    "a scalar assigned after the terminator carries the attestation");
+});
+
+test("a backslash-quoted heredoc delimiter closes on its unquoted terminator", () => {
+  // pm-todos bypass 4: `<<\EOF` quotes the delimiter with a backslash exactly
+  // as `<<'EOF'` quotes it with single quotes, and the shell strips it before
+  // matching the terminator line. A scanner that kept the backslash never
+  // matched the real `EOF` line, so the heredoc stayed open for the rest of
+  // the file: `CMD=npm` was swallowed as payload, `$CMD publish` was never
+  // recognised as a publish at all, and the attested sibling satisfied the
+  // non-vacuity guard -- a measured false pass.
+  for (const opener of ["cat <<\\EOF", "cat <<-\\EOF"]) {
+    const backslashQuoted = auditPublishAttestation([{
+      file: "release.yml",
+      text: `${opener}\ninside\nEOF\nCMD=npm\n$CMD publish\nnpm publish --provenance\n`,
+    }]);
+    assert.equal(backslashQuoted.failures.length, 1,
+      `a backslash-quoted heredoc delimiter (${opener}) must close on its unquoted terminator`);
+    assert.match(backslashQuoted.failures[0]!, /does not enable --provenance/);
+  }
 });
 
 test("comment prose does not change scalar scope tracking", () => {
