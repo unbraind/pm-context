@@ -1,0 +1,21 @@
+id: pm-context-nvxm
+title: "Adjacent operator after a control closer leaves stale scope, suppressing later assignments"
+description: "A same-line control closer immediately followed by an operator is not recognised, e.g. if true; then echo ok; fi&&echo done — the fi is valid but not seen. The stale control scope then suppresses later file-scope assignments, so a subsequent $NPM publish is again unresolved. The closer expression excluded & and | from its trailing characters, so the closer was not recognised and the scope was never popped."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-31T11:15:58.563Z"
+updated_at: "2026-08-31T11:19:11.161Z"
+closed_at: "2026-08-31T11:19:11.148Z"
+completed_at: "2026-08-31T11:19:11.148Z"
+author: pi-agent
+comments[1]{created_at,author,text}:
+  "2026-08-31T11:17:28.908Z",pi-agent,"Fix: the control closer, closesBrace, function opener, and opener self-close patterns now use the shared SEPARATORS constant which includes and-pipe and pipe characters. A closer followed by and-then or pipe is now recognised. Test: a control closer followed by an operator does not leave stale scope. Revert-proof: reverting SEPARATORS to only whitespace-semicolon-hash makes the test fail (0 != 1)."
+files[2]{path,scope}:
+  scripts/shell-command-scan.ts,project
+  test/verify-release-publish-attestation.test.ts,project
+tests[1]{command,path,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm test,test/verify-release-publish-attestation.test.ts,project,pi-agent,"2026-08-31T11:18:01.129Z",local_mutation,fix/index-unquoted-scalar-assignments
+close_reason: "Fixed: control closer, closesBrace, function opener, and opener self-close patterns now use shared SEPARATORS constant including & and |, so a closer followed by an operator is recognised."
+body: ""

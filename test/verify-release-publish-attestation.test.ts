@@ -1151,3 +1151,42 @@ test("a read-write redirection does not turn its target into the command", () =>
   assert.equal(result.failures.length, 1, "the redirected publish must still be audited");
   assert.match(result.failures[0]!, /does not enable --provenance/);
 });
+
+test("a chained assignment followed by an operator is still indexed", () => {
+  // Greptile: `NPM=npm && true` is a persistent assignment — the shell keeps
+  // the binding after the `&&` — but the scanner's assignment regex accepted
+  // only a semicolon, a comment, or end-of-line after the value. The
+  // assignment was not indexed, so a later `$NPM publish` stayed unresolved
+  // and was omitted from publish recognition. An attested sibling publish
+  // then satisfied the non-vacuity guard and the whole scan returned clean
+  // while an unattested publish shipped.
+  const result = auditPublishAttestation([{
+    file: "release.yml",
+    text: [
+      `          npm publish --access public ${ATTESTATION_FLAG}`,
+      "          NPM=npm && true",
+      "          $NPM publish --access public",
+    ].join("\n"),
+  }]);
+  assert.equal(result.failures.length, 1, "the variable-routed publish must be audited");
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+});
+
+test("a control closer followed by an operator does not leave stale scope", () => {
+  // Greptile: `fi&&echo done` — the `fi` is a valid closer, but the closer
+  // regex excluded `&` and `|` from its trailing characters. The stale control
+  // scope then suppressed later file-scope assignments, so a subsequent
+  // `NPM=npm` was not indexed and `$NPM publish` was unresolved — the same
+  // silent supply-chain hole: an attested sibling carries the audit to green.
+  const result = auditPublishAttestation([{
+    file: "release.yml",
+    text: [
+      `          npm publish --access public ${ATTESTATION_FLAG}`,
+      "          if true; then echo ok; fi&&echo done",
+      "          NPM=npm",
+      "          $NPM publish --access public",
+    ].join("\n"),
+  }]);
+  assert.equal(result.failures.length, 1, "the variable-routed publish must be audited");
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+});

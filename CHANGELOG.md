@@ -4,6 +4,13 @@
 
 ### Fixed
 
+- Adjacent operator after a control closer leaves stale scope, suppressing later assignments ([pm-context-nvxm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nvxm.toon))
+- Chained assignment followed by && or \|\| hides publishes from the attestation gate ([pm-context-99le](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-99le.toon))
+
+## 2026.8.29 - 2026-08-29
+
+### Fixed
+
 - Close PR 84 scalar expansion review gaps ([pm-context-nhrm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nhrm.toon))
 - Preserve append-only provenance history during review repair ([pm-context-9xfx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-9xfx.toon))
 - Make the affinity tiebreak test use one shared instant ([pm-context-hxj5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-hxj5.toon))

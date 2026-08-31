@@ -570,9 +570,29 @@ export function bashArrays(text: string): Map<string, string> {
   return arrays;
 }
 
-/** A line opening with one assignment of a fully literal value, ending there or at a `;`. */
+/**
+ * Shell list/pipe operator characters that separate commands.
+ *
+ * `;`, `&` and `|` are the characters that end one command and begin another
+ * on the same line. Enumerating them once keeps every place that terminates a
+ * token in step: a hand-listed subset in one place and a complete set in
+ * another is exactly how `NPM=npm && true` went unindexed and how
+ * `fi&&echo done` left a stale control scope.
+ */
+const OPERATOR_CHARS = ";&|";
+/**
+ * Characters that end a shell token: whitespace, an operator, or a comment.
+ *
+ * Used after a control closer (`fi`, `done`, `esac`, `}`) to decide whether the
+ * closer was actually reached. A closer followed by `&&` or `||` is still a
+ * closer, and excluding `&` or `|` from this set is the bug that left a stale
+ * scope suppressing later file-scope assignments.
+ */
+const SEPARATORS = `[\\s${OPERATOR_CHARS}#]`;
+
+/** A line opening with one assignment of a fully literal value, ending at a separator. */
 const STANDALONE_ASSIGNMENT =
-  /^[ \t]*(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"((?:\\.|[^"\\$`])*)"|'([^']*)'|((?:\\.|[^\s;&|"'`$()\\])+))(?:[ \t]*;|[ \t]+#.*|[ \t]*\r?$)/;
+  new RegExp(`^[ \\t]*(?:export[ \\t]+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"((?:\\\\.|[^"\\\\$\`])*)"|'([^']*)'|((?:\\\\.|[^\\s${OPERATOR_CHARS}"'\`$()\\\\])+))(?:[ \\t]*[${OPERATOR_CHARS}]|[ \\t]+#.*|[ \\t]*\\r?$)`);
 
 /**
  * Index scalar assignments so a command held in a variable can be audited.
@@ -687,12 +707,12 @@ export function shellScalars(text: string): Map<string, string> {
     }
     const syntax = code.trim();
     const closer = controlClosers[controlClosers.length - 1];
-    if (closer !== undefined && new RegExp(`^${closer}(?:[\\s;#]|$)`).test(syntax)) controlClosers.pop();
-    const closesBrace = /}(?:[\s;#]|$)/.test(syntax);
-    if (pendingFunction && /^\{(?:[\s;#]|$)/.test(syntax)) {
+    if (closer !== undefined && new RegExp(`^${closer}(?:${SEPARATORS}|$)`).test(syntax)) controlClosers.pop();
+    const closesBrace = new RegExp(`}(?:${SEPARATORS}|$)`).test(syntax);
+    if (pendingFunction && new RegExp(`^\\{(?:${SEPARATORS}|$)`).test(syntax)) {
       if (!closesBrace) controlClosers.push("\\}");
       pendingFunction = false;
-    } else if (/^\{(?:[\s;#]|$)/.test(syntax) && controlClosers.includes("\\}")) {
+    } else if (new RegExp(`^\\{(?:${SEPARATORS}|$)`).test(syntax) && controlClosers.includes("\\}")) {
       if (!closesBrace) controlClosers.push("\\}");
     } else if (/^(?:function[ \t]+)?[A-Za-z_][A-Za-z0-9_]*(?:[ \t]*\([ \t]*\))?[ \t]*\{/.test(syntax)) {
       if (!closesBrace) controlClosers.push("\\}");
@@ -700,10 +720,10 @@ export function shellScalars(text: string): Map<string, string> {
       pendingFunction = true;
     } else {
       pendingFunction = false;
-      const opener = /(?:^|[;&|][ \t]*)(if|while|until|for|select|case)\b/.exec(syntax)?.[1];
+      const opener = new RegExp(`(?:^|[${OPERATOR_CHARS}][ \\t]*)(if|while|until|for|select|case)\\b`).exec(syntax)?.[1];
       if (opener !== undefined) {
         const expected = opener === "if" ? "fi" : opener === "case" ? "esac" : "done";
-        if (!new RegExp(`(?:^|[;&|][ \\t]*)${expected}(?:[ \\t;#]|$)`).test(syntax)) controlClosers.push(expected);
+        if (!new RegExp(`(?:^|[${OPERATOR_CHARS}][ \\t]*)${expected}(?:${SEPARATORS}|$)`).test(syntax)) controlClosers.push(expected);
       }
     }
 
