@@ -1,6 +1,15 @@
 # Changelog
 
-## Unreleased
+## 2026.8.31 - 2026-08-31
+
+### Fixed
+
+- Remove the unused changelog verifier test import ([pm-context-91b3](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-91b3.toon))
+- Keep CodeQL actions versioned and updated as one unit ([pm-context-zwf1](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-zwf1.toon))
+- Pin pm-changelog 2026.8.30 before the next release ([pm-context-4w80](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-4w80.toon))
+- Rebase the changelog date verifier onto the current release workflow ([pm-context-o76d](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-o76d.toon))
+
+## 2026.8.29 - 2026-08-29
 
 ### Fixed
 

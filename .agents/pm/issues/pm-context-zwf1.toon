@@ -1,0 +1,27 @@
+id: pm-context-zwf1
+title: Keep CodeQL actions versioned and updated as one unit
+description: "CodeQL init and analyze must use the same release, but Dependabot currently opens separate updates that cannot pass independently. Bump every CodeQL action reference together and group future GitHub Actions updates for github/codeql-action."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-30T15:38:18.740Z"
+updated_at: "2026-08-30T15:57:53.118Z"
+closed_at: "2026-08-30T15:40:54.054Z"
+completed_at: "2026-08-30T15:40:54.054Z"
+claim_principal: pi-agent
+author: pi-agent
+comments[3]{created_at,author,text}:
+  "2026-08-30T15:39:45.403Z",pi-agent,"Updated init and analyze to the 4.37.9 commit cdf488f595d80d6e07e03d4674febd5ab45fa938, added the Dependabot codeql-action group, and added regression coverage. npm test passed 297 tests; npm run coverage passed at 100% statements, branches, functions, and lines; npm run docstring passed 47 of 47 declarations. Regression proof: replacing the fixed workflow SHA with the prior 4.37.8 SHA made test/codeql-action-sync.test.ts fail with exit 1, then restoring the fix made both tests pass."
+  "2026-08-30T15:44:53.217Z",pi-agent,"Review follow-up: the synchronization test now scans every workflow YAML file, rejects non-SHA references, compares revisions without pinning the current commit, and parses dependabot.yml so the group must belong to the github-actions update entry. npm test passed 297 tests. Regression proof: changing only analyze back to the prior SHA failed the test with exit 1; restoring the synchronized SHA passed."
+  "2026-08-30T15:57:53.118Z",pi-agent,"CodeRabbit follow-up: added a second CodeQL group scoped to Dependabot security updates and extended the parsed-config regression assertion. npm test passed 297 tests."
+files[3]{path,scope}:
+  .github/dependabot.yml,project
+  .github/workflows/codeql.yml,project
+  test/codeql-action-sync.test.ts,project
+tests[3]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm test,project,pi-agent,"2026-08-30T15:39:43.327Z",local_mutation,chore/bump-pm-changelog-to-2026-8-30
+  npm run coverage,project,pi-agent,"2026-08-30T15:39:44.067Z",local_mutation,chore/bump-pm-changelog-to-2026-8-30
+  npm run docstring,project,pi-agent,"2026-08-30T15:39:44.696Z",local_mutation,chore/bump-pm-changelog-to-2026-8-30
+close_reason: "CodeQL init and analyze now use 4.37.9 together, future updates are grouped, and regression tests enforce both contracts."
+body: ""
