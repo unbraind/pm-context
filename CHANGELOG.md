@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- YAML run-block indentation reaches shellScalars undedented, so a heredoc terminator written inside a run block never ends its payload ([pm-context-14gn](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-14gn.toon))
+- Two heredoc regression tests assert a failure that holds whether or not the heredoc terminator is recognised ([pm-context-598y](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-598y.toon))
+- The scalar scanner deletes a same-line reassignment instead of keeping the shell's final value, and persists pipeline and background bindings ([pm-context-4gk3](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-4gk3.toon))
 - Adjacent operator after a control closer leaves stale scope, suppressing later assignments ([pm-context-nvxm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nvxm.toon))
 - Chained assignment followed by && or \|\| hides publishes from the attestation gate ([pm-context-99le](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-99le.toon))
 

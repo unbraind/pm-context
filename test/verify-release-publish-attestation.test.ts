@@ -30,7 +30,7 @@ import {
   trackedPublishSources,
   verify,
 } from "../scripts/verify-release-publish-attestation.ts";
-import { commandArguments, commandCandidates, commandName, expandScalars, shellScalars, tokenizeCommands } from "../scripts/shell-command-scan.ts";
+import { commandArguments, commandCandidates, commandName, dedentRunBlocks, expandScalars, shellScalars, tokenizeCommands } from "../scripts/shell-command-scan.ts";
 
 /** Tokenises one command and returns it, asserting the text held exactly one. */
 function onlyCommand(text: string): ReturnType<typeof tokenizeCommands>[number] {
@@ -1005,6 +1005,223 @@ test("a same-line scalar overwrite invalidates the earlier value", () => {
   assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
 });
 
+test("a same-line reassignment keeps the final value the shell would end up with", () => {
+  // Greptile P1: `NPM=ignored; NPM=npm` deleted NPM instead of retaining its
+  // final value, so `$NPM publish` stayed unresolved, was omitted from publish
+  // recognition, and an attested sibling carried the audit to a clean pass.
+  // Every separator that keeps the shell in the current environment takes the
+  // later value, because each earlier assignment has already run by the time
+  // the line ends -- measured in bash: `A=1; A=2`, `A=1 && A=2` and
+  // `A=1 & A=2` all leave A=2.
+  for (const line of [
+    "NPM=ignored; NPM=npm",
+    "NPM=ignored && NPM=npm",
+    "NPM=ignored & NPM=npm",
+    "NPM=ignored;\tNPM=npm",
+    "NPM=ignored; export NPM=npm",
+    "NPM=ignored; OTHER=x NPM=npm",
+    "NPM=ignored; NPM=npm # pick npm",
+    "NPM=ignored; NPM='npm'",
+    'NPM=ignored; NPM="npm"',
+    "NPM=ignored; X=$(echo a; echo b); NPM=npm",
+    "NPM=ignored; X=`date`; NPM=npm",
+    "NPM=ignored; NPM=npm; echo done#notacomment",
+  ]) {
+    const text = [
+      "          npm publish --provenance",
+      `          ${line}`,
+      "          $NPM publish",
+    ].join("\n");
+    const result = auditPublishAttestation([{ file: "release.yml", text }]);
+    assert.equal(result.failures.length, 1, line);
+    assert.match(result.failures[0]!, /does not enable --provenance/, line);
+  }
+});
+
+test("a redirection on a reassignment is neither a background job nor a pipeline", () => {
+  // `NPM=npm 2>&1` and `NPM=npm > /dev/null` leave the binding in place: the
+  // shell redirects the empty output of an assignment-only command that still
+  // runs in the current environment. Reading the `&` or the target as a
+  // separator would background or pipeline the assignment instead and drop
+  // the binding -- the too-strict direction that hides a routed publish.
+  for (const line of [
+    "NPM=ignored; NPM=npm 2>&1",
+    "NPM=ignored; NPM=npm > /dev/null",
+    "NPM=ignored; NPM=npm >/dev/null",
+    "NPM=ignored; NPM=npm &> /dev/null",
+  ]) {
+    const text = [
+      "          npm publish --provenance",
+      `          ${line}`,
+      "          $NPM publish",
+    ].join("\n");
+    const result = auditPublishAttestation([{ file: "release.yml", text }]);
+    assert.equal(result.failures.length, 1, line);
+    assert.match(result.failures[0]!, /does not enable --provenance/, line);
+  }
+});
+
+test("a pipeline-component assignment is not global provenance evidence", () => {
+  // Greptile: pipeline assignments were retained as file-wide bindings. Each
+  // segment of a pipeline runs in a subshell, so `FLAG=--provenance | cat`
+  // never sets FLAG in the parent -- and indexing it lent the flag to a later
+  // publish the shell runs without it. Before the fix this audit returned no
+  // failures: a measured false pass of the gate.
+  const smuggled = [
+    "          npm publish --provenance",
+    "          FLAG=--provenance | cat",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: "release.yml", text: smuggled }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+  // A reassignment inside a pipeline does not reach the parent either, so the
+  // earlier persistent binding is the one that stands; a pipelined or
+  // backgrounded `NPM=npm` on its own routes nothing, because the shell never
+  // binds it in the parent at all. Each assertion rejects the delete-branch
+  // and the last-wins reading alike, and the bare-assignment rows reject the
+  // implementation that indexed pipeline and background bindings at all.
+  for (const [line, publish] of [
+    ["FLAG=--provenance; FLAG=--no-provenance | cat", "npm publish --access public $FLAG"],
+    ["NPM=npm | cat", "$NPM publish"],
+    ["NPM=ignored | NPM=npm", "$NPM publish"],
+    ["NPM=ignored |& NPM=npm", "$NPM publish"],
+    ["NPM=npm & cat notes", "$NPM publish"],
+  ] as const) {
+    const text = ["          npm publish --provenance", `          ${line}`, `          ${publish}`].join("\n");
+    assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 0, line);
+  }
+});
+
+test("a backgrounded assignment is not global provenance evidence", () => {
+  // `FLAG=--provenance & echo bg` runs the assignment in a background subshell
+  // (bash: `NPM=npm & echo ${NPM-unset}` prints unset), so the parent never
+  // sees the flag. Before the fix this audit returned no failures either.
+  const smuggled = [
+    "          npm publish --provenance",
+    "          FLAG=--provenance & echo bg",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: "release.yml", text: smuggled }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+  // A reassignment that is backgrounded leaves the earlier binding in place
+  // (bash: `F=1; F=2 & echo bg; echo $F` prints 1), so this publish keeps the
+  // attestation the shell would actually run it with.
+  const kept = [
+    "          npm publish --provenance",
+    "          FLAG=--provenance; FLAG=--no-provenance & echo bg",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text: kept }]).failures.length, 0);
+});
+
+test("a command-scoped reassignment leaves the earlier persistent value in place", () => {
+  // `FLAG=--no-provenance true` binds only for `true`, so the shell runs the
+  // later publish with the earlier `--provenance`. The delete-branch failed
+  // this audit (unresolved `$FLAG` reads as unattested), and indexing the
+  // prefix value would unflag a publish the shell runs attested -- the same
+  // bypass wearing the other hat.
+  const text = [
+    "          FLAG=--provenance; FLAG=--no-provenance true",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 0);
+});
+
+test("a reassignment beside a conditional operator follows the shell's own rule", () => {
+  // An assignment always succeeds, so the right side of `||` never runs and
+  // the earlier value stands (bash: `C=1 || C=2` leaves C=1). Taking the later
+  // value would attest a publish the shell runs unattested.
+  const firstWins = [
+    "          npm publish --provenance",
+    "          FLAG=--no-provenance || FLAG=--provenance",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: "release.yml", text: firstWins }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+  // After a real command, whether the right side runs is that command's exit
+  // status, which a static scan cannot know. The binding is refused rather
+  // than guessed: keeping the earlier value would let `FLAG=--provenance;
+  // cmd && FLAG=--no-provenance` attest a publish the line may have unflagged,
+  // and taking the later value would lend a flag the line may never have set.
+  for (const line of [
+    "NPM=other; node -p 1 && NPM=npm",
+    "NPM=other; node -p 1 || NPM=npm",
+  ]) {
+    const text = [
+      "          npm publish --provenance",
+      `          ${line}`,
+      "          $NPM publish",
+    ].join("\n");
+    assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 0, line);
+  }
+  const refused = [
+    "          npm publish --provenance",
+    "          FLAG=--provenance; node -p 1 && FLAG=--no-provenance",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  const refusedResult = auditPublishAttestation([{ file: "release.yml", text: refused }]);
+  assert.equal(refusedResult.failures.length, 1);
+  assert.match(refusedResult.failures[0]!, /does not enable --provenance/);
+});
+
+test("a reassignment inside a compound command is refused rather than guessed", () => {
+  // A `then` body or a brace group runs as a property of the whole construct,
+  // not of the line, so whether the reassignment executes is not statically
+  // knowable -- the same reason a multi-line conditional body is refused.
+  // Keeping the earlier value attests a publish the line may have unflagged.
+  for (const line of [
+    "FLAG=--provenance; if true; then FLAG=--no-provenance; fi",
+    "FLAG=--provenance; { FLAG=--no-provenance; }",
+  ]) {
+    const text = [
+      "          npm publish --provenance",
+      `          ${line}`,
+      "          npm publish --access public $FLAG",
+    ].join("\n");
+    const result = auditPublishAttestation([{ file: "release.yml", text }]);
+    assert.equal(result.failures.length, 1, line);
+    assert.match(result.failures[0]!, /does not enable --provenance/, line);
+  }
+});
+
+test("a subshelled or appended reassignment does not carry the earlier value forward", () => {
+  // A subshell's binding stays in the subshell (bash: `I=1; (I=2); echo $I`
+  // prints 1), so the parent keeps the earlier value -- which routes no
+  // publish here, and the audit must stay clean rather than invent one.
+  const subshell = [
+    "          npm publish --provenance",
+    "          NPM=ignored; (NPM=npm)",
+    "          $NPM publish",
+  ].join("\n");
+  assert.equal(auditPublishAttestation([{ file: "release.yml", text: subshell }]).failures.length, 0);
+  // `NAME+=` appends to the binding it follows (bash: `M=1; M+=2` gives 12),
+  // so no literal candidate is the value the shell ends with; the name is
+  // refused. Keeping `--provenance` would attest a publish that really runs
+  // with `--provenancex`.
+  const appended = [
+    "          npm publish --provenance",
+    "          FLAG=--provenance; FLAG+=x",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  const appendedResult = auditPublishAttestation([{ file: "release.yml", text: appended }]);
+  assert.equal(appendedResult.failures.length, 1);
+  assert.match(appendedResult.failures[0]!, /does not enable --provenance/);
+  // The same refusal applies across lines: the shell's last write replaced the
+  // earlier binding, so an earlier `--provenance` must not survive a later
+  // value the scanner cannot reproduce exactly.
+  const replaced = [
+    "          FLAG=--provenance",
+    '          FLAG="a;b"',
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  const replacedResult = auditPublishAttestation([{ file: "release.yml", text: replaced }]);
+  assert.equal(replacedResult.failures.length, 1);
+  assert.match(replacedResult.failures[0]!, /does not enable --provenance/);
+});
+
 test("multiline backtick bindings do not escape substitution scope", () => {
   const text = [
     "          npm publish --provenance",
@@ -1054,7 +1271,15 @@ test("quoted heredoc-like prose does not suppress later scalar expansion", () =>
 });
 
 test("heredoc payload syntax does not change scalar scope", () => {
+  // CodeRabbit: this test used to expect one failure that held whether or not
+  // the terminator was recognised, so it proved nothing about termination. The
+  // fixture is now a `run: |` block -- the shape a workflow actually writes --
+  // and the publish is routed through a scalar assigned after the terminator,
+  // so the assertion fails unless the terminator is recognised. The payload's
+  // `)` must still not close the subshell the heredoc was opened in: indexing
+  // the payload `FLAG` would attest the publish instead.
   const text = [
+    "        run: |",
     "          npm publish --provenance",
     "          (",
     "            cat <<'PAYLOAD'",
@@ -1062,37 +1287,126 @@ test("heredoc payload syntax does not change scalar scope", () => {
     "          PAYLOAD",
     "            FLAG=--provenance",
     "          )",
-    "          npm publish $FLAG",
+    "          NPM=npm",
+    "          $NPM publish $FLAG",
   ].join("\n");
-  const result = auditPublishAttestation([{ file: "release.yml", text }]);
+  const result = auditPublishAttestation([{ file: ".github/workflows/release.yml", text }]);
   assert.equal(result.failures.length, 1);
   assert.match(result.failures[0]!, /does not enable --provenance/);
+  assert.equal(shellScalars(dedentRunBlocks(text)).get("NPM"), "npm",
+    "the payload ends at the terminator, so a later assignment is still indexed");
 });
 
 test("a numeric heredoc delimiter keeps its payload as data", () => {
+  // CodeRabbit: the failure this test expected held in both directions -- if
+  // the heredoc closed, FLAG was payload and the publish failed; if it never
+  // closed, FLAG was equally unindexed and the same publish failed. Routing
+  // the publish through a post-terminator scalar makes the assertion fail
+  // unless the terminator is recognised, and indexing the payload FLAG would
+  // turn the same publish attested, so the assertion fails that way too.
   const text = [
+    "        run: |",
     "          npm publish --provenance",
     "          cat <<123",
     "          FLAG=--provenance",
     "          123",
-    "          npm publish $FLAG",
+    "          NPM=npm",
+    "          $NPM publish $FLAG",
   ].join("\n");
-  assert.equal(auditPublishAttestation([{ file: "release.yml", text }]).failures.length, 1);
+  const result = auditPublishAttestation([{ file: ".github/workflows/release.yml", text }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+  assert.equal(shellScalars(dedentRunBlocks(text)).get("NPM"), "npm",
+    "the payload ends at the terminator, so a later assignment is still indexed");
 });
 
 test("multiple heredoc payloads all remain data", () => {
+  // Both payloads must stay data, and both terminators must be recognised:
+  // bash reads ONE's body to `ONE`, then TWO's body to `TWO`, and only then
+  // runs the rest of the line's following commands. A scanner that never
+  // terminates leaves NPM unindexed, so `$NPM publish` vanishes and the
+  // attested sibling carries the audit to clean -- the assertion rejects it.
   const text = [
+    "        run: |",
     "          npm publish --provenance",
     "          cat <<ONE <<'TWO'",
     "          harmless",
     "          ONE",
     "          FLAG=--provenance",
     "          TWO",
-    "          npm publish $FLAG",
+    "          NPM=npm",
+    "          $NPM publish $FLAG",
   ].join("\n");
-  const result = auditPublishAttestation([{ file: "release.yml", text }]);
+  const result = auditPublishAttestation([{ file: ".github/workflows/release.yml", text }]);
   assert.equal(result.failures.length, 1);
   assert.match(result.failures[0]!, /does not enable --provenance/);
+  assert.equal(shellScalars(dedentRunBlocks(text)).get("NPM"), "npm",
+    "the payload ends at the terminator, so a later assignment is still indexed");
+});
+
+test("a run-block heredoc terminator ends the payload, so later assignments are indexed", () => {
+  // CodeRabbit: `publishInvocationsIn` handed workflow text to `shellScalars`
+  // with the YAML block indentation still attached, and the heredoc terminator
+  // is the one scanner rule that is whitespace-sensitive -- it must sit at the
+  // start of the line the shell sees. GitHub Actions dedents a `run:` block
+  // before bash reads it, so an indented terminator is a real terminator to
+  // the shell and a never-matching line to the scanner: the heredoc swallowed
+  // the rest of the file, `NPM=npm` after it was payload, and the unattested
+  // `$NPM publish` was omitted from the audit while the attested sibling
+  // satisfied the non-vacuity guard. Measured before the fix: failures 0.
+  const text = [
+    "      - name: Publish",
+    "        run: |",
+    "          set -euo pipefail",
+    "          cat <<EOF >/tmp/notes",
+    "          release notes prose",
+    "          EOF",
+    "          NPM=npm",
+    "          \"$NPM\" publish --access public",
+    "      - name: Attested sibling",
+    "        run: npm publish --provenance",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: ".github/workflows/release.yml", text }]);
+  assert.equal(result.failures.length, 1, "the publish after the heredoc must be audited");
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+  // The same terminator, asserted positively: a scalar assigned after it
+  // carries the attestation, so this fails when the terminator is not
+  // recognised and the flag stays unindexed.
+  const clean = [
+    "      - name: Publish",
+    "        run: |",
+    "          cat <<EOF",
+    "          release notes prose",
+    "          EOF",
+    "          FLAG=--provenance",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  assert.equal(
+    auditPublishAttestation([{ file: ".github/workflows/release.yml", text: clean }]).failures.length,
+    0,
+    "a scalar assigned after the terminator carries the attestation",
+  );
+});
+
+test("an indented heredoc terminator in a plain shell script is not a terminator", () => {
+  // The dedent belongs to YAML run blocks, where the shell never sees the
+  // indentation. In a shell script the indentation is the shell's own, and
+  // bash does not accept an indented terminator without `<<-`: the payload
+  // continues, the later `FLAG=` is payload too, and the publish the scanner
+  // still enumerates from the text carries no attestation. Recognising the
+  // indented line would index payload prose as a scalar and attest it.
+  const text = [
+    "#!/bin/sh",
+    "cat <<EOF",
+    "  EOF",
+    "  FLAG=--provenance",
+    "EOF",
+    "npm publish --access public $FLAG",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: "scripts/release.sh", text }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+  assert.equal(shellScalars(text).get("FLAG"), undefined, "payload is data, not a scalar");
 });
 
 test("comment prose does not change scalar scope tracking", () => {

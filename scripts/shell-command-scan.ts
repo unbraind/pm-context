@@ -552,6 +552,87 @@ export function joinContinuations(text: string): string {
   return text.replace(/\\\r?\n\s*/g, " ");
 }
 
+/** A `run:` block-scalar header: the key, an indicator, and nothing else. */
+const RUN_BLOCK_HEADER =
+  /^([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][+-]?(?:[ \t]+#.*)?\r?$/;
+
+/** Leading whitespace, which YAML never mixes between a block and its parent. */
+const LEADING_WHITESPACE = /^[ \t]*/;
+
+/** A line that is blank, including the carriage return a CRLF file leaves. */
+const BLANK_LINE = /^[ \t\r]*$/;
+
+/**
+ * Strip the YAML block indentation from `run:` block scalars.
+ *
+ * GitHub Actions takes a `run:` block's text, removes the indentation YAML
+ * gave it, and hands the result to bash -- so the shell never sees the leading
+ * whitespace the raw workflow file carries. The scanner reads the raw file,
+ * and exactly one of its rules is whitespace-sensitive: a heredoc terminator
+ * is recognised only at the start of the line the shell sees. A terminator
+ * compared against a YAML-indented line therefore never matches, the heredoc
+ * swallows the rest of the file, every later assignment is payload, and a
+ * `$NPM publish` after the heredoc is omitted from the audit while an
+ * attested sibling elsewhere satisfies the non-vacuity guard -- the scan
+ * reports clean over an unattested publish.
+ *
+ * Dedenting the block content restores the text bash actually receives. Every
+ * other rule in the scanner already tolerates leading whitespace
+ * (`STANDALONE_ASSIGNMENT` opens with `^[ \t]*`, control closers and function
+ * openers are matched against trimmed syntax, a comment starts after any
+ * separator or whitespace, and `bashArrays` anchors on a word boundary), so
+ * this function changes nothing else about what the scanner sees.
+ *
+ * Only `run:` blocks are dedented, because `run` is the key GitHub Actions
+ * executes; a block scalar under any other key is data no shell runs, and
+ * stripping its indentation would be rewriting prose. The block's indentation
+ * is learned from its first non-blank line, as YAML itself learns it, a line
+ * keeps any indentation beyond the block's own, and the block ends at the
+ * first non-blank line indented less -- which is where YAML ends it too. A
+ * `run:`-shaped line inside another block's content is content, not a header,
+ * because the scanner walks the file once, forward, consuming each block
+ * before looking for the next.
+ *
+ * @param text - A workflow file's raw contents.
+ * @returns The same text with each `run:` block's content dedented.
+ */
+export function dedentRunBlocks(text: string): string {
+  const lines = text.split("\n");
+  const output: string[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    const header = RUN_BLOCK_HEADER.exec(lines[index]!);
+    if (header === null) {
+      output.push(lines[index]!);
+      index += 1;
+      continue;
+    }
+    // The block's indentation comes from its first non-blank line, so blank
+    // lines between the header and the content decide nothing here.
+    let content = index + 1;
+    while (content < lines.length && BLANK_LINE.test(lines[content]!)) content += 1;
+    // A header with no more-indented line after it holds an empty block: YAML
+    // ends it immediately, and so does this scan.
+    const indent = content < lines.length ? LEADING_WHITESPACE.exec(lines[content]!)![0] : "";
+    if (indent.length <= header[1]!.length) {
+      output.push(lines[index]!);
+      index += 1;
+      continue;
+    }
+    output.push(lines[index]!);
+    index += 1;
+    while (index < lines.length) {
+      const body = lines[index]!;
+      // A blank line is block content YAML keeps as an empty line; anything
+      // else must carry the block's own indentation to belong to it.
+      if (!BLANK_LINE.test(body) && !body.startsWith(indent)) break;
+      output.push(BLANK_LINE.test(body) ? body : body.slice(indent.length));
+      index += 1;
+    }
+  }
+  return output.join("\n");
+}
+
 /**
  * Index bash array assignments so a shared options array can be expanded.
  *
@@ -594,6 +675,310 @@ const SEPARATORS = `[\\s${OPERATOR_CHARS}#]`;
 const STANDALONE_ASSIGNMENT =
   new RegExp(`^[ \\t]*(?:export[ \\t]+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"((?:\\\\.|[^"\\\\$\`])*)"|'([^']*)'|((?:\\\\.|[^\\s${OPERATOR_CHARS}"'\`$()\\\\])+))(?:[ \\t]*[${OPERATOR_CHARS}]|[ \\t]+#.*|[ \\t]*\\r?$)`);
 
+/** One word read as an assignment: the name, and the value when it is literal. */
+interface AssignmentWord {
+  /** The variable name the word assigns. */
+  readonly name: string;
+  /**
+   * The value with quoting resolved, or nothing when the word assigns a name
+   * whose value this scanner cannot reproduce exactly.
+   */
+  readonly value: string | undefined;
+  /** True for `NAME+=value`, whose result depends on the binding it appends to. */
+  readonly append: boolean;
+}
+
+/** One assignment word: an optional append marker, then a value of any form. */
+const ASSIGNMENT_WORD = /^([A-Za-z_][A-Za-z0-9_]*)(\+?)=(.*)$/;
+
+/** A double-quoted value: no expansions, backslashes only before specials. */
+const DOUBLE_QUOTED_VALUE = /^"((?:\\.|[^"\\$\`])*)"$/;
+
+/** A single-quoted value: every character is literal, including backslashes. */
+const SINGLE_QUOTED_VALUE = /^'([^']*)'$/;
+
+/** An unquoted value: escapes allowed, no shell syntax the scanner re-reads. */
+const UNQUOTED_VALUE = /^(?:\\.|[^\s;&|"'\`$()\\])*$/;
+
+/** Characters that would become scanner syntax if a value were inlined. */
+const VALUE_SYNTAX = /[$\`"'();&#|<>{}]/;
+
+/**
+ * Read one word as a shell assignment, or nothing when it is not one.
+ *
+ * The grammar is the one `STANDALONE_ASSIGNMENT` applies to a whole line,
+ * reduced to the single word a command actually holds: a name, an optional
+ * `+` append marker, and a value that is fully double-quoted, fully
+ * single-quoted, or unquoted. A word that merely starts inside quotes is not
+ * an assignment at all (`"NPM=npm"` is a command name), and a value that
+ * mixes forms or carries an expansion is still an assignment -- the shell
+ * binds the name -- but one whose value is reported as not literal, because
+ * inlining a value the scanner cannot reproduce exactly is how a publish
+ * reads as attested when it is not.
+ *
+ * @param raw - The word exactly as written, quoting and escapes included.
+ * @param startsQuoted - True when the word's first character was inside quotes.
+ * @returns The assignment the word performs, or nothing for a non-assignment.
+ */
+function parseAssignmentWord(raw: string, startsQuoted: boolean): AssignmentWord | undefined {
+  if (startsQuoted) return undefined;
+  const match = ASSIGNMENT_WORD.exec(raw);
+  if (match === null) return undefined;
+  const text = match[3]!;
+  let value: string | undefined;
+  const doubleQuoted = DOUBLE_QUOTED_VALUE.exec(text);
+  const singleQuoted = SINGLE_QUOTED_VALUE.exec(text);
+  if (doubleQuoted !== null) {
+    // The shell removes a backslash inside double quotes only before the
+    // characters that still mean something there.
+    value = doubleQuoted[1]!.replace(/\\([$\`"\\])/g, "$1");
+  } else if (singleQuoted !== null) {
+    value = singleQuoted[1]!;
+  } else if (UNQUOTED_VALUE.test(text)) {
+    value = text.replace(/\\(.)/g, "$1");
+  }
+  if (value !== undefined && (VALUE_SYNTAX.test(value) || match[2] === "+")) value = undefined;
+  return { name: match[1]!, value, append: match[2] === "+" };
+}
+
+/**
+ * Words that make a segment part of a compound command.
+ *
+ * A reassignment behind one of these (`then NPM=npm`, `{ NPM=npm; }`) runs or
+ * not as a property of the whole construct, not of the line, so its result is
+ * refused rather than guessed -- the same refusal a multi-line conditional
+ * body already receives.
+ */
+const COMPOUND_KEYWORDS = new Set([
+  "if", "while", "until", "for", "case", "then", "else", "elif", "do", "function", "select", "{", "}",
+]);
+
+/** A redirection operator written alone, which consumes the word after it. */
+const BARE_REDIRECTION = /^(?:[0-9]*(?:>>?|<<?|<>|&>>?))$/;
+
+/** A redirection operator written joined to its target, which consumes none. */
+const JOINED_REDIRECTION = /^(?:[0-9]*(?:>>?|<<?|<>|&>>?)|&>>?)/;
+
+/** What one line's own commands leave a named scalar bound to. */
+type ScalarBinding =
+  | { readonly kind: "value"; readonly value: string }
+  | { readonly kind: "unset" }
+  | { readonly kind: "opaque" };
+
+/**
+ * Decide the binding one line of shell leaves on a scalar name.
+ *
+ * `STANDALONE_ASSIGNMENT` decides whether a line OPENS with a literal
+ * assignment; this function decides what the WHOLE line leaves behind,
+ * because a line may assign the same name more than once and the shell keeps
+ * only the last binding that runs in the current shell environment:
+ *
+ * - `NPM=ignored; NPM=npm` ends with `NPM=npm`. Deleting the name instead left
+ *   `$NPM publish` unresolved, and a publish the audit cannot see is a clean
+ *   gate, not a blocked one. The separators that keep the shell in the current
+ *   environment (`;`, `&&`, and a `&` that ends an earlier background job)
+ *   all take the later value, because every assignment left of the last one
+ *   has already run by the time the line finishes.
+ * - An assignment the shell does not persist still indexes nothing: a pipeline
+ *   component (`NPM=npm | cmd` -- each segment of a pipeline runs in a
+ *   subshell), a background job (`NPM=npm & cmd`), and a command prefix
+ *   (`NPM=npm cmd`) never reach the parent environment. Indexing any of them
+ *   let a `FLAG=--provenance | cat` lend a flag to a later publish the shell
+ *   runs without it.
+ * - A reassignment on the right of `||` never runs when the left side is an
+ *   assignment (an assignment always succeeds), so the earlier value stands;
+ *   and when the left side is a real command, whether the right side runs is
+ *   the command's exit status, which a static scan cannot know. The binding
+ *   is then refused (`opaque`) rather than guessed in either direction,
+ *   because guessing the earlier value can attest a publish the line
+ *   actually unflagged, and guessing the later value can hide one it left
+ *   unresolved.
+ * - A reassignment inside a compound command (`then FLAG=x`, `{ FLAG=x; }`)
+ *   is refused for the same reason a multi-line conditional body is: whether
+ *   it runs is a property of the construct.
+ * - `NAME+=value` and any value this scanner cannot reproduce exactly also
+ *   refuse, because the real binding differs from every literal candidate.
+ *
+ * Redirections are skipped rather than read as separators, so `NPM=npm 2>&1`
+ * is an assignment with a redirection and not a background job. Quoted spans,
+ * `$(...)` and backticks are traversed as words rather than split, so a
+ * substitution on the same line can neither end a segment nor contribute a
+ * binding -- its assignments belong to the subshell.
+ *
+ * @param line - One line of shell text.
+ * @param name - The scalar the caller's gate matched at the line's start.
+ * @returns What the line leaves `name` bound to: a literal value, no binding
+ *          at all, or a binding that exists but cannot be known statically.
+ */
+function lineScalarBinding(line: string, name: string): ScalarBinding {
+  let binding: ScalarBinding = { kind: "unset" };
+  let previous: ";" | "&&" | "||" | "&" | "|" | "start" = "start";
+  let previousDeterministic = true;
+  let index = /^[ \t]*(?:export[ \t]+)?/.exec(line)![0].length;
+  while (index < line.length) {
+    const words: Array<{ raw: string; startsQuoted: boolean }> = [];
+    let raw = "";
+    let startsQuoted = false;
+    let started = false;
+    let depth = 0;
+    let quote: "'" | '"' | undefined;
+    let backtick = false;
+    let escaped = false;
+    let operator: ";" | "&&" | "||" | "&" | "|" | "end" = "end";
+    const endWord = (): void => {
+      if (!started) return;
+      words.push({ raw, startsQuoted });
+      raw = "";
+      startsQuoted = false;
+      started = false;
+    };
+    while (index < line.length) {
+      const character = line[index]!;
+      if (escaped) {
+        raw += character;
+        escaped = false;
+        index += 1;
+        continue;
+      }
+      if (character === "\\" && quote !== "'") {
+        raw += character;
+        escaped = true;
+        started = true;
+        index += 1;
+        continue;
+      }
+      if (quote !== undefined) {
+        if (character === quote) quote = undefined;
+        raw += character;
+        index += 1;
+        continue;
+      }
+      if (character === "\`") {
+        backtick = !backtick;
+        raw += character;
+        started = true;
+        index += 1;
+        continue;
+      }
+      if (backtick) {
+        raw += character;
+        index += 1;
+        continue;
+      }
+      if (character === "'" || character === '"') {
+        quote = character;
+        if (!started) startsQuoted = true;
+        raw += character;
+        started = true;
+        index += 1;
+        continue;
+      }
+      // Parentheses are traversed, not split: a substitution's separators and
+      // assignments belong to its subshell, and neither may reach this line's
+      // segments.
+      if (character === "(" || character === ")") {
+        depth = character === "(" ? depth + 1 : Math.max(0, depth - 1);
+        raw += character;
+        started = true;
+        index += 1;
+        continue;
+      }
+      if (depth > 0) {
+        raw += character;
+        index += 1;
+        continue;
+      }
+      if (character === " " || character === "\t" || character === "\r") {
+        endWord();
+        index += 1;
+        continue;
+      }
+      // A comment starts at a word boundary and owns the rest of the line.
+      if (character === "#" && !started) break;
+      // `2>&1` is one redirection, not an assignment followed by a background
+      // job; `&>` is a redirection that happens to begin with the operator.
+      if (character === "&" && (/^[0-9]*[<>]>?$/.test(raw) || (raw === "" && line[index + 1] === ">"))) {
+        raw += character;
+        started = true;
+        index += 1;
+        continue;
+      }
+      if (character === ";" || character === "&" || character === "|") {
+        endWord();
+        if (character === ";") {
+          operator = ";";
+          index += 1;
+        } else if (character === "&") {
+          operator = line[index + 1] === "&" ? "&&" : "&";
+          index += operator === "&&" ? 2 : 1;
+        } else {
+          // `||` is conditional; `|&` pipes both streams and, like `|`, puts
+          // its segments in subshells.
+          operator = line[index + 1] === "|" ? "||" : "|";
+          index += line[index + 1] === "|" || line[index + 1] === "&" ? 2 : 1;
+        }
+        break;
+      }
+      raw += character;
+      started = true;
+      index += 1;
+    }
+    endWord();
+    let assigns: AssignmentWord | undefined;
+    let assignmentOnly = true;
+    let allLiteral = true;
+    let compound = false;
+    for (let position = 0; position < words.length; position += 1) {
+      const word = words[position]!;
+      if (position === 0 && word.raw === "export") continue;
+      if (!word.startsQuoted && BARE_REDIRECTION.test(word.raw)) {
+        position += 1;
+        continue;
+      }
+      if (!word.startsQuoted && JOINED_REDIRECTION.test(word.raw)) continue;
+      if (!word.startsQuoted && COMPOUND_KEYWORDS.has(word.raw)) {
+        compound = true;
+        assignmentOnly = false;
+        continue;
+      }
+      const assignment = parseAssignmentWord(word.raw, word.startsQuoted);
+      if (assignment === undefined) {
+        assignmentOnly = false;
+        continue;
+      }
+      if (assignment.name === name) assigns = assignment;
+      if (assignment.value === undefined) allLiteral = false;
+    }
+    if (assigns !== undefined) {
+      const pipelinedOrBackgrounded = operator === "|" || operator === "&" || previous === "|";
+      const neverRuns = previous === "||" && previousDeterministic;
+      const cannotProve = (previous === "&&" || previous === "||") && !previousDeterministic;
+      if (compound) binding = { kind: "opaque" };
+      else if (!assignmentOnly) {
+        // A command-prefix assignment (`NPM=npm cmd`) binds only for its
+        // command, so it leaves whatever binding the line had already made.
+      } else if (pipelinedOrBackgrounded || neverRuns) {
+        // A pipeline component, a background job, or the right side of an `||`
+        // whose left side already succeeded: the shell never runs it in the
+        // current environment, so the binding the line had still stands.
+      } else if (cannotProve) {
+        // Whether this runs is the exit status of a real command. Keeping the
+        // earlier value can attest a publish the line actually unflagged, and
+        // taking this value can hide one it left unresolved, so refuse both.
+        binding = { kind: "opaque" };
+      } else {
+        binding = assigns.value !== undefined ? { kind: "value", value: assigns.value } : { kind: "opaque" };
+      }
+    }
+    if (operator === "end") break;
+    previous = operator;
+    // Only a segment made entirely of literal assignments provably succeeds,
+    // so only it decides whether `&&` or `||` provably reaches the next one.
+    previousDeterministic = assignmentOnly && !compound && allLiteral;
+  }
+  return binding;
+}
+
 /**
  * Index scalar assignments so a command held in a variable can be audited.
  *
@@ -628,6 +1013,15 @@ const STANDALONE_ASSIGNMENT =
  * assignments: refusing them left `$NPM` unresolved, and an attested publish
  * elsewhere in the file then satisfied the non-vacuity guard, so being too
  * strict here passes an unattested publish just as being too loose does.
+ *
+ * A line that assigns the same name more than once is resolved the way the
+ * shell resolves it -- by `lineScalarBinding`, which keeps the last binding
+ * that runs in the current shell environment, refuses a binding whose value
+ * or execution cannot be known statically, and ignores bindings a pipeline,
+ * a background job or a command prefix never persist. A refusal deletes the
+ * name: the shell's own last write has already replaced any earlier line's
+ * binding, so keeping the earlier value would be lending evidence the line
+ * removed.
  *
  * Escapes are honoured outside single quotes, so `NPM=npm\\ publish` is one word
  * holding a command while `CMD='"'"'a\\b'"'"' keeps its backslash as the shell does.
@@ -733,25 +1127,13 @@ export function shellScalars(text: string): Map<string, string> {
     // Exactly one of the three value alternatives matches, so the last is the
     // only case left rather than a fallback that could be undefined.
     const name = assignment[1]!;
-    const remainder = line.slice(assignment[0].length).replace(/[ \t]+#.*$/, "");
-    if (new RegExp(`\\b${name}[ \\t]*=`).test(remainder)) {
+    const binding = lineScalarBinding(line, name);
+    if (binding.kind === "unset") continue;
+    if (binding.kind === "opaque") {
       scalars.delete(name);
       continue;
     }
-    const raw = assignment[2] ?? assignment[3] ?? assignment[4]!;
-    // Unquoted escapes quote any following character. Double quotes are
-    // narrower: the shell removes a backslash only before $, backtick, ", and
-    // backslash. Single quotes make every backslash literal.
-    const value = assignment[4] !== undefined
-      ? raw.replace(/\\(.)/g, "$1")
-      : assignment[2] !== undefined
-        ? raw.replace(/\\([$`"\\])/g, "$1")
-        : raw;
-    // Text introduced by parameter expansion is data, not shell grammar. The
-    // scanner cannot preserve token identity for operators, so leave these
-    // values unresolved rather than reinterpreting them as commands or flags.
-    if (/[$`"'();&#|<>{}]/.test(value)) continue;
-    scalars.set(name, value);
+    scalars.set(name, binding.value);
   }
   return scalars;
 }

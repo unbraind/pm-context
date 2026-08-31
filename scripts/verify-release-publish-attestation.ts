@@ -26,6 +26,7 @@ import {
   commandArguments,
   commandCandidates,
   commandName,
+  dedentRunBlocks,
   expandArrays,
   expandScalars,
   joinContinuations,
@@ -55,6 +56,18 @@ export const FOREIGN_PUBLISHERS = new Set(["yarn", "pnpm", "bun"]);
 
 /** Repository subtrees whose contents are build output rather than a publish path. */
 const GENERATED_PREFIXES = ["dist/", "coverage/", "node_modules/", ".agents/pm/runtime/"];
+
+/**
+ * Tracked paths whose `run:` blocks GitHub Actions executes as shell.
+ *
+ * Mirrors the two workflow patterns in {@link EXECUTABLE_PATHS}: a workflow
+ * file and a composite action. These are the tracked files whose shell text a
+ * YAML parser hands to bash with the block indentation removed, so they are
+ * the files whose `run:` blocks are dedented before scanning. A plain shell
+ * script is not on this list: its indentation is the shell's own, and a
+ * heredoc terminator indented there is not a terminator in bash either.
+ */
+const WORKFLOW_YAML = /^\.github\/(?:workflows\/[^/]+|actions\/.+\/action)\.ya?ml$/;
 
 /** Tracked paths that can execute a command, matched against the repository-relative path. */
 const EXECUTABLE_PATHS = [
@@ -322,11 +335,21 @@ export function attestationEnabled(command: ShellCommand): boolean {
  * the same reason the changelog-date scan does it: a multi-line invocation
  * otherwise looks like fragments, none of which carries the flag.
  *
+ * A workflow file's `run:` blocks are dedented first, because that is what
+ * happens to them before bash sees the text: YAML strips the block
+ * indentation when it delivers the value. The one scanner rule that is
+ * whitespace-sensitive is the heredoc terminator, which must sit at the start
+ * of the line the shell receives -- with the YAML indentation still attached,
+ * a real terminator never matched, the heredoc swallowed the rest of the file,
+ * and every assignment after it stayed unindexed (see `dedentRunBlocks`).
+ *
  * @param source - The file's path and contents.
  * @returns The publish invocations found, in file order.
  */
 export function publishInvocationsIn(source: SourceFile): PublishInvocation[] {
-  const raw = source.file.endsWith("package.json") ? manifestCommandLines(source.text) : source.text;
+  let raw = source.text;
+  if (source.file.endsWith("package.json")) raw = manifestCommandLines(source.text);
+  else if (WORKFLOW_YAML.test(source.file)) raw = dedentRunBlocks(source.text);
   const text = joinContinuations(raw);
   const arrays = bashArrays(text);
   const scalars = shellScalars(text);
