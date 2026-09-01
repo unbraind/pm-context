@@ -1191,6 +1191,23 @@ test("a redirection on a reassignment is neither a background job nor a pipeline
   }
 });
 
+test("a redirection that can fail does not prove the assignment succeeded", () => {
+  // Greptile: `FLAG=--provenance; FLAG=--provenance > /failing/path || FLAG=--no-provenance`
+  // The redirected assignment can fail (the target may not open), so the shell
+  // executes the `||` branch and FLAG becomes --no-provenance. Before the fix,
+  // the evaluator marked the redirected segment as deterministic and skipped
+  // the `||` branch, leaving FLAG as --provenance and passing an unattested
+  // publish through the gate.
+  const text = [
+    "          npm publish --provenance",
+    "          FLAG=--provenance; FLAG=--provenance > /failing/path || FLAG=--no-provenance",
+    "          npm publish --access public $FLAG",
+  ].join("\n");
+  const result = auditPublishAttestation([{ file: "release.yml", text }]);
+  assert.equal(result.failures.length, 1);
+  assert.match(result.failures[0]!, /does not enable --provenance/);
+});
+
 test("a pipeline-component assignment is not global provenance evidence", () => {
   // Greptile: pipeline assignments were retained as file-wide bindings. Each
   // segment of a pipeline runs in a subshell, so `FLAG=--provenance | cat`

@@ -552,9 +552,21 @@ export function joinContinuations(text: string): string {
   return text.replace(/\\\r?\n\s*/g, " ");
 }
 
-/** A `run:` block-scalar header: the key, an indicator, and nothing else. */
+/**
+ * A `run:` block-scalar header: the key, an indicator, and nothing else.
+ *
+ * YAML allows a block scalar to carry an explicit indentation indicator (a
+ * digit `1`–`9`) alongside the chomping indicator (`+` or `-`), in either
+ * order — `|2`, `|-2`, `|2-` are all valid. When present, the digit tells the
+ * parser exactly how many spaces of indentation the content carries relative
+ * to the parent key, so the scanner can strip that exact width instead of
+ * inferring it from the first non-blank line. The capture group for the digit
+ * is used by {@link dedentRunBlocks} to dedent precisely; without it the
+ * content's YAML indentation would remain and a heredoc terminator would never
+ * match at line start.
+ */
 const RUN_BLOCK_HEADER =
-  /^([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][+-]?(?:[ \t]+#.*)?\r?$/;
+  /^([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>](?:[+-]?([1-9])?[+-]?)?(?:[ \t]+#.*)?\r?$/;
 
 /** Leading whitespace, which YAML never mixes between a block and its parent. */
 const LEADING_WHITESPACE = /^[ \t]*/;
@@ -611,10 +623,19 @@ export function dedentRunBlocks(text: string): string {
     // lines between the header and the content decide nothing here.
     let content = index + 1;
     while (content < lines.length && BLANK_LINE.test(lines[content]!)) content += 1;
+    // An explicit indentation indicator (e.g. `|2`) tells the YAML parser the
+    // content is indented exactly that many spaces beyond the parent key, so
+    // the scanner strips that exact width rather than guessing from the first
+    // non-blank line — which matters when the content itself starts with extra
+    // leading spaces that are data, not structural indentation.
+    const explicitIndent = header[2] !== undefined ? header[1]!.length + Number(header[2]) : undefined;
+    // Without an explicit indicator the block's indentation is learned from
+    // its first non-blank line, as YAML itself learns it.
+    const detected = content < lines.length ? LEADING_WHITESPACE.exec(lines[content]!)![0] : "";
+    const indent = explicitIndent !== undefined ? " ".repeat(explicitIndent) : detected;
     // A header with no more-indented line after it holds an empty block: YAML
     // ends it immediately, and so does this scan.
-    const indent = content < lines.length ? LEADING_WHITESPACE.exec(lines[content]!)![0] : "";
-    if (indent.length <= header[1]!.length) {
+    if (explicitIndent === undefined && indent.length <= header[1]!.length) {
       output.push(lines[index]!);
       index += 1;
       continue;
@@ -928,14 +949,19 @@ function lineScalarBinding(line: string, name: string): ScalarBinding {
     let assignmentOnly = true;
     let allLiteral = true;
     let compound = false;
+    let hasRedirection = false;
     for (let position = 0; position < words.length; position += 1) {
       const word = words[position]!;
       if (position === 0 && word.raw === "export") continue;
       if (!word.startsQuoted && BARE_REDIRECTION.test(word.raw)) {
         position += 1;
+        hasRedirection = true;
         continue;
       }
-      if (!word.startsQuoted && JOINED_REDIRECTION.test(word.raw)) continue;
+      if (!word.startsQuoted && JOINED_REDIRECTION.test(word.raw)) {
+        hasRedirection = true;
+        continue;
+      }
       if (!word.startsQuoted && COMPOUND_KEYWORDS.has(word.raw)) {
         compound = true;
         assignmentOnly = false;
@@ -974,7 +1000,9 @@ function lineScalarBinding(line: string, name: string): ScalarBinding {
     previous = operator;
     // Only a segment made entirely of literal assignments provably succeeds,
     // so only it decides whether `&&` or `||` provably reaches the next one.
-    previousDeterministic = assignmentOnly && !compound && allLiteral;
+    // A redirection can fail (the target may not open), so a segment carrying
+    // one does not provably succeed even when every assignment is literal.
+    previousDeterministic = assignmentOnly && !compound && allLiteral && !hasRedirection;
   }
   return binding;
 }

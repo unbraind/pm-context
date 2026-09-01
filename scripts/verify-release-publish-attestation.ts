@@ -58,21 +58,31 @@ export const FOREIGN_PUBLISHERS = new Set(["yarn", "pnpm", "bun"]);
 const GENERATED_PREFIXES = ["dist/", "coverage/", "node_modules/", ".agents/pm/runtime/"];
 
 /**
- * Tracked paths whose `run:` blocks GitHub Actions executes as shell.
- *
- * Mirrors the two workflow patterns in {@link EXECUTABLE_PATHS}: a workflow
- * file and a composite action. These are the tracked files whose shell text a
- * YAML parser hands to bash with the block indentation removed, so they are
- * the files whose `run:` blocks are dedented before scanning. A plain shell
- * script is not on this list: its indentation is the shell's own, and a
+ * The workflow-shaped path patterns whose `run:` blocks GitHub Actions
+ * executes as shell, defined once so the workflow entries in
+ * {@link EXECUTABLE_PATHS} and the {@link isWorkflowYaml} test can never
+ * drift apart. A workflow file and a composite action are the two shapes a
+ * YAML parser hands to bash with the block indentation removed.
+ */
+const WORKFLOW_PATHS = [
+  /^\.github\/workflows\/[^/]+\.ya?ml$/,
+  /^\.github\/actions\/.+\/action\.ya?ml$/,
+];
+
+/**
+ * Whether a repository-relative path is a workflow file whose `run:` blocks
+ * GitHub Actions executes as shell. These are the tracked files whose shell
+ * text a YAML parser hands to bash with the block indentation removed, so they
+ * are the files whose `run:` blocks are dedented before scanning. A plain
+ * shell script is not on this list: its indentation is the shell's own, and a
  * heredoc terminator indented there is not a terminator in bash either.
  */
-const WORKFLOW_YAML = /^\.github\/(?:workflows\/[^/]+|actions\/.+\/action)\.ya?ml$/;
+const isWorkflowYaml = (path: string): boolean =>
+  WORKFLOW_PATHS.some((pattern) => pattern.test(path));
 
 /** Tracked paths that can execute a command, matched against the repository-relative path. */
 const EXECUTABLE_PATHS = [
-  /^\.github\/workflows\/[^/]+\.ya?ml$/,
-  /^\.github\/actions\/.+\/action\.ya?ml$/,
+  ...WORKFLOW_PATHS,
   /(^|\/)package\.json$/,
   /\.(sh|bash|zsh|ksh)$/,
   /(^|\/)(Makefile|makefile|GNUmakefile)$/,
@@ -359,7 +369,7 @@ export function attestationEnabled(command: ShellCommand): boolean {
 export function publishInvocationsIn(source: SourceFile): PublishInvocation[] {
   let raw = source.text;
   if (source.file.endsWith("package.json")) raw = manifestCommandLines(source.text);
-  else if (WORKFLOW_YAML.test(source.file)) raw = dedentRunBlocks(source.text);
+  else if (isWorkflowYaml(source.file)) raw = dedentRunBlocks(source.text);
   const text = joinContinuations(raw);
   const arrays = bashArrays(text);
   const views = lineScalarViews(text);

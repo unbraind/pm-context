@@ -100,3 +100,28 @@ test("run-block dedenting refuses shapes YAML would not deliver as blocks", () =
     ["  run: npm publish", "  env: |", "    FOO=1"].join("\n"),
   );
 });
+
+test("an explicit block indentation indicator (|2) is accepted and dedented", () => {
+  // YAML allows `run: |2` to declare the content indentation explicitly. The
+  // header must be recognised so the block is dedented; otherwise the YAML
+  // indentation stays and a heredoc terminator at the start of the shell line
+  // never matches, swallowing every later assignment as heredoc payload.
+  assert.equal(
+    dedentRunBlocks(["  run: |2", "    cat <<EOF", "      deeper prose", "    EOF", "    NPM=npm"].join("\n")),
+    ["  run: |2", "cat <<EOF", "  deeper prose", "EOF", "NPM=npm"].join("\n"),
+  );
+  // The chomping indicator may appear before or after the indentation digit.
+  assert.equal(
+    dedentRunBlocks(["  run: |-2", "    cat <<EOF", "    EOF", "    NPM=npm"].join("\n")),
+    ["  run: |-2", "cat <<EOF", "EOF", "NPM=npm"].join("\n"),
+  );
+  assert.equal(
+    dedentRunBlocks(["  run: |2-", "    cat <<EOF", "    EOF", "    NPM=npm"].join("\n")),
+    ["  run: |2-", "cat <<EOF", "EOF", "NPM=npm"].join("\n"),
+  );
+  // A folded block with an explicit indicator is dedented the same way.
+  assert.equal(
+    dedentRunBlocks(["  run: >2", "    echo hi"].join("\n")),
+    ["  run: >2", "echo hi"].join("\n"),
+  );
+});
