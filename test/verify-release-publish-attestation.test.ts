@@ -1703,3 +1703,168 @@ test("a control closer followed by an operator does not leave stale scope", () =
   assert.equal(result.failures.length, 1, "the variable-routed publish must be audited");
   assert.match(result.failures[0]!, /does not enable --provenance/);
 });
+
+test("a binding in one conditional branch does not attest a publish in a sibling branch", () => {
+  // A scalar assigned in the `then` branch and consumed in the `else` branch
+  // of the same `if` is a false pass: the shell runs only one branch, so the
+  // `else` branch never has the flag. The shared `fi` frame used to make both
+  // branches share one scope, so the binding leaked across.
+  const thenElse = auditPublishAttestation([{
+    file: "release.yml",
+    text: "if true; then\nFLAG=--provenance\nelse\nnpm publish $FLAG\nfi\nnpm publish --provenance\n",
+  }]);
+  assert.equal(thenElse.failures.length, 1,
+    "a binding in the then branch cannot attest a publish in the else branch");
+
+  const thenElif = auditPublishAttestation([{
+    file: "release.yml",
+    text: "if true; then\nFLAG=--provenance\nelif false; then\nnpm publish $FLAG\nfi\nnpm publish --provenance\n",
+  }]);
+  assert.equal(thenElif.failures.length, 1,
+    "a binding in the then branch cannot attest a publish in the elif branch");
+
+  // The same bypass for case branches: a binding in one arm must not attest
+  // a publish in a sibling arm.
+  const caseArms = auditPublishAttestation([{
+    file: "release.yml",
+    text: "case $x in\na)\nFLAG=--provenance\n;;\nb)\nnpm publish $FLAG\n;;\nesac\nnpm publish --provenance\n",
+  }]);
+  assert.equal(caseArms.failures.length, 1,
+    "a binding in one case arm cannot attest a publish in a sibling arm");
+
+  // A binding in the same branch still resolves — the fix must not blind the
+  // scan to genuinely attested publishes.
+  const sameBranch = auditPublishAttestation([{
+    file: "release.yml",
+    text: "if true; then\nFLAG=--provenance\nnpm publish $FLAG\nfi\nnpm publish --provenance\n",
+  }]);
+  assert.equal(sameBranch.failures.length, 0,
+    "a binding in the same branch still attests the publish in that branch");
+});
+
+test("an empty unquoted scalar reset clears the binding", () => {
+  // `FLAG=` is a valid shell assignment that sets FLAG to the empty string.
+  // The scanner's unquoted-value alternative used `+` (one or more), so it
+  // never matched, and the previous value persisted — making a later publish
+  // read as attested when the shell runs it with no flag.
+  const emptyReset = auditPublishAttestation([{
+    file: "release.yml",
+    text: "FLAG=--provenance\nFLAG=\nnpm publish $FLAG\nnpm publish --provenance\n",
+  }]);
+  assert.equal(emptyReset.failures.length, 1,
+    "an empty unquoted reset must clear the binding so the publish is unattested");
+});
+
+test("a backslash-escaped scalar reference is not expanded", () => {
+  // In bash, `\$FLAG` is the literal text `$FLAG`, not an expansion. The
+  // scanner's prefix scan set `escaped=true` on the backslash but never checked
+  // it after the loop, so `\$FLAG` was still expanded — handing the publish a
+  // flag the shell does not pass.
+  const escaped = auditPublishAttestation([{
+    file: "release.yml",
+    text: "FLAG=--provenance\nnpm publish \\$FLAG\nnpm publish --provenance\n",
+  }]);
+  assert.equal(escaped.failures.length, 1,
+    "a backslash-escaped $FLAG must not be expanded to --provenance");
+});
+
+test("array declarations are scope- and position-aware", () => {
+  // Arrays were resolved from a whole-file map with no scope or position
+  // tracking, so an array declared in an untaken branch, below a publish, in
+  // a sibling branch, or inside a subshell could attest a publish the shell
+  // runs without it — the same bypass class the per-line scalar views close.
+  const inUntakenBranch = auditPublishAttestation([{
+    file: "release.yml",
+    text: "if false; then\nFLAGS=(--provenance)\nfi\nnpm publish \"${FLAGS[@]}\"\nnpm publish --provenance\n",
+  }]);
+  assert.equal(inUntakenBranch.failures.length, 1,
+    "an array in an untaken branch cannot attest a publish outside it");
+
+  const belowPublish = auditPublishAttestation([{
+    file: "release.yml",
+    text: "npm publish \"${FLAGS[@]}\"\nFLAGS=(--provenance)\nnpm publish --provenance\n",
+  }]);
+  assert.equal(belowPublish.failures.length, 1,
+    "an array declared below a publish cannot attest it");
+
+  const siblingBranch = auditPublishAttestation([{
+    file: "release.yml",
+    text: "if true; then\nFLAGS=(--provenance)\nelse\nnpm publish \"${FLAGS[@]}\"\nfi\nnpm publish --provenance\n",
+  }]);
+  assert.equal(siblingBranch.failures.length, 1,
+    "an array in one branch cannot attest a publish in a sibling branch");
+
+  const inSubshell = auditPublishAttestation([{
+    file: "release.yml",
+    text: "(\nFLAGS=(--provenance)\n)\nnpm publish \"${FLAGS[@]}\"\nnpm publish --provenance\n",
+  }]);
+  assert.equal(inSubshell.failures.length, 1,
+    "an array in a subshell cannot attest a publish in the parent");
+
+  // A file-scope array declared above the publish still attests it, including
+  // one folded across lines the way this repository's own release workflow
+  // declares its shared options array.
+  const inScope = auditPublishAttestation([{
+    file: "release.yml",
+    text: "FLAGS=(--provenance)\nnpm publish \"${FLAGS[@]}\"\n",
+  }]);
+  assert.equal(inScope.failures.length, 0,
+    "a file-scope array above the publish still attests it");
+
+  const folded = auditPublishAttestation([{
+    file: "release.yml",
+    text: "FLAGS=(\n  --provenance\n)\nnpm publish \"${FLAGS[@]}\"\n",
+  }]);
+  assert.equal(folded.failures.length, 0,
+    "a multi-line declaration above the publish still attests it");
+
+  // A declaration that is not the line's own opening statement is not a
+  // binding the shell makes: a comment, a condition the shell may not take,
+  // a pipeline segment, or heredoc payload must not lend a flag.
+  const inComment = auditPublishAttestation([{
+    file: "release.yml",
+    text: "# FLAGS=(--provenance)\nnpm publish \"${FLAGS[@]}\"\nnpm publish --provenance\n",
+  }]);
+  assert.equal(inComment.failures.length, 1,
+    "an array named only in a comment cannot attest a publish");
+
+  const conditional = auditPublishAttestation([{
+    file: "release.yml",
+    text: "false && FLAGS=(--provenance)\nnpm publish \"${FLAGS[@]}\"\nnpm publish --provenance\n",
+  }]);
+  assert.equal(conditional.failures.length, 1,
+    "an array behind a condition the shell may not take cannot attest a publish");
+
+  const pipelineSegment = auditPublishAttestation([{
+    file: "release.yml",
+    text: "FLAGS=(--provenance) | cat\nnpm publish \"${FLAGS[@]}\"\nnpm publish --provenance\n",
+  }]);
+  assert.equal(pipelineSegment.failures.length, 1,
+    "an array bound in a pipeline segment does not reach the parent shell");
+
+  const inHeredocPayload = auditPublishAttestation([{
+    file: "release.yml",
+    text: "cat <<EOF\nFLAGS=(--provenance)\nEOF\nnpm publish \"${FLAGS[@]}\"\nnpm publish --provenance\n",
+  }]);
+  assert.equal(inHeredocPayload.failures.length, 1,
+    "an array named in heredoc payload is data, not a binding");
+
+  // A publish on a sibling branch's own `else` line runs in that branch, so a
+  // declaration from the taken branch must not attest it either.
+  const onSiblingLine = auditPublishAttestation([{
+    file: "release.yml",
+    text: "if true; then\nFLAGS=(--provenance)\nelse npm publish \"${FLAGS[@]}\"\nfi\nnpm publish --provenance\n",
+  }]);
+  assert.equal(onSiblingLine.failures.length, 1,
+    "an array in one branch cannot attest a publish on the sibling branch's own line");
+
+  // A declaration whose literal the scanner cannot reproduce exactly -- a
+  // quoted element, an expansion, scanner syntax -- is refused, so a publish
+  // routing through it is audited as carrying no provable flag.
+  const nonLiteral = auditPublishAttestation([{
+    file: "release.yml",
+    text: "FLAGS=(--provenance \"$TAG\")\nnpm publish \"${FLAGS[@]}\"\nnpm publish --provenance\n",
+  }]);
+  assert.equal(nonLiteral.failures.length, 1,
+    "an array whose literal cannot be reproduced exactly cannot attest a publish");
+});

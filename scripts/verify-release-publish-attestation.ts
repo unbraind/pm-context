@@ -22,7 +22,6 @@ import { closeSync, openSync, readFileSync, readSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
-  bashArrays,
   commandArguments,
   commandCandidates,
   commandName,
@@ -30,6 +29,7 @@ import {
   expandArrays,
   expandScalars,
   joinContinuations,
+  lineArrayViews,
   lineScalarViews,
   type ShellCommand,
   type SourceFile,
@@ -371,11 +371,11 @@ export function publishInvocationsIn(source: SourceFile): PublishInvocation[] {
   if (source.file.endsWith("package.json")) raw = manifestCommandLines(source.text);
   else if (isWorkflowYaml(source.file)) raw = dedentRunBlocks(source.text);
   const text = joinContinuations(raw);
-  const arrays = bashArrays(text);
+  const arrayViews = lineArrayViews(text);
   const views = lineScalarViews(text);
   const expanded = text
     .split("\n")
-    .map((line, index) => expandScalars(expandArrays(line, arrays), views[index]!))
+    .map((line, index) => expandScalars(expandArrays(line, arrayViews[index]!), views[index]!))
     .join("\n");
   const found: PublishInvocation[] = [];
   for (const command of tokenizeCommands(expanded)) {

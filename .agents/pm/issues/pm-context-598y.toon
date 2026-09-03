@@ -1,5 +1,5 @@
 id: pm-context-598y
-title: Two heredoc regression tests assert a failure that holds whether or not the heredoc terminator is recognised
+title: Three heredoc regression tests assert a failure that holds whether or not the heredoc terminator is recognised
 description: "CodeRabbit Major on PR 84: the heredoc tests expect one failure that holds in both directions, so they would pass against a scanner that never terminates heredocs at all — coverage that reads as coverage but proves nothing."
 type: Issue
 status: closed

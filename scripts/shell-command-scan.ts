@@ -692,9 +692,30 @@ const OPERATOR_CHARS = ";&|";
  */
 const SEPARATORS = `[\\s${OPERATOR_CHARS}#]`;
 
+/** Closer for a branch frame within an `if`: matches `elif`, `else`, or `fi`. */
+const BRANCH_IF = "elif|else|fi";
+/** Closer for a branch frame within a `case`: matches `;;` or `esac`. */
+const BRANCH_CASE = ";;|esac";
+
 /** A line opening with one assignment of a fully literal value, ending at a separator. */
 const STANDALONE_ASSIGNMENT =
-  new RegExp(`^[ \\t]*(?:export[ \\t]+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"((?:\\\\.|[^"\\\\$\`])*)"|'([^']*)'|((?:\\\\.|[^\\s${OPERATOR_CHARS}"'\`$()\\\\])+))(?:[ \\t]*[${OPERATOR_CHARS}]|[ \\t]+#.*|[ \\t]*\\r?$)`);
+  new RegExp(`^[ \\t]*(?:export[ \\t]+)?([A-Za-z_][A-Za-z0-9_]*)=(?:"((?:\\\\.|[^"\\\\$\`])*)"|'([^']*)'|((?:\\\\.|[^\\s${OPERATOR_CHARS}"'\`$()\\\\])*))(?:[ \\t]*[${OPERATOR_CHARS}]|[ \\t]+#.*|[ \\t]*\\r?$)`);
+
+/** A line opening with one array assignment, whose literal may span lines. */
+const STANDALONE_ARRAY =
+  /^[ \t]*(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=\(/;
+
+/**
+ * What may follow an array declaration's closing parenthesis.
+ *
+ * A `;`, `&&` or `||` continues the line in the current shell, so the binding
+ * persists and the declaration may be indexed; a trailing `#` comment and a
+ * line end are the same case. A `|` puts the assignment in a pipeline segment
+ * and a lone `&` puts it in a background job -- both run in subshells, so the
+ * parent shell never receives the array -- and any other tail makes the line a
+ * command this grammar does not recognise. All of those are refused.
+ */
+const ARRAY_DECLARATION_TAIL = /^[ \t]*(?:\r?$|#.*|;.*|&&.*|\|\|.*)/;
 
 /** One word read as an assignment: the name, and the value when it is literal. */
 interface AssignmentWord {
@@ -1046,12 +1067,112 @@ export interface ScalarAssignment {
   readonly scope: ScalarScope;
 }
 
+/** One array declaration event: the name, the literal, and where and in which scope it was made. */
+export interface ArrayAssignment {
+  /** Array name the line declares. */
+  readonly name: string;
+  /**
+   * The whitespace-collapsed literal the line binds, or nothing when the shell's
+   * binding cannot be reproduced exactly. Like a scalar refusal, this is an
+   * event rather than an absence: the declaration has already replaced whatever
+   * an earlier line bound, so keeping the earlier literal would lend a later
+   * publish evidence the line removed.
+   */
+  readonly value: string | undefined;
+  /** Zero-based index of the line the declaration opens. */
+  readonly line: number;
+  /** The block nesting the declaration sits inside, outermost first. */
+  readonly scope: ScalarScope;
+}
+
 /** One walk's output: the binding events, and each line's command scope. */
 interface ScalarWalk {
   /** Every scalar binding event, in file order. */
   readonly assignments: ScalarAssignment[];
+  /** Every array declaration event, in file order. */
+  readonly arrays: ArrayAssignment[];
   /** The scope a command on each line runs in, one entry per line of the text. */
   readonly scopes: ScalarScope[];
+}
+
+/**
+ * Read one array declaration the line opens with, as a binding event.
+ *
+ * The literal is scanned from the opening parenthesis to the balancing close,
+ * across lines when the declaration is folded, with the same quote and escape
+ * awareness the walk applies to commands -- so a parenthesis inside quotes is
+ * data, not the closer, and a `)` that closes nothing is still the closer. The
+ * event refuses (reports no literal) whenever the shell's binding cannot be
+ * reproduced exactly: a quoted or escaped element splits differently than the
+ * collapsed text would, a value carrying characters the scanner would re-read
+ * as syntax, a tail that runs the assignment in a subshell (a pipeline segment
+ * or a background job), and a literal that never closes.
+ *
+ * @param lines - The text's lines, with continuations already joined.
+ * @param lineNumber - Zero-based index of the line the declaration opens.
+ * @param scope - The scope at that line's start, which is the scope the
+ *                declaration runs in, because the line opens with it.
+ * @param match - The {@link STANDALONE_ARRAY} match on the opening line.
+ * @returns The declaration as one array binding event, refusals included.
+ */
+function arrayDeclarationEvent(
+  lines: string[],
+  lineNumber: number,
+  scope: ScalarScope,
+  match: RegExpExecArray,
+): ArrayAssignment {
+  const name = match[1]!;
+  let quoted = false;
+  let escaped = false;
+  let depth = 1;
+  let quote: "'" | '"' | undefined;
+  let pendingEscape = false;
+  const value: string[] = [];
+  let line = lineNumber;
+  let index = match[0].length;
+  while (line < lines.length) {
+    const text = lines[line]!;
+    while (index < text.length) {
+      const character = text[index]!;
+      if (pendingEscape) {
+        pendingEscape = false;
+        escaped = true;
+        value.push(character);
+      } else if (character === "\\" && quote !== "'") {
+        pendingEscape = true;
+        value.push(character);
+      } else if (quote !== undefined) {
+        if (character === quote) quote = undefined;
+        else value.push(character);
+      } else if (character === "'" || character === '"') {
+        quote = character;
+        quoted = true;
+      } else if (character === "(") {
+        depth += 1;
+        value.push(character);
+      } else if (character === ")") {
+        depth -= 1;
+        if (depth === 0) {
+          const collapsed = value.join("").replace(/\s+/g, " ").trim();
+          const literal =
+            ARRAY_DECLARATION_TAIL.test(text.slice(index + 1)) && !quoted && !escaped && !VALUE_SYNTAX.test(collapsed)
+              ? collapsed
+              : undefined;
+          return { name, value: literal, line: lineNumber, scope };
+        }
+        value.push(character);
+      } else {
+        value.push(character);
+      }
+      index += 1;
+    }
+    value.push("\n");
+    line += 1;
+    index = 0;
+  }
+  // The literal never closed: the shell cannot parse the line, so the binding
+  // is refused rather than guessed.
+  return { name, value: undefined, line: lineNumber, scope };
 }
 
 /**
@@ -1083,13 +1204,18 @@ interface ScalarWalk {
  * nothing. Everything else -- the comment boundary, the closer/opener
  * keyword tracking, the subshell parenthesis counting, the multiline
  * function headers -- is the same state machine `shellScalars` grew, with
- * its two stacks now carrying frame serials instead of bare counts.
+ * its two stacks now carrying frame serials instead of bare counts. Array
+ * declarations are recorded by the same walk under the same rules, because
+ * the flat `bashArrays` map resolves them file-wide and the bypasses that
+ * leaves open are the ones the scalar half of this walk already closed.
  *
  * @param text - File contents with continuations already joined.
- * @returns The binding events and the per-line command scopes of the walk.
+ * @returns The scalar and array binding events and the per-line command scopes
+ *          of the walk.
  */
 function walkScalarEvents(text: string): ScalarWalk {
   const assignments: ScalarAssignment[] = [];
+  const arrays: ArrayAssignment[] = [];
   const scopes: ScalarScope[] = [];
   const controlClosers: Array<{ closer: string; frame: number }> = [];
   const subshells: number[] = [];
@@ -1108,7 +1234,8 @@ function walkScalarEvents(text: string): ScalarWalk {
     control: controlClosers.map((entry) => entry.frame),
     subshell: [...subshells],
   });
-  for (const line of text.split("\n")) {
+  const lines = text.split("\n");
+  for (const line of lines) {
     lineNumber += 1;
     const heredoc = heredocs[0];
     if (heredoc !== undefined) {
@@ -1177,8 +1304,21 @@ function walkScalarEvents(text: string): ScalarWalk {
       }
     }
     const syntax = code.trim();
-    const closer = controlClosers[controlClosers.length - 1];
-    if (closer !== undefined && new RegExp(`^${closer.closer}(?:${SEPARATORS}|$)`).test(syntax)) controlClosers.pop();
+    // Close every frame whose keyword starts this line. A single `fi` may close
+    // both a branch frame (closer `elif|else|fi`) and the enclosing `if` frame
+    // (closer `fi`), so the check is a loop, not a single test. The closer is
+    // wrapped in a non-capturing group so an alternation like `elif|else|fi`
+    // binds correctly.
+    while (controlClosers.length > 0) {
+      const top = controlClosers[controlClosers.length - 1]!;
+      if (new RegExp(`^(?:${top.closer})(?:${SEPARATORS}|$)`).test(syntax)) {
+        controlClosers.pop();
+        // A branch frame (compound closer with `|`) closes together with its
+        // construct frame, so the loop continues to pop that too. A construct
+        // frame (simple closer) is the last frame this keyword closes.
+        if (!top.closer.includes("|")) break;
+      } else break;
+    }
     // A command's scope: this line's closers have run, and its openers have
     // not taken effect yet.
     scopes.push(snapshot());
@@ -1201,22 +1341,52 @@ function walkScalarEvents(text: string): ScalarWalk {
       }
     }
 
+    // Branch tracking: mutually exclusive branches within one `if` or `case`
+    // must not share a scope frame, or a binding made in the `then` branch
+    // attests a publish in the `else` branch that the shell never runs with
+    // that flag. A branch frame is pushed for `then`, `elif`, and `else`
+    // within an `if`, and for each pattern within a `case`.
+    const topCloser = controlClosers[controlClosers.length - 1]?.closer;
+    const insideIf = topCloser === "fi";
+    const insideCase = topCloser === "esac" || topCloser === BRANCH_CASE;
+    if (insideIf && (/(?:^|;)\s*then\b/.test(syntax) || /^(?:elif|else)\b/.test(syntax))) {
+      openControl(BRANCH_IF);
+    } else if (insideCase && topCloser === "esac" && /\)$/.test(syntax)) {
+      openControl(BRANCH_CASE);
+    }
+    // A `;;` at the end of a line closes the current case branch. A `;;` at
+    // the start of a line was already handled by the closer loop above.
+    if (controlClosers.length > 0 && controlClosers[controlClosers.length - 1]!.closer === BRANCH_CASE && /;;&?$/.test(syntax)) {
+      controlClosers.pop();
+    }
+
     if (prose) continue;
     const assignment = STANDALONE_ASSIGNMENT.exec(line);
-    if (assignment === null) continue;
-    // Exactly one of the three value alternatives matches, so the last is the
-    // only case left rather than a fallback that could be undefined.
-    const name = assignment[1]!;
-    const binding = lineScalarBinding(line, name);
-    if (binding.kind === "unset") continue;
-    assignments.push({
-      name,
-      value: binding.kind === "opaque" ? undefined : binding.value,
-      line: lineNumber,
-      scope: lineScope,
-    });
+    if (assignment !== null) {
+      // Exactly one of the three value alternatives matches, so the last is the
+      // only case left rather than a fallback that could be undefined.
+      const name = assignment[1]!;
+      const binding = lineScalarBinding(line, name);
+      if (binding.kind !== "unset") {
+        assignments.push({
+          name,
+          value: binding.kind === "opaque" ? undefined : binding.value,
+          line: lineNumber,
+          scope: lineScope,
+        });
+      }
+    }
+    // An array declaration is indexed only where the line OPENS with it, under
+    // the same anchoring rule as a scalar: a declaration in a comment, inside
+    // quoted prose, behind `&&`, or as another command's argument is not a
+    // binding the shell makes in the environment this walk tracks, and heredoc
+    // payload lines never reach here.
+    const declaration = STANDALONE_ARRAY.exec(line);
+    if (declaration !== null) {
+      arrays.push(arrayDeclarationEvent(lines, lineNumber, lineScope, declaration));
+    }
   }
-  return { assignments, scopes };
+  return { assignments, arrays, scopes };
 }
 
 /**
@@ -1420,7 +1590,7 @@ export function expandScalars(line: string, scalars: Map<string, string>): strin
       if (character === "'" && !double) single = !single;
       else if (character === '"' && !single) double = !double;
     }
-    if (single) return whole;
+    if (single || escaped) return whole;
     const value = scalars.get(braced ?? bare!);
     // Quote removal happens before parameter expansion: a backslash produced by
     // expansion is data, not syntax. Double it in the scanner input so the one
@@ -1451,5 +1621,43 @@ export interface VerifierResult {
   failures: string[];
   /** Lines describing what was checked, for the operator. */
   notes: string[];
+}
+
+/**
+ * Resolve the array declarations each line of the text may expand against.
+ *
+ * Mirrors {@link lineScalarViews} for arrays, because `bashArrays` builds a
+ * flat file-wide map with no position or scope tracking, so an array declared
+ * below a publish, inside an untaken branch, or inside a subshell attests that
+ * publish -- the same bypass class the per-line scalar views close for `$name`.
+ * Declarations are recorded by the same walk that records scalars, under the
+ * same rules: only a line that OPENS with the declaration is one (a comment,
+ * quoted prose, a heredoc payload, or another command's argument is not), each
+ * event carries the line and scope it was made in, and a line resolves against
+ * only the events at or above it, in its own scope or an enclosing one, with
+ * the last applicable event per name winning and a refusal removing the name.
+ * The consumer scope is the scope a command on that line runs in, so a
+ * declaration in one branch does not attest a publish on a sibling branch's
+ * own `else` line either.
+ *
+ * @param text - File contents with continuations already joined.
+ * @returns One map per line of the text, index-aligned with `text.split("\n")`.
+ */
+export function lineArrayViews(text: string): Array<Map<string, string>> {
+  const { arrays, scopes } = walkScalarEvents(text);
+  const views: Array<Map<string, string>> = [];
+  let next = 0;
+  for (let index = 0; index < scopes.length; index += 1) {
+    while (next < arrays.length && arrays[next]!.line <= index) next += 1;
+    const visible = new Map<string, string>();
+    for (let position = 0; position < next; position += 1) {
+      const declaration = arrays[position]!;
+      if (!scopeEncloses(declaration.scope, scopes[index]!)) continue;
+      if (declaration.value === undefined) visible.delete(declaration.name);
+      else visible.set(declaration.name, declaration.value);
+    }
+    views.push(visible);
+  }
+  return views;
 }
 
