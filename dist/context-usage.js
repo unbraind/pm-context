@@ -7,9 +7,11 @@
  * pm 2026.7.25 maintains an append-only ledger at
  * `<pm_root>/runtime/context-usage.jsonl`, writing a `serve` row whenever
  * `pm context` / `pm next` rank candidates and a `touch` row whenever a command
- * mutates an item. The CLI folds that ledger into the `usage_affinity` signal of
- * its built-in relevance model, but nothing surfaces the ledger itself — an
- * agent cannot ask "what was I shown, and did I actually use it?".
+ * mutates an item. From 2026.9.5 the same ledger also records a correlated
+ * `delivery` row for the post-egress subset actually shown. The CLI folds that
+ * ledger into the `usage_affinity` signal of its built-in relevance model, but
+ * nothing surfaces the ledger itself — an agent cannot ask "what was I shown,
+ * and did I actually use it?".
  *
  * This module answers exactly that, and deliberately stops there. It derives
  * only facts the ledger states directly — serve counts, touch counts, and
@@ -88,7 +90,10 @@ export function resolveSince(value, now = new Date()) {
  *
  * Validates the discriminant and every field the report reads, so a row written
  * by a future pm version — or a partial tail row left by a prune — is reported
- * as malformed rather than silently contributing zeroes to the metrics.
+ * as malformed rather than silently contributing zeroes to the metrics. A
+ * well-formed `delivery` row is recognized so a current ledger is not reported
+ * as truncated; this report still derives "shown" from serve `included` flags
+ * rather than recomputing pm's affinity fold.
  *
  * @param line - Raw JSONL line, assumed already trimmed of surrounding space.
  * @returns The decoded event, or null when the line is absent or malformed.
@@ -112,6 +117,32 @@ export function parseLedgerLine(line) {
         if (typeof row.item_id !== "string" || typeof row.intent !== "string")
             return null;
         return { kind: "touch", at: row.at, author: row.author, item_id: row.item_id, intent: row.intent };
+    }
+    if (row.kind === "delivery") {
+        if (row.schema_version !== 2 || typeof row.serve_id !== "string" || typeof row.result_omitted !== "boolean") {
+            return null;
+        }
+        if (!Array.isArray(row.delivered_item_ids))
+            return null;
+        const surface = SERVE_SURFACES.find((candidate) => candidate === row.surface);
+        if (!surface)
+            return null;
+        const delivered_item_ids = [];
+        for (const id of row.delivered_item_ids) {
+            if (typeof id !== "string")
+                return null;
+            delivered_item_ids.push(id);
+        }
+        return {
+            kind: "delivery",
+            schema_version: 2,
+            serve_id: row.serve_id,
+            at: row.at,
+            author: row.author,
+            surface,
+            result_omitted: row.result_omitted,
+            delivered_item_ids,
+        };
     }
     if (row.kind !== "serve")
         return null;
@@ -173,6 +204,12 @@ export function buildUsageReport(events, options = {}) {
     const { author, surface, since } = options;
     const limit = options.limit ?? DEFAULT_REPORT_LIMIT;
     const selected = events.filter((event) => {
+        // Delivery is a recognized ledger kind so it is not malformed, but this
+        // report's conversion still reads packed inclusion from serve rows. Folding
+        // delivered ids in would recompute pm's affinity model, which this module
+        // is written not to do.
+        if (event.kind === "delivery")
+            return false;
         if (author && event.author !== author)
             return false;
         if (since && event.at <= since)

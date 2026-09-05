@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Recognize context-usage delivery events on pm-cli 2026.9.5 ([pm-context-d77x](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-d77x.toon))
+
 ## 2026.8.31 - 2026-08-31
 
 ### Fixed

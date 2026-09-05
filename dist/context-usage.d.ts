@@ -112,7 +112,10 @@ export declare function resolveSince(value: string, now?: Date): string | null;
  *
  * Validates the discriminant and every field the report reads, so a row written
  * by a future pm version — or a partial tail row left by a prune — is reported
- * as malformed rather than silently contributing zeroes to the metrics.
+ * as malformed rather than silently contributing zeroes to the metrics. A
+ * well-formed `delivery` row is recognized so a current ledger is not reported
+ * as truncated; this report still derives "shown" from serve `included` flags
+ * rather than recomputing pm's affinity fold.
  *
  * @param line - Raw JSONL line, assumed already trimmed of surrounding space.
  * @returns The decoded event, or null when the line is absent or malformed.

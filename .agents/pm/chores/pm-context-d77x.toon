@@ -1,0 +1,32 @@
+id: pm-context-d77x
+title: Recognize context-usage delivery events on pm-cli 2026.9.5
+description: "Pin @unbrained/pm-cli and pm-ops to 2026.9.5. The new ContextUsageEvent union includes a delivery kind, so typecheck failed on event.rows and a current ledger would be reported as truncated. Parse delivery without folding it into conversion, and seed affinity fixtures as v2 serve+delivery so the SDK store is actually exercised."
+type: Chore
+status: closed
+priority: 2
+tags: []
+created_at: "2026-09-05T18:13:43.333Z"
+updated_at: "2026-09-05T18:14:29.232Z"
+closed_at: "2026-09-05T18:14:29.202Z"
+completed_at: "2026-09-05T18:14:29.202Z"
+claim_principal: pi-agent
+author: pi-agent
+resolution: Pinned pm-cli/pm-ops 2026.9.5 and made context-usage recognize delivery events without folding them into conversion.
+expected_result: "release:check and pm health --strict-exit pass on the current toolchain."
+actual_result: "release:check exit 0; pm health --strict-exit exit 0; three delivery tests fail 3/3 on the old parser and pass 3/3 on the new one."
+comments[1]{created_at,author,text}:
+  "2026-09-05T18:14:27.716Z",pi-agent,"pm-cli 2026.9.5 added a delivery ledger kind. Typecheck failed because buildUsageReport treated every non-touch event as a serve and read event.rows. An unflagged changelog run now emits the bare ## <version> heading; this repo already asserted that the flag changes the heading rather than pinning the clock, so that gate stayed green. Affinity fixtures that wrote legacy serve rows were classified untrusted and scored 0; they now write v2 serve+delivery. Revert-proof: the three new delivery tests failed 3/3 against the old parser (parse returned null, readLedger counted malformed, buildUsageReport threw event.rows is not iterable) and passed 3/3 after the fix. npm run release:check exit 0. pm health --strict-exit exit 0."
+files[7]{path,scope}:
+  context-usage.ts,project
+  test/context-usage.test.ts,project
+  test/coverage-gaps.test.ts,project
+  package.json,project
+  package-lock.json,project
+  dist/context-usage.js,project
+  dist/context-usage.d.ts,project
+tests[3]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  "parseLedgerLine decodes a well-formed delivery row, including an omitted result",project,pi-agent,"2026-09-05T18:14:18.100Z",local_mutation,fix/recognize-context-usage-delivery-on-pm-cli-2026.9.5
+  readLedger does not count a well-formed delivery row as malformed,project,pi-agent,"2026-09-05T18:14:18.100Z",local_mutation,fix/recognize-context-usage-delivery-on-pm-cli-2026.9.5
+  buildUsageReport ignores delivery events so they cannot skew serve counts or conversion,project,pi-agent,"2026-09-05T18:14:18.100Z",local_mutation,fix/recognize-context-usage-delivery-on-pm-cli-2026.9.5
+close_reason: Pinned pm-cli/pm-ops 2026.9.5 and made context-usage recognize delivery events without folding them into conversion.
+body: ""

@@ -77,6 +77,35 @@ test("parseLedgerLine decodes well-formed touch and serve rows", () => {
   );
 });
 
+test("parseLedgerLine decodes a well-formed delivery row, including an omitted result", () => {
+  assert.deepEqual(
+    parseLedgerLine('{"kind":"delivery","schema_version":2,"serve_id":"s1","at":"2026-07-01T00:00:02.000Z","author":"a","surface":"context","result_omitted":false,"delivered_item_ids":["x-1"]}'),
+    {
+      kind: "delivery",
+      schema_version: 2,
+      serve_id: "s1",
+      at: "2026-07-01T00:00:02.000Z",
+      author: "a",
+      surface: "context",
+      result_omitted: false,
+      delivered_item_ids: ["x-1"],
+    },
+  );
+  assert.deepEqual(
+    parseLedgerLine('{"kind":"delivery","schema_version":2,"serve_id":"s2","at":"2026-07-01T00:00:03.000Z","author":"a","surface":"next","result_omitted":true,"delivered_item_ids":[]}'),
+    {
+      kind: "delivery",
+      schema_version: 2,
+      serve_id: "s2",
+      at: "2026-07-01T00:00:03.000Z",
+      author: "a",
+      surface: "next",
+      result_omitted: true,
+      delivered_item_ids: [],
+    },
+  );
+});
+
 test("parseLedgerLine rejects every malformed shape rather than admitting partial rows", () => {
   const base = '"at":"2026-07-01T00:00:00.000Z","author":"a"';
   for (const line of [
@@ -95,6 +124,13 @@ test("parseLedgerLine rejects every malformed shape rather than admitting partia
     `{"kind":"serve",${base},"surface":"next","profile":"next","rows":[{"rank":1,"included":true}]}`,
     `{"kind":"serve",${base},"surface":"next","profile":"next","rows":[{"id":"x","rank":"1","included":true}]}`,
     `{"kind":"serve",${base},"surface":"next","profile":"next","rows":[{"id":"x","rank":1}]}`,
+    `{"kind":"delivery",${base},"serve_id":"s1","surface":"context","result_omitted":false,"delivered_item_ids":[]}`,
+    `{"kind":"delivery",${base},"schema_version":1,"serve_id":"s1","surface":"context","result_omitted":false,"delivered_item_ids":[]}`,
+    `{"kind":"delivery",${base},"schema_version":2,"surface":"context","result_omitted":false,"delivered_item_ids":[]}`,
+    `{"kind":"delivery",${base},"schema_version":2,"serve_id":"s1","surface":"context","delivered_item_ids":[]}`,
+    `{"kind":"delivery",${base},"schema_version":2,"serve_id":"s1","surface":"context","result_omitted":false,"delivered_item_ids":{}}`,
+    `{"kind":"delivery",${base},"schema_version":2,"serve_id":"s1","surface":"elsewhere","result_omitted":false,"delivered_item_ids":[]}`,
+    `{"kind":"delivery",${base},"schema_version":2,"serve_id":"s1","surface":"context","result_omitted":false,"delivered_item_ids":[1]}`,
   ]) {
     assert.equal(parseLedgerLine(line), null, `expected null for ${line || "<empty>"}`);
   }
@@ -155,6 +191,49 @@ test("readLedger skips blank lines and counts malformed ones separately", () => 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("readLedger does not count a well-formed delivery row as malformed", () => {
+  const root = trackerWithLedger(
+    [
+      '{"kind":"serve","at":"2026-07-01T00:00:00.000Z","author":"a","surface":"context","profile":"context","rows":[]}',
+      '{"kind":"delivery","schema_version":2,"serve_id":"s1","at":"2026-07-01T00:00:01.000Z","author":"a","surface":"context","result_omitted":false,"delivered_item_ids":["x-1"]}',
+    ].join("\n"),
+  );
+  try {
+    const ledger = readLedger(root);
+    assert.equal(ledger.present, true);
+    assert.equal(ledger.malformed, 0);
+    assert.equal(ledger.events.length, 2);
+    assert.equal(ledger.events[1]?.kind, "delivery");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("buildUsageReport ignores delivery events so they cannot skew serve counts or conversion", () => {
+  const delivery: ContextUsageEvent = {
+    kind: "delivery",
+    schema_version: 2,
+    serve_id: "s1",
+    at: "2026-07-01T00:00:02.000Z",
+    author: "a",
+    surface: "context",
+    result_omitted: false,
+    delivered_item_ids: ["x-9"],
+  };
+  const report = buildUsageReport([
+    serve("2026-07-01T00:00:00.000Z", "a", "context", [["x-1", 1, true]]),
+    delivery,
+    touch("2026-07-01T00:01:00.000Z", "a", "x-1"),
+  ]);
+  assert.equal(report.event_count, 2, "delivery is recognized but not a serve or touch");
+  assert.equal(report.serve_event_count, 1);
+  assert.equal(report.touch_event_count, 1);
+  assert.deepEqual(report.waste, []);
+  assert.deepEqual(report.misses, []);
+  assert.equal(report.conversion_rate, 1);
+  assert.equal(report.items.some((item) => item.id === "x-9"), false, "delivered ids are not imputed as serves");
 });
 
 test("buildUsageReport converts a serve only when the same author touches it later", () => {
