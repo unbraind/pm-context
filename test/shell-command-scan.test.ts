@@ -13,7 +13,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
-import { bashArrays, expandArrays, joinContinuations } from "../scripts/shell-command-scan.ts";
+import { bashArrays, dedentRunBlocks, expandArrays, joinContinuations } from "../scripts/shell-command-scan.ts";
 import { isMainInvocation } from "../scripts/main-invocation.ts";
 
 test("an unknown array reference is left in place rather than erased", () => {
@@ -52,4 +52,76 @@ test("an array reference is replaced by the declaration's contents, quoted or ba
   const arrays = bashArrays('common=( --access public --provenance )\n');
   assert.equal(expandArrays('npm publish "${common[@]}"', arrays), "npm publish --access public --provenance");
   assert.equal(expandArrays("npm publish ${common[@]}", arrays), "npm publish --access public --provenance");
+});
+
+test("run-block content is dedented the way YAML delivers it to bash", () => {
+  // The block's indentation is learned from its first non-blank line, a line
+  // keeps any indentation beyond the block's own, and the block ends at the
+  // first non-blank line indented less -- which is where YAML ends it too.
+  assert.equal(
+    dedentRunBlocks(["      - run: |", "          cat <<EOF", "            deeper prose", "          EOF", "          NPM=npm", "      - name: next"].join("\n")),
+    ["      - run: |", "cat <<EOF", "  deeper prose", "EOF", "NPM=npm", "      - name: next"].join("\n"),
+  );
+  // A folded block (`>`) is dedented the same way, and blank lines stay
+  // blank because YAML keeps them as empty content.
+  assert.equal(
+    dedentRunBlocks(["  run: >-", "", "    deep", "      deeper"].join("\n")),
+    ["  run: >-", "", "deep", "  deeper"].join("\n"),
+  );
+  // A comment after the indicator is still a header, and a CRLF line ending
+  // survives the strip.
+  assert.equal(
+    dedentRunBlocks("  run: | # note\r\n    x\r\n"),
+    "  run: | # note\r\nx\r\n",
+  );
+  // A `run:`-shaped line inside another block's content is content, not a
+  // header: the scan consumes each block before looking for the next.
+  assert.equal(
+    dedentRunBlocks(["  run: |", "    cat <<X", "    run: |", "      payload", "    X"].join("\n")),
+    ["  run: |", "cat <<X", "run: |", "  payload", "X"].join("\n"),
+  );
+});
+
+test("run-block dedenting refuses shapes YAML would not deliver as blocks", () => {
+  // A header whose next non-blank line is indented no deeper holds an empty
+  // block, so the following line is not content and is left untouched.
+  assert.equal(
+    dedentRunBlocks(["  run: |", "next: value"].join("\n")),
+    ["  run: |", "next: value"].join("\n"),
+  );
+  // A header at the end of the file, or followed only by blank lines, holds
+  // no content at all.
+  assert.equal(dedentRunBlocks("prior\n  run: |"), "prior\n  run: |");
+  assert.equal(dedentRunBlocks("  run: |\n\n"), "  run: |\n\n");
+  // A `run:` value that is not a block scalar is not a header, and a block
+  // scalar under any other key is data no shell runs, so both stay as written.
+  assert.equal(
+    dedentRunBlocks(["  run: npm publish", "  env: |", "    FOO=1"].join("\n")),
+    ["  run: npm publish", "  env: |", "    FOO=1"].join("\n"),
+  );
+});
+
+test("an explicit block indentation indicator (|2) is accepted and dedented", () => {
+  // YAML allows `run: |2` to declare the content indentation explicitly. The
+  // header must be recognised so the block is dedented; otherwise the YAML
+  // indentation stays and a heredoc terminator at the start of the shell line
+  // never matches, swallowing every later assignment as heredoc payload.
+  assert.equal(
+    dedentRunBlocks(["  run: |2", "    cat <<EOF", "      deeper prose", "    EOF", "    NPM=npm"].join("\n")),
+    ["  run: |2", "cat <<EOF", "  deeper prose", "EOF", "NPM=npm"].join("\n"),
+  );
+  // The chomping indicator may appear before or after the indentation digit.
+  assert.equal(
+    dedentRunBlocks(["  run: |-2", "    cat <<EOF", "    EOF", "    NPM=npm"].join("\n")),
+    ["  run: |-2", "cat <<EOF", "EOF", "NPM=npm"].join("\n"),
+  );
+  assert.equal(
+    dedentRunBlocks(["  run: |2-", "    cat <<EOF", "    EOF", "    NPM=npm"].join("\n")),
+    ["  run: |2-", "cat <<EOF", "EOF", "NPM=npm"].join("\n"),
+  );
+  // A folded block with an explicit indicator is dedented the same way.
+  assert.equal(
+    dedentRunBlocks(["  run: >2", "    echo hi"].join("\n")),
+    ["  run: >2", "echo hi"].join("\n"),
+  );
 });

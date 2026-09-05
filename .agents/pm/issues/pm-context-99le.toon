@@ -1,0 +1,21 @@
+id: pm-context-99le
+title: Chained assignment followed by && or || hides publishes from the attestation gate
+description: "A persistent assignment followed by && or || is not indexed by shellScalars. Given NPM=npm && true, a later $NPM publish stays unresolved and is omitted from publish recognition. The STANDALONE_ASSIGNMENT regex accepted only a semicolon, a comment, or end-of-line after the value, excluding the & and | operators. An attested sibling publish then satisfied the non-vacuity guard, so the whole scan returned clean while an unattested publish shipped."
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-31T11:15:40.755Z"
+updated_at: "2026-08-31T11:19:02.513Z"
+closed_at: "2026-08-31T11:19:02.487Z"
+completed_at: "2026-08-31T11:19:02.487Z"
+author: pi-agent
+comments[1]{created_at,author,text}:
+  "2026-08-31T11:17:21.028Z",pi-agent,"Fix: defined shared OPERATOR_CHARS and SEPARATORS constants. The STANDALONE_ASSIGNMENT trailing now uses OPERATOR_CHARS instead of just semicolon, so NPM=npm followed by and-then or or-then is indexed. Test: a chained assignment followed by an operator is still indexed. Revert-proof: reverting OPERATOR_CHARS back to semicolon makes the test fail (0 != 1)."
+files[2]{path,scope}:
+  scripts/shell-command-scan.ts,project
+  test/verify-release-publish-attestation.test.ts,project
+tests[1]{command,path,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm test,test/verify-release-publish-attestation.test.ts,project,pi-agent,"2026-08-31T11:17:55.632Z",local_mutation,fix/index-unquoted-scalar-assignments
+close_reason: "Fixed: STANDALONE_ASSIGNMENT trailing now uses shared OPERATOR_CHARS constant, so assignments followed by && or || are indexed."
+body: ""

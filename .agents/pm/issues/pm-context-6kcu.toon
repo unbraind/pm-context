@@ -1,0 +1,23 @@
+id: pm-context-6kcu
+title: "An assignment written below a command attests it, because scalar resolution is file-wide"
+description: "npm publish $FLAG above FLAG=--provenance audits as attested: shellScalars builds one map over the whole file and publishInvocationsIn expands every line against it, so a binding the shell has not made yet resolves a command written above it. Measured: the audit returns 0 failures where 1 is required."
+type: Issue
+status: closed
+priority: 0
+tags[3]: scanner,security,supply-chain
+created_at: "2026-08-31T20:15:01.092Z"
+updated_at: "2026-08-31T20:33:54.819Z"
+closed_at: "2026-08-31T20:33:01.172Z"
+completed_at: "2026-08-31T20:33:01.172Z"
+author: pi-agent
+resolution: "Bindings carry the line that made them; publishInvocationsIn resolves each line against lineScalarViews events at or above it, <= its own line"
+expected_result: "An assignment below a command no longer attests it (1 failure); a same-line assignment still resolves (1 failure, publish found)"
+actual_result: 361/361 tests pass; bypass-3 fixture went red on revert (0 failures) and green restored; all gates green; pm health --strict-exit 0
+files[3]{path,scope,note}:
+  scripts/shell-command-scan.ts,project,scalarAssignments/lineScalarViews record each binding line; resolution folds events at or above the command's line
+  scripts/verify-release-publish-attestation.ts,project,publishInvocationsIn expands each line against lineScalarViews(text) at its index instead of a file-wide map
+  test/verify-release-publish-attestation.test.ts,project,assignment-below-command fixture plus the same-line mirror
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref},note}:
+  npm test,project,300,pi-agent,"2026-08-31T20:30:52.176Z",local_mutation,fix/index-unquoted-scalar-assignments,"full suite: bypass 3 fixture (assignment below a command) and its same-line mirror run with the rest of the scanner suite"
+close_reason: "Reproduced before any change: auditPublishAttestation on npm publish $FLAG above FLAG=--provenance (plus a genuinely attested sibling, so non-vacuity cannot carry a vacuous pass) returned 0 failures where 1 is required -- the file-wide shellScalars map let a binding the shell has not made yet resolve a command written above it. This was the deferred follow-up already named in this PR's description (raised by Sourcery in round 3, filed as pm-cli-website-1j4o).\n\nFix, ported from the pm-todos reference into this repository's own structure: the scalar walk (walkScalarEvents) now records every binding event with the line that made it (scalarAssignments), and lineScalarViews resolves one map per line from the events at or above it. publishInvocationsIn expands line index against views at that index instead of a file-wide map. The scope test is <= the command's own line, not <: NPM=npm; \\\"$NPM\\\" publish assigns and runs on one line and the shell binds first, so that publish is still found and flagged (measured 1 failure both before and after -- the mirror is pinned so the fix cannot trade fail-open for fail-silent).\n\nRevert-red: dropping the position filter (folding every event into every line) reddened exactly the new fixture, 0 failures where 1 is required. Restored.\n\nVerified: full suite 361/361 pass; npm run coverage thresholds met at 100/100/100; npm run typecheck; npm run docstring 8 files 55 declarations; npm run verify:release-publish-attestation green over the real workflows (1 invocation, attested); ./node_modules/.bin/pm health --strict-exit exit 0. pm test --run executes npm test inside the linked-test sandbox, where this repository's own pm-integration tests collide with the sandbox's PM_PATH ancestor tracker -- pre-existing, files untouched by this change, same collision recorded on pm-context-14gn; every linked command was executed directly and observed green, including the single-title run."
+body: ""

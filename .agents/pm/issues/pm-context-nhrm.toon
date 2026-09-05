@@ -1,0 +1,30 @@
+id: pm-context-nhrm
+title: Close PR 84 scalar expansion review gaps
+description: Prevent assignment-prefix backtracking and preserve shell scalar semantics without inventing attestation flags.
+type: Issue
+status: closed
+priority: 2
+tags: []
+created_at: "2026-08-29T04:45:11.664Z"
+updated_at: "2026-08-29T06:06:15.604Z"
+closed_at: "2026-08-29T06:06:15.587Z"
+completed_at: "2026-08-29T06:06:15.587Z"
+claim_principal: pi-agent
+author: pi-agent
+comments[8]{created_at,author,text}:
+  "2026-08-29T04:45:17.227Z",pi-agent,"Confirmed all three findings. The assignment regex accepts adjacent hash prefixes, and textual scalar expansion can reinterpret operators and backslashes as scanner syntax."
+  "2026-08-29T04:46:18.037Z",pi-agent,"Required whitespace before trailing # comments, rejected expansion values containing shell operators, decoded double-quoted escapes correctly, and protected expansion-produced backslashes. npm test passes (300 tests)."
+  "2026-08-29T04:53:33.720Z",pi-agent,Follow-up review found multiline subshell scope leakage. shellScalars now tracks quote-aware parenthesis depth across lines and indexes assignments only at file scope; targeted regression passes.
+  "2026-08-29T04:59:44.743Z",pi-agent,"Second follow-up: scope tracking now stops at an unquoted shell comment boundary, so comment prose cannot leak quote or parenthesis state. Audit-level regression passes."
+  "2026-08-29T05:06:30.281Z",pi-agent,"Third follow-up: scalar-expanded attestation flags are now conservatively neutralized because static scope tracking cannot prove conditional/function execution; scalar-held commands remain expanded and audited. Full attestation verifier file passes (64 tests)."
+  "2026-08-29T05:14:25.142Z",pi-agent,"Final scope model tracks functions, conditional bodies, subshells, comments, and quoted/unquoted heredoc bodies. Restored unconditional scalar attestation and prevented phantom scalar commands. Post-fix linked verification passes."
+  "2026-08-29T05:21:10.554Z",pi-agent,Final heredoc follow-up records opener position only when << occurs outside quotes and escapes. Quoted heredoc-like prose regression and linked verifier both pass.
+  "2026-08-29T05:27:32.987Z",pi-agent,Added multiline function declaration tracking and queued every heredoc opened by a command. Targeted regressions and refreshed linked verifier pass.
+files[2]{path,scope}:
+  scripts/shell-command-scan.ts,project
+  test/verify-release-publish-attestation.test.ts,project
+tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm test,project,pi-agent,"2026-08-29T04:46:17.346Z",local_mutation,fix/index-unquoted-scalar-assignments
+  "npm run verify:release-publish-attestation",project,pi-agent,"2026-08-29T06:06:14.338Z",local_mutation,fix/index-unquoted-scalar-assignments
+close_reason: Validated quoted closers and function-name parentheses.
+body: ""

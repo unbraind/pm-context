@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Fixed
+
+- The publish-attestation gate misses a publish routed through an unquoted shell variable ([pm-context-mlvw](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-mlvw.toon))
+- YAML run-block indentation reaches shellScalars undedented, so a heredoc terminator written inside a run block never ends its payload ([pm-context-14gn](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-14gn.toon))
+- Three heredoc regression tests assert a failure that holds whether or not the heredoc terminator is recognised ([pm-context-598y](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-598y.toon))
+- The scalar scanner deletes a same-line reassignment instead of keeping the shell's final value, and persists pipeline and background bindings ([pm-context-4gk3](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-4gk3.toon))
+- Adjacent operator after a control closer leaves stale scope, suppressing later assignments ([pm-context-nvxm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nvxm.toon))
+- Chained assignment followed by && or \|\| hides publishes from the attestation gate ([pm-context-99le](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-99le.toon))
+
+### Security
+
+- The heredoc-body, escaped-separator and backslash-delimiter bypasses are unpinned by any discriminating fixture ([pm-context-e242](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-e242.toon))
+- A binding confined to a block blinds the scan to publishes inside that block ([pm-context-ze4v](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-ze4v.toon))
+- An assignment written below a command attests it, because scalar resolution is file-wide ([pm-context-6kcu](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-6kcu.toon))
+
 ### Other
 
 - Recognize context-usage delivery events on pm-cli 2026.9.5 ([pm-context-d77x](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-d77x.toon))
@@ -19,6 +34,7 @@
 
 ### Fixed
 
+- Close PR 84 scalar expansion review gaps ([pm-context-nhrm](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nhrm.toon))
 - Preserve append-only provenance history during review repair ([pm-context-9xfx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-9xfx.toon))
 - Make the affinity tiebreak test use one shared instant ([pm-context-hxj5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-hxj5.toon))
 

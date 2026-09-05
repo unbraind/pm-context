@@ -22,14 +22,15 @@ import { closeSync, openSync, readFileSync, readSync } from "node:fs";
 import { resolve } from "node:path";
 
 import {
-  bashArrays,
   commandArguments,
   commandCandidates,
   commandName,
+  dedentRunBlocks,
   expandArrays,
   expandScalars,
   joinContinuations,
-  shellScalars,
+  lineArrayViews,
+  lineScalarViews,
   type ShellCommand,
   type SourceFile,
   tokenizeCommands,
@@ -56,10 +57,32 @@ export const FOREIGN_PUBLISHERS = new Set(["yarn", "pnpm", "bun"]);
 /** Repository subtrees whose contents are build output rather than a publish path. */
 const GENERATED_PREFIXES = ["dist/", "coverage/", "node_modules/", ".agents/pm/runtime/"];
 
-/** Tracked paths that can execute a command, matched against the repository-relative path. */
-const EXECUTABLE_PATHS = [
+/**
+ * The workflow-shaped path patterns whose `run:` blocks GitHub Actions
+ * executes as shell, defined once so the workflow entries in
+ * {@link EXECUTABLE_PATHS} and the {@link isWorkflowYaml} test can never
+ * drift apart. A workflow file and a composite action are the two shapes a
+ * YAML parser hands to bash with the block indentation removed.
+ */
+const WORKFLOW_PATHS = [
   /^\.github\/workflows\/[^/]+\.ya?ml$/,
   /^\.github\/actions\/.+\/action\.ya?ml$/,
+];
+
+/**
+ * Whether a repository-relative path is a workflow file whose `run:` blocks
+ * GitHub Actions executes as shell. These are the tracked files whose shell
+ * text a YAML parser hands to bash with the block indentation removed, so they
+ * are the files whose `run:` blocks are dedented before scanning. A plain
+ * shell script is not on this list: its indentation is the shell's own, and a
+ * heredoc terminator indented there is not a terminator in bash either.
+ */
+const isWorkflowYaml = (path: string): boolean =>
+  WORKFLOW_PATHS.some((pattern) => pattern.test(path));
+
+/** Tracked paths that can execute a command, matched against the repository-relative path. */
+const EXECUTABLE_PATHS = [
+  ...WORKFLOW_PATHS,
   /(^|\/)package\.json$/,
   /\.(sh|bash|zsh|ksh)$/,
   /(^|\/)(Makefile|makefile|GNUmakefile)$/,
@@ -322,17 +345,37 @@ export function attestationEnabled(command: ShellCommand): boolean {
  * the same reason the changelog-date scan does it: a multi-line invocation
  * otherwise looks like fragments, none of which carries the flag.
  *
+ * A workflow file's `run:` blocks are dedented first, because that is what
+ * happens to them before bash sees the text: YAML strips the block
+ * indentation when it delivers the value. The one scanner rule that is
+ * whitespace-sensitive is the heredoc terminator, which must sit at the start
+ * of the line the shell receives -- with the YAML indentation still attached,
+ * a real terminator never matched, the heredoc swallowed the rest of the file,
+ * and every assignment after it stayed unindexed (see `dedentRunBlocks`).
+ *
+ * Scalars are resolved per line, not file-wide: each line expands against
+ * only the bindings made at or above it, in its own scope or an enclosing one
+ * (`lineScalarViews`). A file-wide map let an assignment written BELOW a
+ * command resolve it, so `npm publish $FLAG` above `FLAG=--provenance` read
+ * as attested although the shell runs the publish with `$FLAG` unset, and it
+ * let a binding confined to a block attest a publish outside it while
+ * blinding the scan to the publishes inside it. The `<=` in the resolution
+ * keeps `NPM=npm; "$NPM" publish` working: the shell binds before running
+ * the rest of the line, so the publish must be found, not left unexpanded.
+ *
  * @param source - The file's path and contents.
  * @returns The publish invocations found, in file order.
  */
 export function publishInvocationsIn(source: SourceFile): PublishInvocation[] {
-  const raw = source.file.endsWith("package.json") ? manifestCommandLines(source.text) : source.text;
+  let raw = source.text;
+  if (source.file.endsWith("package.json")) raw = manifestCommandLines(source.text);
+  else if (isWorkflowYaml(source.file)) raw = dedentRunBlocks(source.text);
   const text = joinContinuations(raw);
-  const arrays = bashArrays(text);
-  const scalars = shellScalars(text);
+  const arrayViews = lineArrayViews(text);
+  const views = lineScalarViews(text);
   const expanded = text
     .split("\n")
-    .map((line) => expandScalars(expandArrays(line, arrays), scalars))
+    .map((line, index) => expandScalars(expandArrays(line, arrayViews[index]!), views[index]!))
     .join("\n");
   const found: PublishInvocation[] = [];
   for (const command of tokenizeCommands(expanded)) {
