@@ -517,6 +517,64 @@ function recentIso(minutesAgo: number): string {
   return new Date(Date.now() - minutesAgo * 60_000).toISOString();
 }
 
+/**
+ * A v2 serve plus its matching delivery. pm 2026.9.5's affinity fold ignores
+ * legacy serve rows (no schema_version/serve_id) and only scores ids present in
+ * the correlated delivery, so a pre-v2 fixture proves nothing about the store.
+ */
+function trustedServeLines(
+  at: string,
+  author: string,
+  rows: Array<[string, number, boolean]>,
+  serveId = "s1",
+): string[] {
+  const mapped = rows.map(([id, rank, included]) => ({ id, rank, included }));
+  const delivered = mapped.filter((row) => row.included).map((row) => row.id);
+  return [
+    JSON.stringify({
+      kind: "serve",
+      schema_version: 2,
+      serve_id: serveId,
+      at,
+      author,
+      surface: "context",
+      profile: "context",
+      rows: mapped,
+      result_omitted: false,
+      packed_item_ids: delivered,
+    }),
+    JSON.stringify({
+      kind: "delivery",
+      schema_version: 2,
+      serve_id: serveId,
+      at,
+      author,
+      surface: "context",
+      result_omitted: false,
+      delivered_item_ids: delivered,
+    }),
+  ];
+}
+
+/**
+ * A v2 serve whose `rows` cannot be iterated. The affinity reader trusts the
+ * schema_version/serve_id pair and then throws on `for...of`, which is the
+ * remaining way a current ledger can fail the read (a legacy `rows: null`
+ * serve is now classified untrusted and returned, not thrown).
+ */
+function throwingServeLine(at: string, author: string): string {
+  return JSON.stringify({
+    kind: "serve",
+    schema_version: 2,
+    serve_id: "s-bad",
+    at,
+    author,
+    surface: "context",
+    profile: "context",
+    rows: null,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // context-usage with --by (author) and affinity
 // ---------------------------------------------------------------------------
@@ -529,7 +587,7 @@ test("context-usage with --by returns affinity from the SDK store", async () => 
     writeFileSync(
       join(initialized.path, "runtime", "context-usage.jsonl"),
       [
-        JSON.stringify({ kind: "serve", at: recentIso(10), author: "a", surface: "context", profile: "context", rows: [{ id: "x-1", rank: 1, included: true }] }),
+        ...trustedServeLines(recentIso(10), "a", [["x-1", 1, true]]),
         JSON.stringify({ kind: "touch", at: recentIso(5), author: "a", item_id: "x-1", intent: "update" }),
       ].join("\n") + "\n",
       "utf-8",
@@ -559,7 +617,7 @@ test("context-usage with --by renders affinity in markdown", async () => {
     writeFileSync(
       join(initialized.path, "runtime", "context-usage.jsonl"),
       [
-        JSON.stringify({ kind: "serve", at: recentIso(10), author: "a", surface: "context", profile: "context", rows: [{ id: "x-1", rank: 1, included: true }] }),
+        ...trustedServeLines(recentIso(10), "a", [["x-1", 1, true]]),
         JSON.stringify({ kind: "touch", at: recentIso(5), author: "a", item_id: "x-1", intent: "update" }),
       ].join("\n") + "\n",
       "utf-8",
@@ -584,11 +642,12 @@ test("context-usage with --by degrades gracefully when affinity read fails", asy
   const root = mkdtempSync(join(tmpdir(), "pm-context-usage-"));
   try {
     const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    // Write a corrupted serve event with non-iterable rows so readContextUsageAffinity throws.
+    // Write a trusted-looking v2 serve whose rows cannot be iterated, so the
+    // affinity reader throws instead of classifying the row as untrusted.
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
     writeFileSync(
       join(initialized.path, "runtime", "context-usage.jsonl"),
-      JSON.stringify({ kind: "serve", at: recentIso(10), author: "a", surface: "context", profile: "context", rows: null }) + "\n",
+      throwingServeLine(recentIso(10), "a") + "\n",
       "utf-8",
     );
     const runner = await harness();
@@ -648,11 +707,12 @@ test("context-pack with author degrades when affinity read fails on corrupted le
   try {
     const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
     const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
-    // Write a corrupted serve event so readContextUsageAffinity throws during rank option resolution.
+    // Write a trusted-looking v2 serve whose rows cannot be iterated, so the
+    // affinity reader throws during rank option resolution.
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
     writeFileSync(
       join(initialized.path, "runtime", "context-usage.jsonl"),
-      JSON.stringify({ kind: "serve", at: recentIso(10), author: "test", surface: "context", profile: "context", rows: null }) + "\n",
+      throwingServeLine(recentIso(10), "test") + "\n",
       "utf-8",
     );
     const runner = await harness();
@@ -1314,7 +1374,7 @@ test("context-usage with --by sorts affinity entries with equal values by id", a
     writeFileSync(
       join(initialized.path, "runtime", "context-usage.jsonl"),
       [
-        JSON.stringify({ kind: "serve", at: recentIso(10), author: "a", surface: "context", profile: "context", rows: [{ id: "x-2", rank: 1, included: true }, { id: "x-1", rank: 2, included: true }] }),
+        ...trustedServeLines(recentIso(10), "a", [["x-2", 1, true], ["x-1", 2, true]]),
         JSON.stringify({ kind: "touch", at: touchedAt, author: "a", item_id: "x-1", intent: "update" }),
         JSON.stringify({ kind: "touch", at: touchedAt, author: "a", item_id: "x-2", intent: "update" }),
       ].join("\n") + "\n",

@@ -17,6 +17,10 @@
 - A binding confined to a block blinds the scan to publishes inside that block ([pm-context-ze4v](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-ze4v.toon))
 - An assignment written below a command attests it, because scalar resolution is file-wide ([pm-context-6kcu](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-6kcu.toon))
 
+### Other
+
+- Recognize context-usage delivery events on pm-cli 2026.9.5 ([pm-context-d77x](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-d77x.toon))
+
 ## 2026.8.31 - 2026-08-31
 
 ### Fixed
