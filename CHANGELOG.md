@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Security
+
+- Consume the canonical attestation gate instead of carrying a copy of it ([pm-context-m6cr](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-m6cr.toon))
+
 ## 2026.9.6 - 2026-09-06
 
 ### Other
