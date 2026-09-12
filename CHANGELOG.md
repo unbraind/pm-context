@@ -4,6 +4,8 @@
 
 ### Other
 
+- Certify the CLI and SDK on PM 2026.9.7 ([pm-context-ioz3](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-ioz3.toon))
+- Certify pm CLI 2026.9.12 and the pm-ops 2026.9.11 auditor ([pm-context-0ruy](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-0ruy.toon))
 - Certify pm CLI 2026.9.10 and pick up the canonical auditor fixes the lockfile was holding back ([pm-context-syd5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-syd5.toon))
 
 ## 2026.9.8 - 2026-09-08
