@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Other
+
+- Certify pm CLI 2026.9.17 ([pm-context-ptx2](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-ptx2.toon))
+
 ## 2026.9.13 - 2026-09-13
 
 ### Other
@@ -37,6 +43,7 @@
 
 ### Fixed
 
+- Refuse the unattested publish fallback after provenance failure ([pm-context-fuhi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-fuhi.toon))
 - Preserve append-only provenance history during review repair ([pm-context-9xfx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-9xfx.toon))
 - Make the affinity tiebreak test use one shared instant ([pm-context-hxj5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-hxj5.toon))
 
@@ -44,7 +51,6 @@
 
 ### Fixed
 
-- Refuse the unattested publish fallback after provenance failure ([pm-context-fuhi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-fuhi.toon))
 - changelog scripts read the pm workspace with default budgets instead of canonical complete reads ([pm-context-8th2](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-8th2.toon))
 
 ### Security
@@ -111,7 +117,7 @@
 
 - Resolve pm-changelog to the release that derives release dates in UTC ([pm-context-6rua](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-6rua.toon))
 
-## 2026.7.31 - 2026-07-31
+## 2026.8.1 - 2026-08-01
 
 ### Fixed
 
