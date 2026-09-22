@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A publish that npm accepts late is reported as failed and the GitHub Release is skipped on bun mirror lag ([pm-context-ims7](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-ims7.toon))
+
+### Other
+
+- Certify pm CLI 2026.9.21 and install merge drivers through the canonical pm-ops launcher ([pm-context-2axh](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-2axh.toon))
+
 ## 2026.9.18 - 2026-09-18
 
 ### Other
