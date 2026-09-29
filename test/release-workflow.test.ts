@@ -1,13 +1,107 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import test from "node:test";
+import { parse } from "yaml";
 
 /** The release workflow source, read once and asserted against as text. */
 const workflow = readFileSync(
   resolve(import.meta.dirname, "../.github/workflows/release.yml"),
   "utf-8"
 );
+
+/** Execute the real Decide release script against a disposable Git history. */
+function decideRelease(commits: Array<{ version: string; title: string; tag?: string; manifestVersion?: string }>): Record<string, string> {
+  const root = mkdtempSync(resolve(tmpdir(), "pm-context-release-resume-"));
+  try {
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Release Fixture"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "release-fixture@example.invalid"], { cwd: root });
+    for (const commit of commits) {
+      writeFileSync(resolve(root, "package.json"), JSON.stringify({ name: "pm-context", version: commit.version }));
+      writeFileSync(resolve(root, "manifest.json"), JSON.stringify({ version: commit.manifestVersion ?? commit.version }));
+      writeFileSync(resolve(root, "package-lock.json"), JSON.stringify({ version: commit.version }));
+      writeFileSync(resolve(root, "change.txt"), commit.title);
+      execFileSync("git", ["add", "."], { cwd: root });
+      execFileSync("git", ["commit", "-qm", commit.title], { cwd: root });
+      if (commit.tag) execFileSync("git", ["tag", commit.tag], { cwd: root });
+    }
+    const document = parse(workflow) as { jobs: { release: { steps: Array<{ name?: string; run?: string }> } } };
+    const script = document.jobs.release.steps.find((step) => step.name === "Decide release")?.run;
+    assert.ok(script, "workflow must expose its release decision script");
+    const output = resolve(root, "github-output");
+    writeFileSync(output, "");
+    execFileSync("bash", ["-e", "-c", script], {
+      cwd: root,
+      env: { ...process.env, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: resolve(root, "summary"), RELEASE_TIMEZONE: "Europe/Vienna" },
+    });
+    return Object.fromEntries(readFileSync(output, "utf8").trim().split("\n").map((line) => line.split("=", 2)));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("a failed publish resumes its prepared commit after the calendar day and later source commits", () => {
+  const result = decideRelease([
+    { version: "2026.9.26", title: "Release pm-context v2026.9.26", tag: "v2026.9.26" },
+    { version: "2026.9.27", title: "Release pm-context v2026.9.27" },
+    { version: "2026.9.27", title: "Document a later feature" },
+  ]);
+  assert.equal(result.should_release, "true");
+  assert.equal(result.resume, "true");
+  assert.equal(result.tag, "v2026.9.27");
+  assert.equal(result.npm_version, "2026.9.27");
+  assert.match(result.release_sha ?? "", /^[0-9a-f]{40}$/);
+  assert.notEqual(result.release_sha, result.base_sha, "later source commits must not change the release artifact");
+});
+
+test("a tagged release followed by new work chooses a new version", () => {
+  const result = decideRelease([
+    { version: "2026.9.26", title: "Release pm-context v2026.9.26", tag: "v2026.9.26" },
+    { version: "2026.9.26", title: "Add context usage fixture" },
+  ]);
+  assert.equal(result.should_release, "true");
+  assert.equal(result.resume, "false");
+  assert.notEqual(result.tag, "v2026.9.26");
+});
+
+test("inconsistent prepared metadata stops the release instead of minting another version", () => {
+  assert.throws(
+    () => decideRelease([
+      { version: "2026.9.26", title: "Release pm-context v2026.9.26", tag: "v2026.9.26" },
+      { version: "2026.9.27", manifestVersion: "2026.9.26", title: "Release pm-context v2026.9.27" },
+    ]),
+    /Command failed/,
+  );
+});
+
+test("resume notes are extracted from the prepared version and absent notes fail closed", () => {
+  const root = mkdtempSync(resolve(tmpdir(), "pm-context-release-notes-"));
+  try {
+    const document = parse(workflow) as { jobs: { release: { steps: Array<{ name?: string; run?: string }> } } };
+    const script = document.jobs.release.steps.find((step) => step.name === "Restore prepared release notes")?.run;
+    assert.ok(script);
+    writeFileSync(resolve(root, "CHANGELOG.md"), "# Changelog\n\n## 2026.9.27 - 2026-09-27\nRecovered fix\n\n## 2026.9.26 - 2026-09-26\nOld fix\n");
+    execFileSync("bash", ["-e", "-c", script], { cwd: root, env: { ...process.env, NPM_VERSION: "2026.9.27" } });
+    assert.equal(readFileSync(resolve(root, "RELEASE_NOTES.md"), "utf8"), "## 2026.9.27 - 2026-09-27\nRecovered fix\n\n");
+    assert.throws(
+      () => execFileSync("bash", ["-e", "-c", script], { cwd: root, env: { ...process.env, NPM_VERSION: "2026.9.25" } }),
+      /Command failed/,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a prepared version cannot flow through metadata generation or another release PR", () => {
+  for (const step of ["Update release version", "Generate changelog and release notes", "Run release checks", "Commit release files", "Merge release metadata through protected PR"]) {
+    assert.match(stepSource(step), /steps\.decide\.outputs\.resume != 'true'/);
+  }
+  assert.match(stepSource("Verify merged release"), /steps\.decide\.outputs\.release_sha/);
+  assert.match(stepSource("Restore prepared release notes"), /CHANGELOG\.md/);
+});
 
 /**
  * Locate a named workflow step so tests can assert on ordering between steps.
@@ -441,7 +535,10 @@ test("publication is proven possible before anything is mutated", () => {
     1,
     "the preflight must carry exactly one condition, so none can shadow the release condition"
   );
-  assert.match(executable(stepSource("Update release version")), preflightCondition);
+  assert.match(
+    executable(stepSource("Update release version")),
+    /^ *if: steps\.decide\.outputs\.should_release == 'true' && steps\.decide\.outputs\.resume != 'true'$/m,
+  );
 
   // A second `trap ... EXIT` REPLACES the first, so appending one is enough to
   // keep the credential file on disk while every assertion above still passes.

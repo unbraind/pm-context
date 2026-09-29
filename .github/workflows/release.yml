@@ -78,12 +78,59 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --force --tags
-          latest_tag="$(git tag --sort=-creatordate | head -n 1 || true)"
+          latest_tag="$(git tag --merged HEAD --sort=-creatordate | head -n 1 || true)"
           if [[ -n "$latest_tag" ]] && git diff --quiet "$latest_tag"..HEAD -- .; then
             echo "should_release=false" >> "$GITHUB_OUTPUT"
             echo "No changes since $latest_tag; skipping release." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          # A protected release PR can merge before npm accepts the artifact.
+          # Find the oldest release commit after the last tag and complete that
+          # immutable transaction before choosing another calendar version.
+          # The commit can be behind HEAD when source work landed meanwhile.
+          range="${latest_tag:+${latest_tag}..}HEAD"
+          while IFS= read -r candidate_sha; do
+            [[ -z "$candidate_sha" ]] && continue
+            subject="$(git show -s --format=%s "$candidate_sha")"
+            candidate_tag="${subject#Release pm-context }"
+            if [[ "$candidate_tag" == "$subject" ]] || ! grep -Eq '^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(-[0-9]+)?$' <<< "$candidate_tag"; then
+              echo "::error::Release commit ${candidate_sha} has an invalid version title: ${subject}"
+              exit 1
+            fi
+            if git show-ref --verify --quiet "refs/tags/${candidate_tag}"; then
+              tagged_sha="$(git rev-list -n 1 "$candidate_tag")"
+              if [[ "$tagged_sha" != "$candidate_sha" ]]; then
+                echo "::error::${candidate_tag} points to ${tagged_sha}, not prepared release ${candidate_sha}."
+                exit 1
+              fi
+              continue
+            fi
+            version_core="${candidate_tag#v}"
+            year="${version_core%%.*}"
+            version_tail="${version_core#*.}"
+            month="${version_tail%%.*}"
+            day_and_suffix="${version_tail#*.}"
+            day="${day_and_suffix%%-*}"
+            suffix="${day_and_suffix#"$day"}"
+            candidate_version="$((10#$year)).$((10#$month)).$((10#$day))${suffix}"
+            package_version="$(git show "${candidate_sha}:package.json" | jq -r .version)"
+            manifest_version="$(git show "${candidate_sha}:manifest.json" | jq -r .version)"
+            lock_version="$(git show "${candidate_sha}:package-lock.json" | jq -r .version)"
+            if [[ "$package_version" != "$candidate_version" || "$manifest_version" != "$candidate_version" || "$lock_version" != "$candidate_version" ]]; then
+              echo "::error::Prepared release ${candidate_sha} (${candidate_tag}) has inconsistent package, manifest or lock versions; refusing to mint a newer release."
+              exit 1
+            fi
+            {
+              echo "should_release=true"
+              echo "resume=true"
+              echo "tag=$candidate_tag"
+              echo "npm_version=$candidate_version"
+              echo "release_sha=$candidate_sha"
+              echo "base_sha=$(git rev-parse HEAD)"
+            } >> "$GITHUB_OUTPUT"
+            echo "Resuming untagged ${candidate_tag} from ${candidate_sha}." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          done < <(git log --reverse --format=%H "$range" --grep='^Release pm-context v')
           release_date="$(TZ="$RELEASE_TIMEZONE" date +%Y.%m.%d)"
           base_tag="v${release_date}"
           max_suffix=-1
@@ -113,6 +160,7 @@ jobs:
           suffix="${day_and_suffix#"$day"}"
           npm_version="$((10#$year)).$((10#$month)).$((10#$day))${suffix}"
           echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "resume=false" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "npm_version=$npm_version" >> "$GITHUB_OUTPUT"
           echo "base_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
@@ -249,7 +297,7 @@ jobs:
           exit 1
 
       - name: Update release version
-        if: steps.decide.outputs.should_release == 'true'
+        if: steps.decide.outputs.should_release == 'true' && steps.decide.outputs.resume != 'true'
         env:
           NPM_VERSION: ${{ steps.decide.outputs.npm_version }}
         shell: bash
@@ -267,7 +315,7 @@ jobs:
           npm run build
 
       - name: Generate changelog and release notes
-        if: steps.decide.outputs.should_release == 'true'
+        if: steps.decide.outputs.should_release == 'true' && steps.decide.outputs.resume != 'true'
         shell: bash
         env:
           # RELEASE_TAG flows through env rather than inline template expansion
@@ -318,7 +366,7 @@ jobs:
           fi
 
       - name: Run release checks
-        if: steps.decide.outputs.should_release == 'true'
+        if: steps.decide.outputs.should_release == 'true' && steps.decide.outputs.resume != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -333,7 +381,7 @@ jobs:
           npm run release:check
 
       - name: Commit release files
-        if: steps.decide.outputs.should_release == 'true'
+        if: steps.decide.outputs.should_release == 'true' && steps.decide.outputs.resume != 'true'
         env:
           REPO_NAME: ${{ github.event.repository.name }}
           RELEASE_TAG: ${{ steps.decide.outputs.tag }}
@@ -355,7 +403,7 @@ jobs:
           fi
 
       - name: Merge release metadata through protected PR
-        if: steps.decide.outputs.should_release == 'true'
+        if: steps.decide.outputs.should_release == 'true' && steps.decide.outputs.resume != 'true'
         id: release_pr
         shell: bash
         env:
@@ -622,17 +670,22 @@ jobs:
         if: steps.decide.outputs.should_release == 'true'
         shell: bash
         env:
-          MERGED_SHA: ${{ steps.release_pr.outputs.merged_sha }}
+          MERGED_SHA: ${{ steps.decide.outputs.release_sha || steps.release_pr.outputs.merged_sha }}
+          RESUME_RELEASE: ${{ steps.decide.outputs.resume }}
           NPM_VERSION: ${{ steps.decide.outputs.npm_version }}
         run: |
           set -euo pipefail
           git fetch origin main --force
-          git checkout --detach origin/main
-          actual_sha="$(git rev-parse HEAD)"
-          if [[ "$actual_sha" != "$MERGED_SHA" ]]; then
-            echo "::error::main advanced from merged release ${MERGED_SHA} to ${actual_sha} before publication. Retry to rebuild release metadata on the new head."
+          if [[ "$RESUME_RELEASE" == "true" ]]; then
+            if ! git merge-base --is-ancestor "$MERGED_SHA" origin/main; then
+              echo "::error::Prepared release ${MERGED_SHA} is no longer an ancestor of main; refusing the release."
+              exit 1
+            fi
+          elif [[ "$(git rev-parse origin/main)" != "$MERGED_SHA" ]]; then
+            echo "::error::main advanced from merged release ${MERGED_SHA} before publication. Retry from the new main head."
             exit 1
           fi
+          git checkout --detach "$MERGED_SHA"
 
           actual_version="$(npm pkg get version | tr -d '"')"
           if [[ "$actual_version" != "$NPM_VERSION" ]]; then
@@ -657,6 +710,22 @@ jobs:
               echo "$dist_status"
               exit 1
             fi
+          fi
+
+      - name: Restore prepared release notes
+        if: steps.decide.outputs.should_release == 'true' && steps.decide.outputs.resume == 'true'
+        shell: bash
+        env:
+          NPM_VERSION: ${{ steps.decide.outputs.npm_version }}
+        run: |
+          set -euo pipefail
+          awk -v version="$NPM_VERSION" '
+            /^## / { if (found) exit; if (index($0, "## " version " - ") == 1) found = 1 }
+            found { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          if [[ ! -s RELEASE_NOTES.md ]]; then
+            echo "::error::The prepared release ${NPM_VERSION} has no changelog section; refusing to create empty release notes."
+            exit 1
           fi
 
       # Authentication is npm trusted publishing (OIDC), not a long-lived token.
