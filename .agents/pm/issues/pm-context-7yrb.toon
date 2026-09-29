@@ -2,17 +2,19 @@ id: pm-context-7yrb
 title: A release that merges but fails to publish is abandoned by the next day's run
 description: "Decide release computes the version from today's date and the existing tags, and the tag is pushed only after npm publish succeeds. If the protected release PR merges and publication then fails, main carries release metadata for a version that was never tagged or published. The next day's run sees the old latest tag, computes a new version from the new date, and commits it over the merged metadata, so the earlier version is silently skipped on npm. Needs a guard in Decide release that detects a committed-but-untagged version and resumes it rather than computing a new one."
 type: Issue
-status: in_progress
+status: blocked
 priority: 2
 tags: []
 created_at: "2026-08-09T13:46:47.076Z"
-updated_at: "2026-09-29T16:07:43.548Z"
-assignee: codex
-claim_principal: codex
+updated_at: "2026-09-29T16:11:17.200Z"
 author: claude
 acceptance_criteria: "A prepared release commit without its matching tag is selected before a new calendar version, even after later main commits; The resume path publishes and tags the exact prepared commit without a new version bump or release PR; Missing or inconsistent release metadata fails closed with an actionable diagnostic; Fixture tests prove first-run, failed-publish retry, later commits, and tagged release behavior"
 outcome: Retry the same immutable release coordinate after a publish failure
 risk: high
+blocked_by: pm-context-3s5f
+blocked_reason: "All authored source: c8 branches 904/909 (99.44%); required 100% branch gate is not met. PR #122 remains unmerged."
+dependencies[1]{id,kind,created_at,author,source_kind,author_source}:
+  pm-context-3s5f,blocked_by,"2026-09-29T16:11:12.924Z",codex,"cli:update:blocked_by",detected
 notes[3]{created_at,author,text}:
   "2026-09-29T15:53:11.783Z",codex,"Local candidate: 13 focused release-workflow tests passed; full release:check passed 282 tests with V8 lines/branches/functions at 100%, 27 documented declarations, npm audit zero production vulnerabilities, pack and attestation checks. Changelog check passed. Clean npm and Bun installs of the packed pm-context@2026.9.26 tarball with @unbrained/pm-cli@2026.9.29 loaded default.activate and buildContextPack. Statement coverage and all executable script inclusion remain separate quality gaps; this item stays open through PR review."
   "2026-09-29T16:02:05.306Z",codex,"Greptile review of c641931 found a valid body-grep defect: a source commit body quoting Release pm-context v... was selected as a release. A disposable Git regression failed before the fix; the decision now filters subjects only. Its fixture-remote objection did not reproduce locally, but the fixture now declares a self remote and the inconsistent-metadata assertion checks the actual diagnostic. New local release:check passed; independent c8 across eight authored TypeScript source files ran 283 tests and measured statements 3393/3393 (100%), branches 904/909 (99.44%), functions 91/91 (100%), lines 3393/3393 (100%). Five branch arms remain, so coverage is a merge blocker."
