@@ -49,13 +49,13 @@ function decideRelease(commits: Array<{ version: string; title: string; body?: s
 
 test("a failed publish resumes its prepared commit after the calendar day and later source commits", () => {
   const result = decideRelease([
-    { version: "2026.9.26", title: "Release pm-context v2026.9.26", tag: "v2026.9.26" },
-    { version: "2026.9.27", title: "Release pm-context v2026.9.27" },
+    { version: "2026.9.26", title: "Release pm-context v2026.09.26", tag: "v2026.09.26" },
+    { version: "2026.9.27", title: "Release pm-context v2026.09.27" },
     { version: "2026.9.27", title: "Document a later feature" },
   ]);
   assert.equal(result.should_release, "true");
   assert.equal(result.resume, "true");
-  assert.equal(result.tag, "v2026.9.27");
+  assert.equal(result.tag, "v2026.09.27");
   assert.equal(result.npm_version, "2026.9.27");
   assert.match(result.release_sha ?? "", /^[0-9a-f]{40}$/);
   assert.notEqual(result.release_sha, result.base_sha, "later source commits must not change the release artifact");

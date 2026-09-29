@@ -6,16 +6,17 @@ status: in_progress
 priority: 2
 tags: []
 created_at: "2026-08-09T13:46:47.076Z"
-updated_at: "2026-09-29T16:02:05.306Z"
+updated_at: "2026-09-29T16:07:43.548Z"
 assignee: codex
 claim_principal: codex
 author: claude
 acceptance_criteria: "A prepared release commit without its matching tag is selected before a new calendar version, even after later main commits; The resume path publishes and tags the exact prepared commit without a new version bump or release PR; Missing or inconsistent release metadata fails closed with an actionable diagnostic; Fixture tests prove first-run, failed-publish retry, later commits, and tagged release behavior"
 outcome: Retry the same immutable release coordinate after a publish failure
 risk: high
-notes[2]{created_at,author,text}:
+notes[3]{created_at,author,text}:
   "2026-09-29T15:53:11.783Z",codex,"Local candidate: 13 focused release-workflow tests passed; full release:check passed 282 tests with V8 lines/branches/functions at 100%, 27 documented declarations, npm audit zero production vulnerabilities, pack and attestation checks. Changelog check passed. Clean npm and Bun installs of the packed pm-context@2026.9.26 tarball with @unbrained/pm-cli@2026.9.29 loaded default.activate and buildContextPack. Statement coverage and all executable script inclusion remain separate quality gaps; this item stays open through PR review."
   "2026-09-29T16:02:05.306Z",codex,"Greptile review of c641931 found a valid body-grep defect: a source commit body quoting Release pm-context v... was selected as a release. A disposable Git regression failed before the fix; the decision now filters subjects only. Its fixture-remote objection did not reproduce locally, but the fixture now declares a self remote and the inconsistent-metadata assertion checks the actual diagnostic. New local release:check passed; independent c8 across eight authored TypeScript source files ran 283 tests and measured statements 3393/3393 (100%), branches 904/909 (99.44%), functions 91/91 (100%), lines 3393/3393 (100%). Five branch arms remain, so coverage is a merge blocker."
+  "2026-09-29T16:07:43.548Z",codex,"Review round 2 on de7e19c: required CI test (22)/(26), CodeQL, Semgrep and Greptile passed. CodeRabbit correctly noted the fixture used an unpadded tag; it now uses v2026.09.27 and asserts npm_version 2026.9.27. Its proposed alternate changelog heading was rejected with evidence: pinned pm-changelog 2026.9.23 resolveReleaseTagWindowResolution on pendingVersion v2026.09.29 returned 2026.9.29 - 2026-09-29, and formatTagVersion strips the v and calendar padding. No production tag-form heading is generated on this workflow path. Sourcery reported weekly review quota exhaustion and supplied no substantive review."
 files[2]{path,scope,note}:
   .github/workflows/release.yml,project,release decision and resume path
   test/release-workflow.test.ts,project,disposable Git history and notes recovery fixtures
