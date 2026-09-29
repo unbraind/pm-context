@@ -130,7 +130,7 @@ jobs:
             } >> "$GITHUB_OUTPUT"
             echo "Resuming untagged ${candidate_tag} from ${candidate_sha}." >> "$GITHUB_STEP_SUMMARY"
             exit 0
-          done < <(git log --reverse --format=%H "$range" --grep='^Release pm-context v')
+          done < <(git log --reverse --format='%H%x09%s' "$range" | awk -F '\t' '$2 ~ /^Release pm-context v/ { print $1 }')
           release_date="$(TZ="$RELEASE_TIMEZONE" date +%Y.%m.%d)"
           base_tag="v${release_date}"
           max_suffix=-1
