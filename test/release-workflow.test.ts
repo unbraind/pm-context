@@ -113,7 +113,7 @@ test("resume notes are extracted from the prepared version and absent notes fail
 
 test("a prepared version cannot flow through metadata generation or another release PR", () => {
   for (const step of ["Update release version", "Generate changelog and release notes", "Run release checks", "Commit release files", "Merge release metadata through protected PR"]) {
-    assert.match(stepSource(step), /steps\.decide\.outputs\.resume != 'true'/);
+    assert.match(executable(stepSource(step)), /^ *if: .*steps\.decide\.outputs\.resume != 'true'/m);
   }
   assert.match(stepSource("Verify merged release"), /steps\.decide\.outputs\.release_sha/);
   assert.match(stepSource("Restore prepared release notes"), /CHANGELOG\.md/);
