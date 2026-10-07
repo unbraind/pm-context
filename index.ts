@@ -23,6 +23,7 @@ import type {
 } from "@unbrained/pm-cli/sdk/query";
 import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSince } from "./context-usage.ts";
 import { readContextUsageAffinity } from "@unbrained/pm-cli/sdk/query";
+import { recordReceiptUsage, reportContextReceipts, renderReceiptReport, serveContextReceipt } from "./context-receipts.ts";
 
 /**
  * Runtime stand-in for the SDK's `defineExtension`.
@@ -1356,6 +1357,37 @@ async function recordPackServing(ctx: CommandHandlerContext, focus: readonly PmI
   }
 }
 
+/**
+ * Measure the rendered subset on both serving paths. A failed runtime write is
+ * disclosed in the output rather than inventing a receipt or blocking context.
+ */
+async function measureContextOutput(ctx: CommandHandlerContext, pack: ContextPack, output: string, format: string, command: string, outputPath?: string): Promise<string> {
+  try {
+    const measured = serveContextReceipt(ctx.pm_root, output, format === "json" ? "json" : "text", {
+      item_ids: [...pack.items, ...pack.neighbors].map((item) => item.id),
+      files: pack.links.filter((link) => link.kind === "file"),
+    }, {
+      session: stringOption(ctx.options, "session") ?? process.env.PM_CONTEXT_SESSION,
+      author: stringOption(ctx.options, "author") ?? ctx.global.author ?? process.env.PM_AUTHOR ?? "anonymous",
+      command,
+    }, outputPath);
+    const visible = new Set(measured.receipt.facts.flatMap((fact) => fact.item_ids));
+    await recordPackServing(ctx, pack.items.filter((item) => visible.has(item.id)), pack.neighbors.filter((item) => visible.has(item.id)));
+    return measured.output;
+  } catch {
+    let fallback: string;
+    if (format === "json") {
+      const payload = JSON.parse(output) as Record<string, unknown>;
+      payload.context_receipt_error = "Runtime receipt unavailable; usage cannot be measured for this bundle";
+      fallback = `${JSON.stringify(payload)}\n`;
+    } else {
+      fallback = `${output}\nContext receipt unavailable; usage cannot be measured for this bundle.\n`;
+    }
+    if (outputPath) writeFileSync(outputPath, fallback, "utf8");
+    return fallback;
+  }
+}
+
 function setupCommands(api: ExtensionApi): void {
   const contextPackDefaultLimit = 25;
   const contextHandoffDefaultLimit = 12;
@@ -1376,6 +1408,7 @@ function setupCommands(api: ExtensionApi): void {
       "pm context-pack --status in_progress --explain",
     ],
     flags: [
+      { long: "--session", value_name: "id", description: "Usage session id (defaults to PM_CONTEXT_SESSION or the receipt id)", type: "string" },
       { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
       { long: "--ids", value_name: "ids", description: "Comma-separated focus ids (alias for repeated --id)", type: "string" },
       { long: "--status", value_name: "status", description: "Filter focus items by status", type: "string" },
@@ -1453,7 +1486,6 @@ function setupCommands(api: ExtensionApi): void {
         }
         return renderedCommandResult(output);
       }
-      await recordPackServing(ctx, pack.items, pack.neighbors);
       const suggestedCommand = buildSuggestedAgentCommand({
         commandName: "context-pack",
         selection,
@@ -1471,16 +1503,16 @@ function setupCommands(api: ExtensionApi): void {
         sections: sections.length > 0 ? sections : undefined,
       });
       const renderOpts = { recentLimit, suggestedCommand, compress, sections: sections.length > 0 ? sections : undefined };
-      const output = format === "json"
+      let output = format === "json"
         ? `${JSON.stringify(pack, null, compress ? 0 : 2)}\n`
         : format === "agent"
           ? renderAgentHandoff(pack, renderOpts)
           : renderMarkdown(pack, renderOpts);
       const outputPath = stringOption(options, "output");
+      output = await measureContextOutput(ctx, pack, output, format, "context-pack", outputPath);
       if (outputPath) {
-        writeFileSync(outputPath, output, "utf-8");
         const reportedFormat = requestedFormat === "compact" ? "compact" : format;
-        return format === "json" ? pack : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
+        return format === "json" ? JSON.parse(output) as unknown : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
       }
       return renderedCommandResult(output);
     },
@@ -1499,6 +1531,7 @@ function setupCommands(api: ExtensionApi): void {
       "pm context-handoff --id pm-1234 --compress --include-deps",
     ],
     flags: [
+      { long: "--session", value_name: "id", description: "Usage session id (defaults to PM_CONTEXT_SESSION or the receipt id)", type: "string" },
       { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
       { long: "--ids", value_name: "ids", description: "Comma-separated focus ids (alias for repeated --id)", type: "string" },
       { long: "--status", value_name: "status", description: "Filter focus items by status", type: "string" },
@@ -1557,7 +1590,6 @@ function setupCommands(api: ExtensionApi): void {
         ranker,
         packer,
       });
-      await recordPackServing(ctx, pack.items, pack.neighbors);
       const suggestedCommand = buildSuggestedAgentCommand({
         commandName: "context-handoff",
         selection,
@@ -1575,12 +1607,12 @@ function setupCommands(api: ExtensionApi): void {
       });
       const renderOpts = { recentLimit, suggestedCommand, compress, sections: sections.length > 0 ? sections : undefined };
       const handoff = buildAgentHandoff(pack, { recentLimit, suggestedCommand });
-      const output = format === "json"
+      let output = format === "json"
         ? `${JSON.stringify(handoff, null, compress ? 0 : 2)}\n`
         : renderAgentHandoff(pack, renderOpts);
       const outputPath = stringOption(options, "output");
+      output = await measureContextOutput(ctx, pack, output, format, "context-handoff", outputPath);
       if (outputPath) {
-        writeFileSync(outputPath, output, "utf-8");
         return {
           ok: true,
           format: format === "json" ? "json" : "agent",
@@ -1604,6 +1636,11 @@ function setupCommands(api: ExtensionApi): void {
       "pm context-usage --by agent-a --limit 50",
     ],
     flags: [
+      { long: "--session", value_name: "id", description: "Filter bundle receipts to a session", type: "string" },
+      { long: "--receipt", value_name: "id", description: "Filter or report usage against one bundle receipt", type: "string" },
+      { long: "--cite", value_name: "ids", description: "Used fact or section ids (repeatable/comma-separated; requires --receipt)", type: "string" },
+      { long: "--touch", value_name: "ids", description: "Item ids touched in later mutations (requires --receipt)", type: "string" },
+      { long: "--edited-file", value_name: "paths", description: "Repository-relative edited files (requires --receipt)", type: "string" },
       { long: "--by", value_name: "author", description: "Restrict to one recording author", type: "string" },
       { long: "--surface", value_name: "surface", description: "Restrict serve events to one surface: context or next", type: "string" },
       { long: "--since", value_name: "when", description: "Drop events at or before this point (ISO timestamp, or a day offset such as 7d)", type: "string" },
@@ -1631,6 +1668,21 @@ function setupCommands(api: ExtensionApi): void {
       // would silently narrow every report to the invoking agent, so this keeps
       // a distinct `--by`.
       const author = stringOption(options, "by");
+      const session = stringOption(options, "session") ?? process.env.PM_CONTEXT_SESSION;
+      const receiptId = stringOption(options, "receipt");
+      const citations = asArray(options.cite);
+      const touchedItems = asArray(options.touch);
+      const editedFiles = asArray(options["edited-file"] ?? options.editedFile);
+      if (citations.length + touchedItems.length + editedFiles.length > 0) {
+        if (!receiptId) throw new CommandError("Usage evidence requires --receipt", EXIT_CODE.USAGE);
+        try {
+          recordReceiptUsage(ctx.pm_root, { receipt_id: receiptId, session, citations, touched_items: touchedItems, edited_files: editedFiles });
+        } catch (error) {
+          throw new CommandError(error instanceof Error ? error.message : String(error), EXIT_CODE.USAGE);
+        }
+      }
+      const bundles = reportContextReceipts(ctx.pm_root, { session, author, since: since ?? undefined,
+        receipt_id: receiptId, limit: intOption(options, "limit", DEFAULT_REPORT_LIMIT) });
       const report = reportContextUsage(ctx.pm_root, {
         author,
         surface,
@@ -1651,13 +1703,13 @@ function setupCommands(api: ExtensionApi): void {
           affinity = undefined;
         }
       }
-      const reportWithAffinity = affinity ? { ...report, affinity } : report;
+      const reportWithAffinity = { ...report, bundles, ...(affinity ? { affinity } : {}) };
       // pm's global --json owns that flag name, so a command-level alias would be
       // silently shadowed and never populate ctx.options. Read the global instead,
       // so `pm context-usage --json` returns the raw report as an agent expects.
       const wantsJson = requestedFormat === "json" || ctx.global?.json === true;
       return renderedCommandResult(
-        wantsJson ? `${JSON.stringify(reportWithAffinity, null, 2)}\n` : renderUsageReport(reportWithAffinity),
+        wantsJson ? `${JSON.stringify(reportWithAffinity, null, 2)}\n` : `${renderUsageReport(reportWithAffinity)}\n${renderReceiptReport(bundles)}`,
       );
     },
   });
