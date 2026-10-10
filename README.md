@@ -209,11 +209,15 @@ carry no session or fact ids and are never automatically credited to a receipt.
 Receipts live exclusively in the tracker's ignored
 `runtime/context-receipts/` directory. Each atomic JSON snapshot stores ids,
 associations, token estimates and deduplicated evidence, **no context text**.
-Rotation keeps at most 200 most-recently-written snapshots of at most 256 KiB
-each (50 MiB maximum retained receipt data). Older receipts are deleted; their
+Rotation keeps the current receipt and the most recently written siblings, at
+most 200 snapshots of 256 KiB each (50 MiB maximum retained receipt data).
+Older receipts are deleted; their
 metrics leave the retained-window report. Successful evidence writes refresh a
 receipt's retention position. There is no tracked receipt file or schema change,
 and the host-owned `runtime/context-usage.jsonl` remains under SDK ownership.
+The receipt returned by the current serving call is protected during rotation,
+including when older snapshots have future modification times. The remaining
+199 slots retain the most recently written siblings.
 
 A directory lock serializes cooperating writers; contention fails a usage
 submission and can be retried. A process crash can leave `.lock`; an operator

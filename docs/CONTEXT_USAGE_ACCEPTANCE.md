@@ -26,7 +26,9 @@ retain the served denominator and unused estimated token cost.
 
 The package owns atomic snapshots under `runtime/context-receipts/`, separate
 from the SDK's ledger: at most 200 receipts, each at most 256 KiB. Rotation
-removes the least recently written snapshots. Failed output-file writes roll
+protects the receipt returned by the serving call and removes the least recently
+written siblings, retaining at most 199 beside the current receipt. This holds
+even when the siblings have future modification times. Failed output-file writes roll
 back the receipt. Corrupt and oversized snapshots are counted and skipped.
 No receipt state enters tracked item/history files. The README defines the v1
 agent protocol, estimation model, retention window and evidence limitations.
@@ -75,16 +77,63 @@ npm run changelog:full
 
 The release checks retain the repository's exact thresholds: 100% lines,
 branches and functions across every configured executable source; no threshold,
-source list or exemption changed. The source gate reports statement coverage
-through Node's native line/branch/function counters rather than a separate
-statement threshold.
+source list or exemption changed. Node's native gate does not independently
+report or enforce statement coverage.
 
-Both release commands passed with 295 tests and 100% lines/branches/functions
+Historical validation on SDK 2026.10.4: both release commands passed with 295 tests and 100% lines/branches/functions
 across six configured sources. The nine dedicated receipt tests passed. Fresh
 npm and Bun consumers installed the packed tarball and pinned host, activated
 the extension with the real CLI, and exercised serving, citation and reporting.
 Node and native Bun both returned two served facts, one used fact, precision
 0.5, positive unused-token cost, and a JSON handoff receipt.
+
+## Main merge and SDK 2026.10.10 renewal
+
+PR 131 started at `aaa5743` and merged main `49f1594` normally. Only the generated
+`dist/index.js.map` conflicted; `npm run build` regenerated it from the merged
+TypeScript. Receipt source and the real future-mtime regression were preserved.
+Package, manifest and runtime versions remain the main release `2026.10.10`.
+Development dependencies are exact SDK `2026.10.10`, pm-ops `2026.10.6` and
+pm-changelog `2026.10.5`. The independent peer and manifest floors remain
+`>=2026.8.15` and `2026.8.15` respectively.
+
+The unchanged `npm run release:check` passed 295 tests, with zero failures,
+cancellations, skips or todos. Both existing owner-linked receipt commands
+passed within their unchanged 240-second deadlines. The original source-only
+retention control from `1268aa5` was repeated with the regression unchanged:
+the returned receipt was absent (actual 0, expected 1). Restoring the original
+source bytes passed the identical focused test. The earlier two behavioral
+revert records above remain historical evidence.
+
+The authored executable inventory is eleven files: three runtime TypeScript
+modules, six TypeScript scripts, one JavaScript verifier and one shell script.
+The configured six-file native Node gate measured 3278/3278 lines,
+1038/1038 branches and 219/219 functions. Its scope excludes
+`scripts/main-invocation.ts`, `scripts/prepare-merge-driver.ts`,
+`scripts/verify-release-changelog-date.ts`, `.agents/pm/verify-release-yaml.mjs`
+and `scripts/alert-on-release-failure.sh`; these existing exclusions were not
+changed. Docstrings passed for nine TypeScript files and 31 declarations
+selected by the analyzer's rules; JavaScript and shell documentation are outside
+that denominator.
+
+An additional c8 observation included all ten authored JavaScript/TypeScript
+files: statements and lines 3809/3857 (98.75%), branches 1154/1160 (99.48%),
+functions 103/104 (99.03%). The verifier was unexercised by that test-only run;
+the normal release gate executes it separately. Shell coverage was not measured.
+This observation is separate from the unchanged mandatory native Node gate and
+does not establish whole-source four-metric certification.
+
+Fresh npm/Node and Bun/native Bun consumers installed the npm-packed built
+artifact under SDK `2026.10.10` and minimum `2026.8.15`. Each exercised the real
+governed host harness and installed CLI: two served focus facts, one cited fact,
+precision 0.5, positive unused-token cost, isolated sessions, idempotent
+citations, actual SDK mutation and file edit proxies, and JSON handoff output.
+Each also repeated three real filesystem retention rounds with 200 future-mtime
+siblings, checking both the hard 200-receipt bound and immediate citation of
+the returned receipt. No item/history bytes changed during serving/reporting.
+Native Bun used explicit `--bun`. Both production and development npm audits
+reported zero vulnerabilities. These bounded synthetic consumers do not
+establish production readiness, deployment, scale or final host delivery.
 
 ## SDK boundaries and open risks
 
