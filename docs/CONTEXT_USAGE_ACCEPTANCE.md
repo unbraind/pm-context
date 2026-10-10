@@ -196,6 +196,21 @@ pass for nine TypeScript files and 31 rule-selected declarations. These figures
 do not claim whole-source four-metric coverage or documentation certification;
 the existing coverage owner `pm-context-3s5f` retains that gap.
 
+Fresh consumers install the same 17-file npm archive directly under current
+SDK `2026.10.10` and minimum `2026.8.15`, using npm/Node and Bun/native Bun.
+All four pass the governed built harness, actual CLI, session/citation/proxy
+checks and the three existing retention rounds. The actual installed CLI also
+passes both commands' pretty/compact fallback bytes and output-write failures;
+direct packed receipt calls retain literal and inherited item associations.
+Both `npx --no-install pm` and `bunx --bun --no-install pm` pass receipt/citation
+checks in each consumer, with separate disposable trackers and the installed
+SDK version checked. All four consumers typecheck the default export against
+their actual SDK authoring `ExtensionModule` and required package metadata.
+Every archive file matches its built source bytes. Current production and
+development audits report zero findings; the minimum host graph separately
+retains four high findings. Compatibility therefore remains a separate claim
+from dependency audit cleanliness, whole privacy/quality and final review.
+
 ## SDK boundaries and open risks
 
 The SDK's host touch ledger exposes item/author/time evidence without receipt,
