@@ -105,10 +105,10 @@ export function serveContextReceipt(pmRoot, output, format, associations, identi
             persistReceipt(path, receipt);
             if (outputPath)
                 writeFileSync(outputPath, rendered, "utf8");
-            const entries = readdirSync(directory).filter((entry) => /^[\da-f-]{36}\.json$/.test(entry))
+            const entries = readdirSync(directory).filter((entry) => /^[\da-f-]{36}\.json$/.test(entry) && entry !== `${receipt.receipt_id}.json`)
                 .map((entry) => ({ entry, modified: statSync(join(directory, entry)).mtimeMs }))
                 .sort((a, b) => b.modified - a.modified || b.entry.localeCompare(a.entry));
-            for (const entry of entries.slice(RECEIPT_LIMITS.count))
+            for (const entry of entries.slice(RECEIPT_LIMITS.count - 1))
                 rmSync(join(directory, entry.entry));
         }
         catch (error) {
