@@ -145,8 +145,12 @@ citations, actual SDK mutation and file edit proxies, and JSON handoff output.
 Each also repeated three real filesystem retention rounds with 200 future-mtime
 siblings, checking both the hard 200-receipt bound and immediate citation of
 the returned receipt. No item/history bytes changed during serving/reporting.
-Native Bun used explicit `--bun`. Both production and development npm audits
-reported zero vulnerabilities. These bounded synthetic consumers do not
+Native Bun used explicit `--bun`. The package's production and development npm
+audits reported zero vulnerabilities. The minimum SDK consumer separately
+reported four high-severity findings in the old host dependency graph
+(`@unbrained/pm-cli`, `braces`, `fast-glob`, `micromatch`); its compatibility
+result is not a clean audit. The independent compatibility floor was preserved.
+These bounded synthetic consumers do not
 establish production readiness, deployment, scale or final host delivery.
 
 ## SDK boundaries and open risks
