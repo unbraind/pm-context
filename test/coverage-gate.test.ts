@@ -14,7 +14,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import test from "node:test";
@@ -284,6 +284,7 @@ test("coverage gate fails when coverage falls below the threshold", async (t) =>
 
   const { code, stderr } = await runGate(fixture.dir);
   assert.notStrictEqual(code, 0, "gate should fail when coverage is below threshold");
+  assert.equal(existsSync(join(fixture.dir, "coverage", "lcov.info")), false, "threshold failure must invalidate its incomplete report");
   assert.doesNotMatch(
     stderr,
     /coverage-gate:/,
@@ -314,6 +315,7 @@ test("coverage gate fails when a source file is never loaded by any test", async
   assert.strictEqual(code, 1, `expected failure; stderr: ${stderr}`);
   assert.match(stderr, /never loaded/);
   assert.match(stderr, /untested\.ts/);
+  assert.equal(existsSync(join(fixture.dir, "coverage", "lcov.info")), false, "an incomplete inventory must not leave a reusable report");
 });
 
 // ---------------------------------------------------------------------------
@@ -325,10 +327,13 @@ test("coverage gate fails when package.json has no coverageGate block", async (t
   t.after(fixture.cleanup);
 
   writeFileSync(join(fixture.dir, "package.json"), JSON.stringify({ name: "no-gate" }));
+  mkdirSync(join(fixture.dir, "coverage"));
+  writeFileSync(join(fixture.dir, "coverage", "lcov.info"), "predecessor report must not survive");
 
   const { code, stderr } = await runGate(fixture.dir);
   assert.strictEqual(code, 1);
   assert.match(stderr, /no.*coverageGate.*block/);
+  assert.equal(existsSync(join(fixture.dir, "coverage", "lcov.info")), false);
 });
 
 test("coverage gate rejects malformed coverageGate collection shapes", async (t) => {

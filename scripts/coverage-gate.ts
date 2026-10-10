@@ -42,8 +42,9 @@ import { fileURLToPath } from "node:url";
 /**
  * Minimum acceptable percentage for each coverage dimension Node reports.
  *
- * Statement coverage is not listed because V8 reports statements as lines; the
- * line figure is the statement figure for this runtime.
+ * The native test reporter exposes lines, branches and functions. It provides
+ * no independent statement metric; a separate c8 report is required for that
+ * dimension and for executable helpers outside the configured native scope.
  */
 interface CoverageThresholds {
   /** Minimum percentage of executable lines that must be covered. */
@@ -256,6 +257,10 @@ export function runCoverageGate(
   stdio: "inherit" | "ignore" = "inherit",
   runtime: CoverageGateRuntime = {},
 ): number {
+  const lcovPath = join(rootDir, "coverage", "lcov.info");
+  // Invalidate before reading configuration: an early configuration or source
+  // failure must not leave a predecessor report available to another gate.
+  rmSync(lcovPath, { force: true });
   const manifest = JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8")) as PackageManifest;
   const config = manifest.coverageGate;
 
@@ -355,7 +360,6 @@ export function runCoverageGate(
     return 1;
   }
 
-  const lcovPath = join(rootDir, "coverage", "lcov.info");
   mkdirSync(join(rootDir, "coverage"), { recursive: true });
   // Delete any previous report first. If this run writes none, a leftover file
   // from an earlier, broader run would satisfy the presence check on stale data —
@@ -407,6 +411,7 @@ export function runCoverageGate(
   );
 
   if (result.error) {
+    rmSync(lcovPath, { force: true });
     console.error(`coverage-gate: failed to start the test runner: ${result.error.message}`);
     return 1;
   }
@@ -417,6 +422,7 @@ export function runCoverageGate(
   // describe a coverage-configuration problem the author does not have —
   // burying the test failure they need to act on.
   if (result.status !== 0) {
+    rmSync(lcovPath, { force: true });
     return result.status ?? 1;
   }
 
@@ -440,6 +446,7 @@ export function runCoverageGate(
       reported.add(relative(rootDir, abs).split(sep).join("/"));
     }
   } catch {
+    rmSync(lcovPath, { force: true });
     console.error(`coverage-gate: no coverage report was written to ${relative(rootDir, lcovPath)}.`);
     return 1;
   }
@@ -447,6 +454,7 @@ export function runCoverageGate(
   const missing = required.filter((file) => !reported.has(file));
 
   if (missing.length > 0) {
+    rmSync(lcovPath, { force: true });
     console.error(
       [
         "",

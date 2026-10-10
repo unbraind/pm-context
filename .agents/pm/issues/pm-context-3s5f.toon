@@ -6,7 +6,7 @@ status: open
 priority: 1
 tags[4]: coverage,quality-gate,release-readiness,tdd
 created_at: "2026-07-26T14:29:15.160Z"
-updated_at: "2026-07-26T15:10:43.869Z"
+updated_at: "2026-10-10T14:51:27.403Z"
 assignee: codex
 author: codex
 estimated_minutes: 360
@@ -19,14 +19,33 @@ actual_result: "Baseline after the SDK context review fixes: 91.78 percent state
 affected_version: 2026.7.26
 component: testing
 customer_impact: Uncovered command and rendering branches can regress without blocking release.
+comments[2]{created_at,author,text}:
+  "2026-10-10T14:39:18.310Z",codex-sol,"Complete-source quality work is linked to the existing context-usage implementation owner pm-context-ci6v. Retain this open quality owner and its assignment; no competing claim or replacement issue. Current baseline measures six of eleven authored executables natively; broad ten-source c8 records 3789/3837 statements and lines, 1158/1164 branches and 102/103 functions, with shell behavior separately unmeasured. The required target remains all authored source and gate/template code with independent statement measurement and no coverage exceptions."
+  "2026-10-10T14:50:53.732Z",codex-sol,"Independent focused repair: LCOV invalidates before configuration parsing and on runner or inventory failure. Three real filesystem assertions fail with original source and pass after byte-identical restoration. Actual existing YAML verifier accepts real scalar and array dependency fixtures and rejects seven workflow or marker drifts. Full native suite now passes 301 tests with unchanged thresholds. Broader pre-repair c8 observation reached 3837/3837 statements and lines, 1177/1178 branches and 102/102 reported functions across ten TS/JS executables; one non-Error conversion branch, shell coverage and zero function counters for two operational scripts remain explicit. Whole AST presence inventory includes 247 callables (57 with JSDoc) and 809 declaration/type nodes (115 with JSDoc); these are presence counts, not high-quality documentation approval. Closed helper owner pm-context-qu0a remains held by codex; managed launcher callback remains undocumented under its byte-identical template contract. No source is excluded or renamed to claim whole-source completion."
 notes[2]{created_at,author,text}:
   "2026-07-26T14:29:15.160Z",codex,Created separately from pm-context-lk82 so review correctness can ship without falsely claiming the mandated 100 percent coverage target is already met.
   "2026-07-26T15:10:43.852Z",codex,"Remeasured after final CodeRabbit remediation with c8 12 over both generated runtime modules: 91.78 statements,81.93 branches,95.31 functions,and 91.78 lines. The open 100/100/100/100 gap remains explicit and is not represented as complete."
-files[2]{path,scope,note}:
-  index.ts,project,primary uncovered command and rendering branches
+files[5]{path,scope,note}:
   context-usage.ts,project,remaining uncovered error branches
-tests[1]{command,scope,timeout_seconds,note}:
-  NPM_CONFIG_USERCONFIG=/dev/null npx c8 --all --include=dist/index.js --include=dist/context-usage.js --reporter=text node --test dist-test/*.js,project,60,current honest coverage baseline
+  index.ts,project,primary uncovered command and rendering branches
+  scripts/coverage-gate.ts,project,early and failure LCOV invalidation repair
+  test/coverage-gate.test.ts,project,real stale-report behavior regressions
+  test/release-workflow-verifier.test.ts,project,real parsed gate fixtures without helper owner changes
+tests[2]:
+  - command: NPM_CONFIG_USERCONFIG=/dev/null npx c8 --all --include=dist/index.js --include=dist/context-usage.js --reporter=text node --test dist-test/*.js
+    scope: project
+    timeout_seconds: 60
+    note: current honest coverage baseline
+  - command: node --test test/coverage-gate.test.ts test/release-workflow-verifier.test.ts
+    path: test/release-workflow-verifier.test.ts
+    scope: project
+    timeout_seconds: 60
+    provenance:
+      author: codex-sol
+      created_at: "2026-10-10T14:51:27.372Z"
+      source_kind: local_mutation
+      source_ref: feat/context-usage
+    note: real gate invalidation and workflow acceptance/rejection fixtures
 docs[1]{path,scope,note}:
   README.md,project,document enforced coverage gate when complete
 body: "Coverage must exercise public behavior and real SDK-host dispatch where applicable. Do not ignore source paths, lower thresholds, use vacuous assertions, or duplicate tests merely to satisfy counters. Baseline was measured against both generated runtime modules after the SDK context review fixes."

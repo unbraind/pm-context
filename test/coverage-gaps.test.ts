@@ -41,6 +41,7 @@ import { init } from "@unbrained/pm-cli/sdk";
 import { create } from "@unbrained/pm-cli/sdk/core";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 import { readSettings, resolveRuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
+import { isMainInvocation } from "../scripts/main-invocation.ts";
 
 type ExtensionHarness = Awaited<ReturnType<typeof createExtensionTestHarness>>;
 
@@ -53,6 +54,51 @@ test.afterEach(async () => {
 
 /** Manifest capabilities the harness must grant for registration to be permitted. */
 const CAPABILITIES = ["commands", "renderers", "schema"] as const;
+
+test("markdown includes description fallback while omitting empty context lines", () => {
+  const pack = buildContextPack([
+    { id: "pm-described", title: "Description only", type: "Task", status: "open", body: "", description: "Fallback context" },
+    { id: "pm-empty", title: "Empty context", type: "Task", status: "open", body: "", description: "" },
+  ], { ids: ["pm-described", "pm-empty"], includeBody: true, generatedAt: "fixed" });
+  const output = renderMarkdown(pack, { sections: ["focus"] });
+  assert.match(output, /pm-described[\s\S]*context: Fallback context/);
+  assert.equal(output.match(/context:/g)?.length, 1, "an empty body and description must emit no context line");
+  assert.match(output, /pm-empty/);
+});
+
+test("JSON explain and compact file results preserve format and observational receipt behavior", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pm-context-output-formats-"));
+  try {
+    const pmRoot = join(root, ".agents", "pm");
+    await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot });
+    const focus = await create({ id: "focus", title: "Format evidence", author: "test" }, { cwd: root, pmRoot });
+    const runner = await harness();
+    const explainedPath = join(root, "explain.json");
+    const explained = commandResult<{ ok: boolean; format: string; explained: number }>(await runner.runCommand({
+      command: "context-pack", pmRoot,
+      options: { id: focus.item.id, explain: true, format: "json", output: explainedPath },
+    }));
+    assert.deepEqual(explained, { ok: true, format: "json", explained: 1 });
+    const report = JSON.parse(readFileSync(explainedPath, "utf8")) as { entries: Array<{ id: string }> };
+    assert.deepEqual(report.entries.map((entry) => entry.id), [focus.item.id]);
+    assert.equal(existsSync(join(pmRoot, "runtime", "context-receipts")), false, "explain must remain observational");
+
+    const compactPath = join(root, "pack.md");
+    const compact = commandResult<{ ok: boolean; format: string; selected: number; neighbors: number }>(await runner.runCommand({
+      command: "context-pack", pmRoot,
+      options: { id: focus.item.id, format: "compact", output: compactPath, session: "format-fixture" },
+    }));
+    assert.deepEqual(compact, { ok: true, format: "compact", selected: 1, neighbors: 0 });
+    assert.match(readFileSync(compactPath, "utf8"), /^# pm agent handoff/);
+    assert.match(readFileSync(compactPath, "utf8"), /pm-context-usage\/v1/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a launcher without an entry argument is an import rather than a direct invocation", () => {
+  assert.equal(isMainInvocation([process.execPath], new URL("../scripts/main-invocation.ts", import.meta.url).href), false);
+});
 
 /** Build SdkRankOptions from a real tracker root, used for direct ranking tests. */
 async function rankOptionsFrom(root: string, author?: string): Promise<SdkRankOptions> {
