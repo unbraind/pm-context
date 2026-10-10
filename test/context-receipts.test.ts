@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, readdirSync, mkdirSync, rmSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,7 +33,7 @@ async function fixture(t: TestContext, built = false) {
     const result = await harness.runCommand({ command, pmRoot: initialized.path, options, global });
     return (result as { result: { output: string } }).result.output;
   };
-  return { root, pmRoot: initialized.path, first: first.item.id, second: second.item.id, client, run };
+  return { root, pmRoot: initialized.path, first: first.item.id, second: second.item.id, client, harness, run };
 }
 
 /** Extract a JSON command's receipt or the markdown footer identifier and runtime snapshot. */
@@ -141,6 +142,31 @@ test("serving writes measured output files, leaves explain observational, disclo
   const unavailableOutput = join(f.root, "unavailable.json");
   await f.run("context-pack", { id: f.first, format: "json", output: unavailableOutput });
   assert.match(readFileSync(unavailableOutput, "utf8"), /context_receipt_error/);
+  // A regular file at the receipt directory blocks real persistence, independent
+  // of permissions or lock timing. Both commands must retain the caller's format.
+  const receiptDirectory = join(f.pmRoot, RECEIPTS_RELATIVE_PATH);
+  rmSync(receiptDirectory, { recursive: true });
+  writeFileSync(receiptDirectory, "blocked receipt directory");
+  for (const command of ["context-pack", "context-handoff"]) {
+    for (const compress of [false, true]) {
+      const options = { id: f.first, format: "json", compress };
+      const rendered = await f.run(command, options);
+      const payload = JSON.parse(rendered) as Record<string, unknown>;
+      assert.equal(payload.context_receipt_error, "Runtime receipt unavailable; usage cannot be measured for this bundle");
+      assert.ok(!("context_receipt" in payload));
+      assert.equal(rendered, `${JSON.stringify(payload, null, compress ? 0 : 2)}\n`, `${command} must preserve requested JSON spacing`);
+      const destination = join(f.root, `${command}-${compress}.json`);
+      await f.run(command, { ...options, output: destination });
+      const written = readFileSync(destination, "utf8");
+      assert.equal(written, `${JSON.stringify(JSON.parse(written), null, compress ? 0 : 2)}\n`, `${command} output-file bytes must preserve requested JSON spacing`);
+      assert.equal((JSON.parse(written) as Record<string, unknown>).context_receipt_error, payload.context_receipt_error);
+      const failed = await f.harness.runCommand({ command, pmRoot: f.pmRoot,
+        options: { ...options, output: join(f.root, "absent", "fallback.json") }, global: { author: "agent-a" } });
+      assert.equal(failed.handled, false, `${command} must propagate output-file write failures to the SDK host`);
+      assert.match(failed.errorMessage ?? "", /ENOENT/);
+    }
+  }
+  assert.equal(readFileSync(receiptDirectory, "utf8"), "blocked receipt directory");
 });
 
 test("session environment is honored; no identity yields an isolated receipt session", async (t) => {
@@ -223,6 +249,52 @@ test("token accounting, JSON minification, text inheritance, stable ids and norm
   assert.deepEqual(quoted.receipt.facts[0].files, [quotedFile], "JSON escaping must preserve editable-file associations");
   const hiddenLink = serveContextReceipt(f.pmRoot, '# Pack\n- item-1: src/used.tsx\n', "text", { item_ids: ["item-1"], files: [{ itemId: "item-1", value: "src/used.ts" }] }, { author: "a", command: "context-pack" });
   assert.deepEqual(hiddenLink.receipt.facts[0].files, [], "partial filename text cannot credit an excluded link");
+});
+
+test("literal item matchers compile once per receipt and preserve exact fact associations", async (t) => {
+  const f = await fixture(t);
+  const literalId = 'item.[*+?^${}()|]';
+  const association = { item_ids: [literalId, "item-1", "item-10"], files: [
+    { itemId: literalId, value: "./src/literal.ts" }, { itemId: "item-1", value: "src/used.ts" },
+  ] };
+  const exact = `- ${literalId} item-1 item-1`;
+  const nearby = `- x${literalId} ${literalId}-near _item-1 item-1x item-1-near`;
+  const fragments = [exact, "  - inherited body", nearby, "- item-10", `- ${literalId} file: ./src/literal.ts`, "- item-1 file: src/used.ts"];
+  const output = `## Focus\n${fragments.slice(0, 4).join("\n")}\n## Links\n${fragments.slice(4).join("\n")}\n## Focus\n${exact}\n`;
+  const originalRegExp = globalThis.RegExp;
+  const compiled: string[] = [];
+  globalThis.RegExp = new Proxy(originalRegExp, {
+    construct(target, args, newTarget) {
+      if (typeof args[0] === "string" && args[0].startsWith("(?<![\\w-])")) compiled.push(args[0]);
+      return Reflect.construct(target, args, newTarget);
+    },
+  });
+  try {
+    const first = serveContextReceipt(f.pmRoot, output, "text", association, { author: "a", command: "context-pack" });
+    assert.equal(compiled.length, association.item_ids.length, "one actual matcher constructor per item per receipt, independent of fragment count");
+    const expectedItems = [[literalId, "item-1"].sort(), [literalId, "item-1"].sort(), [], ["item-10"], [literalId], ["item-1"]];
+    const expected = fragments.map((text, index) => {
+      const section_id = `s-${createHash("sha256").update(index < 4 ? "Focus" : "Links").digest("hex").slice(0, 24)}`;
+      const item_ids = expectedItems[index];
+      return {
+        id: `f-${createHash("sha256").update(JSON.stringify([section_id, item_ids, text])).digest("hex").slice(0, 24)}`,
+        section_id, item_ids, files: index === 4 ? ["src/literal.ts"] : index === 5 ? ["src/used.ts"] : [],
+        estimated_tokens: Math.ceil(text.length / 4) * (index === 0 ? 2 : 1),
+      };
+    });
+    assert.deepEqual(first.receipt.facts, expected, "literal escaping, boundaries, inheritance, order, deduplication and stable hashes");
+    assert.deepEqual(receiptFrom(first.output, f.pmRoot).facts, expected, "real persisted receipt retains exact associations");
+    const second = serveContextReceipt(f.pmRoot, output, "text", association, { author: "b", command: "context-handoff" });
+    assert.equal(compiled.length, 2 * association.item_ids.length);
+    assert.deepEqual(second.receipt.facts, expected);
+    assert.notEqual(first.receipt.receipt_id, second.receipt.receipt_id);
+    const json = serveContextReceipt(f.pmRoot, JSON.stringify({ items: [{ id: literalId }, { id: `${literalId}-near` }, { id: "item-10" }], links: association.files }), "json", association, { author: "a", command: "context-pack" });
+    assert.equal(compiled.length, 3 * association.item_ids.length);
+    assert.deepEqual(json.receipt.facts.map((fact) => fact.item_ids), [[literalId], [], ["item-10"], [literalId], ["item-1"]]);
+    assert.deepEqual(json.receipt.facts.map((fact) => fact.files), [[], [], [], ["src/literal.ts"], ["src/used.ts"]]);
+  } finally {
+    globalThis.RegExp = originalRegExp;
+  }
 });
 
 test("receipt aggregates honor filters and row limits without changing denominators", async (t) => {

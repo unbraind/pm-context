@@ -153,6 +153,49 @@ result is not a clean audit. The independent compatibility floor was preserved.
 These bounded synthetic consumers do not
 establish production readiness, deployment, scale or final host delivery.
 
+## Receipt rendering and matcher review renewal
+
+The earlier SDK renewal counts above describe the historical candidate. The
+reviewed candidate preserves the SDK default-module constraint using the actual
+`ExtensionModule` authoring type intersected with the package's required
+`name`, `version` and `description` fields. `satisfies` erases at runtime;
+the obsolete one-use identity wrapper is removed. Preliminary module-only and
+manifest-only constraints failed typechecking and are excluded from passing
+evidence because those SDK interfaces do not declare all package metadata.
+
+When receipt persistence fails, both `context-pack` and `context-handoff`
+explicitly carry the caller's compression choice into fallback JSON rendering.
+The regression blocks the real receipt directory with a regular file, checks
+the exact pretty and compact bytes returned and written, and asserts that
+output-file failures reach the SDK host's documented failure result. Successful
+output writes remain possible while usage measurement is disclosed as unavailable.
+The original fallback fails the requested-spacing assertion with the same test;
+restoring byte-identical source passes. An earlier test incorrectly expected the
+host harness to throw ordinary filesystem errors; its documented failure result
+is asserted directly in the final test.
+
+Item patterns are compiled once per receipt, retaining literal escaping and
+word/hyphen boundaries. A bounded delegating constructor observer uses the
+original `RegExp` implementation and real filesystem receipt persistence.
+Metacharacter ids, exact and nearby ids, multiple text and JSON fragments,
+inherited items, file associations, stable fact hashes, ordering and deduplication
+are checked against explicit expected facts. Original source compiles 21
+patterns instead of three for the text receipt and fails the constructor-count
+assertion. Restoring exact source passes. This ordinary optimization provides no
+security, resource-capacity or production-scale evidence.
+
+Both unchanged release launchers pass 296 tests, with zero failures,
+cancellations, skips or todos. The ten receipt tests pass. The six configured
+native Node sources measure 3258/3258 lines, 1041/1041 branches and 220/220
+functions; all counters are positive. The gate does not independently measure
+statements. The full authored inventory remains eleven executable files.
+All ten JavaScript/TypeScript files are included in the separate c8 observation:
+statements and lines 3789/3837 (98.74%), branches 1158/1164 (99.48%), and
+functions 102/103 (99.02%). Shell coverage remains unmeasured. Docstrings
+pass for nine TypeScript files and 31 rule-selected declarations. These figures
+do not claim whole-source four-metric coverage or documentation certification;
+the existing coverage owner `pm-context-3s5f` retains that gap.
+
 ## SDK boundaries and open risks
 
 The SDK's host touch ledger exposes item/author/time evidence without receipt,

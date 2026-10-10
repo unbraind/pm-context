@@ -36,6 +36,10 @@ export function serveContextReceipt(pmRoot, output, format, associations, identi
         }
         catch { /* External links are not editable files. */ }
     }
+    // Compile each literal id once for this receipt; patterns have no mutable flags.
+    const itemMatchers = associations.item_ids.map((id) => ({
+        id, pattern: new RegExp(`(?<![\\w-])${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\w-])`),
+    }));
     /** Intern a stable section name for both JSON and text projections. */
     const sectionFor = (name) => {
         const existing = receipt.sections.find((section) => section.name === name);
@@ -47,10 +51,7 @@ export function serveContextReceipt(pmRoot, output, format, associations, identi
     };
     /** Associate one visible fragment with content ids, items and editable files. */
     const factFor = (section, text, inheritedItems = []) => {
-        const itemIds = associations.item_ids.filter((id) => {
-            const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            return new RegExp(`(?<![\\w-])${escaped}(?![\\w-])`).test(text);
-        });
+        const itemIds = itemMatchers.filter(({ pattern }) => pattern.test(text)).map(({ id }) => id);
         const item_ids = [...new Set([...inheritedItems, ...itemIds])].sort();
         const files = [...new Set(knownFiles.filter((file) => item_ids.includes(file.itemId) && (format === "json" ? text.includes(JSON.stringify(file.value)) : text === `- ${file.itemId} file: ${file.value}`)).map((file) => file.normalized))].sort();
         const id = `f-${createHash("sha256").update(JSON.stringify([section.id, item_ids, text])).digest("hex").slice(0, 24)}`;

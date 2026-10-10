@@ -25,17 +25,7 @@ import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSin
 import { readContextUsageAffinity } from "@unbrained/pm-cli/sdk/query";
 import { recordReceiptUsage, reportContextReceipts, renderReceiptReport, serveContextReceipt } from "./context-receipts.ts";
 
-/**
- * Runtime stand-in for the SDK's `defineExtension`.
- *
- * `defineExtension` is a documented zero-cost identity function. This package
- * now resolves `@unbrained/pm-cli` at runtime (it is a peer dependency the pm
- * host provides) for the `sdk/core` and `sdk/query` engines, but the authoring
- * helper itself has no runtime behavior, so a local identity shim avoids a
- * needless value import while still contract-checking the module against
- * {@link ExtensionModule}.
- */
-
+/** Stable failure categories reported by context command handlers. */
 export const EXIT_CODE = {
   GENERIC_FAILURE: 1,
   USAGE: 2,
@@ -1361,7 +1351,7 @@ async function recordPackServing(ctx: CommandHandlerContext, focus: readonly PmI
  * Measure the rendered subset on both serving paths. A failed runtime write is
  * disclosed in the output rather than inventing a receipt or blocking context.
  */
-async function measureContextOutput(ctx: CommandHandlerContext, pack: ContextPack, output: string, format: string, command: string, outputPath?: string): Promise<string> {
+async function measureContextOutput(ctx: CommandHandlerContext, pack: ContextPack, output: string, format: string, command: string, compress: boolean, outputPath?: string): Promise<string> {
   try {
     const measured = serveContextReceipt(ctx.pm_root, output, format === "json" ? "json" : "text", {
       item_ids: [...pack.items, ...pack.neighbors].map((item) => item.id),
@@ -1379,7 +1369,7 @@ async function measureContextOutput(ctx: CommandHandlerContext, pack: ContextPac
     if (format === "json") {
       const payload = JSON.parse(output) as Record<string, unknown>;
       payload.context_receipt_error = "Runtime receipt unavailable; usage cannot be measured for this bundle";
-      fallback = `${JSON.stringify(payload)}\n`;
+      fallback = `${JSON.stringify(payload, null, compress ? 0 : 2)}\n`;
     } else {
       fallback = `${output}\nContext receipt unavailable; usage cannot be measured for this bundle.\n`;
     }
@@ -1509,7 +1499,7 @@ function setupCommands(api: ExtensionApi): void {
           ? renderAgentHandoff(pack, renderOpts)
           : renderMarkdown(pack, renderOpts);
       const outputPath = stringOption(options, "output");
-      output = await measureContextOutput(ctx, pack, output, format, "context-pack", outputPath);
+      output = await measureContextOutput(ctx, pack, output, format, "context-pack", compress, outputPath);
       if (outputPath) {
         const reportedFormat = requestedFormat === "compact" ? "compact" : format;
         return format === "json" ? JSON.parse(output) as unknown : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
@@ -1611,7 +1601,7 @@ function setupCommands(api: ExtensionApi): void {
         ? `${JSON.stringify(handoff, null, compress ? 0 : 2)}\n`
         : renderAgentHandoff(pack, renderOpts);
       const outputPath = stringOption(options, "output");
-      output = await measureContextOutput(ctx, pack, output, format, "context-handoff", outputPath);
+      output = await measureContextOutput(ctx, pack, output, format, "context-handoff", compress, outputPath);
       if (outputPath) {
         return {
           ok: true,
@@ -1715,19 +1705,8 @@ function setupCommands(api: ExtensionApi): void {
   });
 }
 
-/**
- * Local stand-in for the SDK's `defineExtension` identity helper.
- *
- * This package resolves `@unbrained/pm-cli` at runtime for the `sdk/core` and
- * `sdk/query` engines (it is a peer dependency the pm host provides), but
- * `defineExtension` itself is a pure identity with no runtime behavior, so a
- * local shim avoids a needless value import while still contract-checking the
- * extension object against {@link ExtensionModule} exactly as the imported
- * helper would.
- */
-const defineExtension = <TModule extends ExtensionModule>(module: TModule): TModule => module;
-
-export default defineExtension({
+/** Register context commands and renderers with checked host behavior and package metadata. */
+export default {
   name: "pm-context",
   version: "2026.10.10",
   description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
@@ -1742,4 +1721,4 @@ export default defineExtension({
       api.registerRenderer("json", renderCommandResult, rendererOwnership);
     }
   },
-});
+} satisfies ExtensionModule & { name: string; version: string; description: string };
