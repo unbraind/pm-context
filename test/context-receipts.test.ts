@@ -181,6 +181,15 @@ test("receipt storage rotates at the hard count bound and rejects oversized snap
   serveContextReceipt(f.pmRoot, "# Empty\n", "text", { item_ids: [], files: [] }, { author: "a", command: "context-pack" });
   assert.equal(readdirSync(directory).filter((name) => name.endsWith(".json")).length, RECEIPT_LIMITS.count);
   assert.ok(!readdirSync(directory).includes("00000000-0000-0000-0000-000000000000.json"));
+  // A clock moving backwards or coarse timestamps must not evict the receipt
+  // this serving call promises the agent can cite immediately afterwards.
+  for (const name of readdirSync(directory)) {
+    const future = new Date("2100-01-01T00:00:00.000Z");
+    utimesSync(join(directory, name), future, future);
+  }
+  const current = serveContextReceipt(f.pmRoot, "# Current\n", "text", { item_ids: [], files: [] }, { author: "a", command: "context-pack" });
+  assert.equal(reportContextReceipts(f.pmRoot, { receipt_id: current.receipt.receipt_id, limit: 20 }).retained_receipts, 1);
+  assert.equal(readdirSync(directory).filter((name) => name.endsWith(".json")).length, RECEIPT_LIMITS.count);
   assert.throws(() => serveContextReceipt(f.pmRoot, "# Pack\n- x\n", "text", { item_ids: [], files: [] }, {
     author: "a".repeat(RECEIPT_LIMITS.bytes), command: "context-pack",
   }), /byte limit/);
