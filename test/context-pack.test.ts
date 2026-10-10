@@ -566,7 +566,7 @@ test("activate exposes new flags for both commands", async () => {
 test("context-pack explains the exact emitted pack and records every visible item as included", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "integration-test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "integration-test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const neighbors = [];
     for (let index = 1; index <= 3; index += 1) {
       neighbors.push(await create(
@@ -576,7 +576,7 @@ test("context-pack explains the exact emitted pack and records every visible ite
           status: "open",
           author: "integration-test",
         },
-        { cwd: root },
+        { cwd: root, pmRoot: join(root, ".agents", "pm") },
       ));
     }
     const focus = await create(
@@ -587,7 +587,7 @@ test("context-pack explains the exact emitted pack and records every visible ite
         dep: neighbors.map((neighbor) => `id=${neighbor.item.id},kind=blocked_by`),
         author: "integration-test",
       },
-      { cwd: root },
+      { cwd: root, pmRoot: join(root, ".agents", "pm") },
     );
     const runner = await createExtensionTestHarness(extension, {
       name: "pm-context",

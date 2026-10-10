@@ -105,6 +105,20 @@ the returned receipt was absent (actual 0, expected 1). Restoring the original
 source bytes passed the identical focused test. The earlier two behavioral
 revert records above remain historical evidence.
 
+Linking the full release command exposed an older fixture isolation defect:
+the schema tracker environment took precedence over SDK initialization calls
+that supplied only `cwd`. That linked run executed 295 tests: 256 passed and
+39 failed, with zero skips. Pinning initialization alone left 22 failures
+because item creation still selected the injected schema tracker. The 39
+initialization and 24 item-creation calls in
+`test/context-pack.test.ts` and `test/coverage-gaps.test.ts` now supply both
+`cwd` and `pmRoot`, preserving real disposable trackers under linked execution.
+No assertion, test count, coverage threshold or deadline was changed. The two
+original receipt commands, full release command and changelog check remain
+owner-linked with 240-second deadlines.
+Repeating all four linked commands passed after both boundaries were pinned;
+the full release run again passed all 295 tests with zero failures or skips.
+
 The authored executable inventory is eleven files: three runtime TypeScript
 modules, six TypeScript scripts, one JavaScript verifier and one shell script.
 The configured six-file native Node gate measured 3278/3278 lines,
