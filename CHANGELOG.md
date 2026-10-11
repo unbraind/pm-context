@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- pm context-usage: report which served context an agent actually used ([pm-context-ci6v](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-ci6v.toon))
+
 ## 2026.10.5 - 2026-10-05
 
 ### Other
