@@ -61,7 +61,10 @@ test("markdown includes description fallback while omitting empty context lines"
     { id: "pm-empty", title: "Empty context", type: "Task", status: "open", body: "", description: "" },
   ], { ids: ["pm-described", "pm-empty"], includeBody: true, generatedAt: "fixed" });
   const output = renderMarkdown(pack, { sections: ["focus"] });
-  assert.match(output, /pm-described[\s\S]*context: Fallback context/);
+  const described = output.indexOf("pm-described"), empty = output.indexOf("pm-empty");
+  assert.ok(described >= 0 && empty > described, "both items render, described first");
+  // Bind the fallback line to the described item's own block, not anything after it.
+  assert.match(output.slice(described, empty), /context: Fallback context/);
   assert.equal(output.match(/context:/g)?.length, 1, "an empty body and description must emit no context line");
   assert.match(output, /pm-empty/);
 });
