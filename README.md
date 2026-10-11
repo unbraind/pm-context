@@ -278,3 +278,39 @@ itself lists each affected stream in its output; `pm history --verify <id>` spot
 content, so `reconcile` only re-greens the hash chain (no data loss) — see the authoritative
 [pm-cli merge-safety guide](https://github.com/unbraind/pm-cli/blob/main/docs/MERGE_SAFETY.md). The
 older blunt `pm history-repair --all` remains available as a lower-level primitive.
+
+The existing quality owner, `pm-context-3s5f`, remains open. The native coverage
+gate enforces 100% lines, branches and functions for six configured files; it
+does not expose an independent statement counter. A separate c8 observation
+includes all ten authored TypeScript/JavaScript executables. Neither measurement
+covers the shell alert helper, so passing the release command does not establish
+whole-source 100/100/100/100.
+
+| Authored executable | Native gate | Separate c8 observation |
+| --- | --- | --- |
+| `index.ts` | Included | Included |
+| `context-receipts.ts` | Included | Included |
+| `context-usage.ts` | Included | Included |
+| `scripts/coverage-gate.ts` | Included | Included |
+| `scripts/docstring-gate.ts` | Included | Included |
+| `scripts/verify-release-publish-attestation.ts` | Included | Included |
+| `scripts/main-invocation.ts` | Outside configured scope | Included |
+| `scripts/prepare-merge-driver.ts` | Outside configured scope | Included |
+| `scripts/verify-release-changelog-date.ts` | Outside configured scope | Included |
+| `.agents/pm/verify-release-yaml.mjs` | Outside configured scope | Included |
+| `scripts/alert-on-release-failure.sh` | Unmeasured | Unmeasured |
+
+Coverage reports are removed before configuration validation and on runner or
+inventory failures, preventing an earlier report from surviving a failed gate.
+The parsed-workflow verifier has disposable real-file acceptance and rejection
+fixtures in `test/release-workflow-verifier.test.ts`; those tests never contact
+GitHub or mutate release controls.
+
+The documentation launcher checks the pm-ops analyzer's selected declaration
+policy. It excludes anonymous callbacks and several internal declaration forms,
+so its passing count does not certify documentation of every authored declaration.
+The managed merge-driver launcher must remain byte-identical to the pinned
+pm-ops template; its internal callback is part of the outstanding documentation
+scope. The alert and workflow-verifier migration also requires coordinating the
+existing `pm-context-qu0a` ownership before migrating its linked paths. No helper
+has been marked removed while that dependency remains unresolved.
