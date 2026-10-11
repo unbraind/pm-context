@@ -33,6 +33,7 @@ import extension, {
   renderedCommandResult,
   CommandError,
   type ContextPack,
+  type ContextExplainReport,
   type PmItem,
   type SdkRankOptions,
 } from "../index.ts";
@@ -82,8 +83,15 @@ test("JSON explain and compact file results preserve format and observational re
       options: { id: focus.item.id, explain: true, format: "json", output: explainedPath },
     }));
     assert.deepEqual(explained, { ok: true, format: "json", explained: 1 });
-    const report = JSON.parse(readFileSync(explainedPath, "utf8")) as { entries: Array<{ id: string }> };
+    const report = JSON.parse(readFileSync(explainedPath, "utf8")) as ContextExplainReport;
     assert.deepEqual(report.entries.map((entry) => entry.id), [focus.item.id]);
+    // Stable explain contract: scope, a non-empty model and signal list, and a ranked, scored entry.
+    assert.equal(report.ranking_scope, "emitted_pack");
+    assert.ok(report.model.length > 0 && report.available_signals.length > 0);
+    const [entry] = report.entries;
+    assert.equal(entry!.rank, 1);
+    assert.ok(Number.isFinite(entry!.score));
+    assert.ok(Object.keys(entry!.contributions).every((signal) => report.available_signals.includes(signal)));
     assert.equal(existsSync(join(pmRoot, "runtime", "context-receipts")), false, "explain must remain observational");
 
     const compactPath = join(root, "pack.md");

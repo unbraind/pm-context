@@ -31,7 +31,9 @@ function verify(release: string, ci: string, markerPresent = true): SpawnSyncRet
 }
 
 test("actual parsed verifier accepts scalar and array dependencies while validating real checked-in workflows", () => {
-  for (const release of [releaseSource, releaseSource.replace("    needs: release\n", "    needs: [release]\n")]) {
+  const arrayRelease = releaseSource.replace("    needs: release\n", "    needs: [release]\n");
+  assert.notEqual(arrayRelease, releaseSource, "array dependency fixture did not change the release workflow");
+  for (const release of [releaseSource, arrayRelease]) {
     const result = verify(release, ciSource);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /release.yml alert job verified/);
