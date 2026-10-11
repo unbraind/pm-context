@@ -2,16 +2,7 @@ import type { ExtensionApi, RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk"
 import { list as pmList } from "@unbrained/pm-cli/sdk/core";
 import type { ListResult } from "@unbrained/pm-cli/sdk/query";
 import type { ContextRelevanceReport } from "@unbrained/pm-cli/sdk/query";
-/**
- * Runtime stand-in for the SDK's `defineExtension`.
- *
- * `defineExtension` is a documented zero-cost identity function. This package
- * now resolves `@unbrained/pm-cli` at runtime (it is a peer dependency the pm
- * host provides) for the `sdk/core` and `sdk/query` engines, but the authoring
- * helper itself has no runtime behavior, so a local identity shim avoids a
- * needless value import while still contract-checking the module against
- * {@link ExtensionModule}.
- */
+/** Stable failure categories reported by context command handlers. */
 export declare const EXIT_CODE: {
     readonly GENERIC_FAILURE: 1;
     readonly USAGE: 2;
@@ -433,6 +424,7 @@ export declare function buildContextExplain(items: readonly PmItem[], options: S
 export declare function renderContextExplain(report: ContextExplainReport, options?: {
     compress?: boolean;
 }): string;
+/** Register context commands and renderers with checked host behavior and package metadata. */
 declare const _default: {
     name: string;
     version: string;

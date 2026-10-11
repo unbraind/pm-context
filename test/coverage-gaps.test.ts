@@ -202,7 +202,7 @@ test("renderContextExplain compress removes blank lines", () => {
 test("createSdkRanker returns items unchanged when length <= 1", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-rank-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const opts = await rankOptionsFrom(initialized.path);
     const ranker = createSdkRanker([], opts);
     assert.deepEqual(ranker([]), []);
@@ -236,7 +236,7 @@ test("createSdkPacker handles items without body in projection cost estimation",
 test("scoreContextItems fills missing optional fields via toItemMetadata", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-rank-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const opts = await rankOptionsFrom(initialized.path);
     // Items with no title, no description, no type, no status, no tags, no
     // timestamps, and an out-of-range priority — toItemMetadata must fill
@@ -257,7 +257,7 @@ test("scoreContextItems fills missing optional fields via toItemMetadata", async
 test("rankContextItems returns items in ranked order", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-rank-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const opts = await rankOptionsFrom(initialized.path);
     const items: PmItem[] = [
       { id: "pm-1", title: "A", type: "Task", status: "in_progress", priority: 1, updated_at: "2026-07-01T00:00:00Z" },
@@ -275,7 +275,7 @@ test("rankContextItems returns items in ranked order", async () => {
 test("buildContextExplain produces a report from the SDK relevance model", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-rank-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const opts = await rankOptionsFrom(initialized.path);
     const items: PmItem[] = [
       { id: "pm-1", title: "A", type: "Task", status: "in_progress", priority: 1, updated_at: "2026-07-01T00:00:00Z" },
@@ -332,10 +332,10 @@ function jsonCommandResult<TResult>(result: unknown): TResult {
 test("context-handoff renders agent handoff for a focus item", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const focus = await create(
       { title: "Handoff focus", id: "focus", status: "in_progress", author: "test" },
-      { cwd: root },
+      { cwd: root, pmRoot: join(root, ".agents", "pm") },
     );
     const runner = await harness();
     const result = await runner.runCommand({
@@ -356,10 +356,10 @@ test("context-handoff renders agent handoff for a focus item", async () => {
 test("context-handoff returns json for --format json", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const focus = await create(
       { title: "Handoff focus", id: "focus", status: "in_progress", author: "test" },
-      { cwd: root },
+      { cwd: root, pmRoot: join(root, ".agents", "pm") },
     );
     const runner = await harness();
     const result = await runner.runCommand({
@@ -381,7 +381,7 @@ test("context-handoff returns json for --format json", async () => {
 test("context-handoff rejects an invalid format", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     await assert.rejects(
       () => runner.runCommand({ command: "context-handoff", pmRoot: initialized.path, options: { format: "markdown" } }),
@@ -395,10 +395,10 @@ test("context-handoff rejects an invalid format", async () => {
 test("context-handoff writes output to --output file", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const focus = await create(
       { title: "Handoff focus", id: "focus", status: "in_progress", author: "test" },
-      { cwd: root },
+      { cwd: root, pmRoot: join(root, ".agents", "pm") },
     );
     const runner = await harness();
     const outputPath = join(root, "handoff.md");
@@ -421,9 +421,9 @@ test("context-handoff writes output to --output file", async () => {
 test("context-handoff defaults status to in_progress when no selector is given", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const ip = await create({ title: "In progress", id: "ip", status: "in_progress", author: "test" }, { cwd: root });
-    await create({ title: "Open", id: "open", status: "open", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const ip = await create({ title: "In progress", id: "ip", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    await create({ title: "Open", id: "open", status: "open", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-handoff",
@@ -444,8 +444,8 @@ test("context-handoff defaults status to in_progress when no selector is given",
 test("context-handoff writes json output to --output file", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const outputPath = join(root, "handoff.json");
     const result = await runner.runCommand({
@@ -466,8 +466,8 @@ test("context-handoff writes json output to --output file", async () => {
 test("context-handoff records a serving event when author is provided", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     await runner.runCommand({
       command: "context-handoff",
@@ -489,8 +489,8 @@ test("context-handoff records a serving event when author is provided", async ()
 test("context-handoff uses max-items to budget the pack", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-handoff",
@@ -582,7 +582,7 @@ function throwingServeLine(at: string, author: string): string {
 test("context-usage with --by returns affinity from the SDK store", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-usage-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
     writeFileSync(
       join(initialized.path, "runtime", "context-usage.jsonl"),
@@ -612,7 +612,7 @@ test("context-usage with --by returns affinity from the SDK store", async () => 
 test("context-usage with --by renders affinity in markdown", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-usage-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
     writeFileSync(
       join(initialized.path, "runtime", "context-usage.jsonl"),
@@ -641,7 +641,7 @@ test("context-usage with --by renders affinity in markdown", async () => {
 test("context-usage with --by degrades gracefully when affinity read fails", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-usage-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     // Write a trusted-looking v2 serve whose rows cannot be iterated, so the
     // affinity reader throws instead of classifying the row as untrusted.
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
@@ -673,7 +673,7 @@ test("context-usage with --by degrades gracefully when affinity read fails", asy
 test("context-pack rejects a non-positive --limit", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     await assert.rejects(
       () => runner.runCommand({ command: "context-pack", pmRoot: initialized.path, options: { limit: "0" } }),
@@ -687,7 +687,7 @@ test("context-pack rejects a non-positive --limit", async () => {
 test("context-pack rejects a negative --recent", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     await assert.rejects(
       () => runner.runCommand({ command: "context-pack", pmRoot: initialized.path, options: { recent: "-1" } }),
@@ -705,8 +705,8 @@ test("context-pack rejects a negative --recent", async () => {
 test("context-pack with author degrades when affinity read fails on corrupted ledger", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     // Write a trusted-looking v2 serve whose rows cannot be iterated, so the
     // affinity reader throws during rank option resolution.
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
@@ -737,8 +737,8 @@ test("context-pack with author degrades when affinity read fails on corrupted le
 test("context-pack with author does not fail when serving record throws", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     // Create a directory at the ledger path so appendFile fails with EISDIR.
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
     mkdirSync(join(initialized.path, "runtime", "context-usage.jsonl"), { recursive: true });
@@ -764,8 +764,8 @@ test("context-pack with author does not fail when serving record throws", async 
 test("context-pack writes markdown to --output file", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const outputPath = join(root, "pack.md");
     const result = await runner.runCommand({
@@ -791,8 +791,8 @@ test("context-pack writes markdown to --output file", async () => {
 test("context-pack --explain renders markdown by default", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-pack",
@@ -812,8 +812,8 @@ test("context-pack --explain renders markdown by default", async () => {
 test("context-pack --explain writes markdown to --output file", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const outputPath = join(root, "explain.md");
     const result = await runner.runCommand({
@@ -1094,7 +1094,7 @@ test("buildSuggestedAgentCommand produces no id args when all ids are whitespace
 test("createSdkPacker uses fallback ranks for items not in the ranked list", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const opts = await rankOptionsFrom(initialized.path);
     // Build the packer with empty rank maps so all lookups fall back
     const packer = createSdkPacker([], []);
@@ -1114,7 +1114,7 @@ test("createSdkPacker uses fallback ranks for items not in the ranked list", asy
 test("createSdkPacker accounts for body text in projection costs", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const opts = await rankOptionsFrom(initialized.path);
     const focus: PmItem[] = [{ id: "pm-1", title: "F", type: "Task", status: "in_progress", priority: 1, body: "A substantial body of text that adds token cost." }];
     const neighbors: PmItem[] = [];
@@ -1133,7 +1133,7 @@ test("createSdkPacker accounts for body text in projection costs", async () => {
 test("createSdkRanker ranks multiple items through the SDK model", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-rank-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const opts = await rankOptionsFrom(initialized.path);
     const items: PmItem[] = [
       { id: "pm-1", title: "A", type: "Task", status: "in_progress", priority: 1, updated_at: "2026-07-01T00:00:00Z" },
@@ -1155,7 +1155,7 @@ test("createSdkRanker ranks multiple items through the SDK model", async () => {
 test("context-pack rejects an invalid format", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     await assert.rejects(
       () => runner.runCommand({ command: "context-pack", pmRoot: initialized.path, options: { format: "xml" } }),
@@ -1171,8 +1171,8 @@ test("context-pack rejects an invalid format", async () => {
 test("context-pack treats compact format as agent", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-pack",
@@ -1193,8 +1193,8 @@ test("context-pack treats compact format as agent", async () => {
 test("context-pack produces compressed json output", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-pack",
@@ -1218,8 +1218,8 @@ test("context-pack produces compressed json output", async () => {
 test("context-pack passes sections through in json output", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-pack",
@@ -1241,8 +1241,8 @@ test("context-pack passes sections through in json output", async () => {
 test("context-handoff treats compact format as agent", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-handoff",
@@ -1263,8 +1263,8 @@ test("context-handoff treats compact format as agent", async () => {
 test("context-handoff produces compressed json output", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-handoff",
@@ -1287,8 +1287,8 @@ test("context-handoff produces compressed json output", async () => {
 test("context-handoff passes sections through in agent output", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-handoff",
@@ -1310,8 +1310,8 @@ test("context-handoff passes sections through in agent output", async () => {
 test("context-handoff --output reports defaultedStatus when status is inferred", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    await create({ title: "In progress", id: "ip", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    await create({ title: "In progress", id: "ip", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const outputPath = join(root, "handoff.md");
     const result = await runner.runCommand({
@@ -1335,7 +1335,7 @@ test("context-handoff --output reports defaultedStatus when status is inferred",
 test("context-pack with no matching items does not fail on empty serving", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     // Use a tag that matches no items → empty pack → recordPackServing returns early
     const result = await runner.runCommand({
@@ -1359,7 +1359,7 @@ test("context-pack with no matching items does not fail on empty serving", async
 test("context-usage with --by sorts affinity entries with equal values by id", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-usage-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     mkdirSync(join(initialized.path, "runtime"), { recursive: true });
     // Seed two items with identical serve+touch patterns so they get equal affinity.
     // The sort tiebreaker (a[0].localeCompare(b[0])) should order them by id.
@@ -1463,8 +1463,8 @@ test("renderAgentHandoff omits priority from focus metadata when absent", () => 
 test("context-pack --explain produces compressed json", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-pack",
@@ -1487,8 +1487,8 @@ test("context-pack --explain produces compressed json", async () => {
 test("context-handoff defaults to agent format when no --format is given", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-handoff-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
-    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+    const f = await create({ title: "F", id: "f", status: "in_progress", author: "test" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const runner = await harness();
     const result = await runner.runCommand({
       command: "context-handoff",
@@ -1509,7 +1509,7 @@ test("context-handoff defaults to agent format when no --format is given", async
 test("rankContextItems processes items with tags through toItemMetadata", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-rank-"));
   try {
-    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root });
+    const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
     const opts = await rankOptionsFrom(initialized.path);
     const items: PmItem[] = [
       { id: "pm-1", title: "A", type: "Task", status: "in_progress", priority: 1, tags: ["web", "release"], updated_at: "2026-07-01T00:00:00Z" },
