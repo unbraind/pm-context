@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import { readSettings, resolveRuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
+import { createRelationshipKindRegistry, readSettings, resolveRuntimeStatusRegistry, resolveWorkspaceRelationshipKindRegistry, } from "@unbrained/pm-cli/sdk";
 import { list as pmList } from "@unbrained/pm-cli/sdk/core";
 import { buildItemContextRelevanceCandidates, defaultScoreContextCandidates, packContextCandidates, recordContextUsageServing, } from "@unbrained/pm-cli/sdk/query";
 import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSince } from "./context-usage.js";
@@ -388,16 +388,24 @@ export function buildContextPack(allItems, options = {}) {
     // for every visible item in the pack.
     let deps;
     if (options.includeDeps) {
+        const registry = options.relationshipRegistry ?? createRelationshipKindRegistry();
         const visibleIds = [...packItems, ...packNeighbors].map((item) => item.id);
         const dependsOn = new Map();
         const dependedBy = new Map();
         for (const rel of allRelationships) {
-            const outgoing = dependsOn.get(rel.from) ?? new Set();
-            outgoing.add(rel.to);
-            dependsOn.set(rel.from, outgoing);
-            const incoming = dependedBy.get(rel.to) ?? new Set();
-            incoming.add(rel.from);
-            dependedBy.set(rel.to, incoming);
+            const definition = registry.resolve(rel.kind);
+            if (!definition?.ordering)
+                continue;
+            // The public kind contract defaults omitted precedence to source before target.
+            const targetFirst = definition.precedence === "target_before_source";
+            const predecessor = targetFirst ? rel.to : rel.from;
+            const successor = targetFirst ? rel.from : rel.to;
+            const outgoing = dependsOn.get(successor) ?? new Set();
+            outgoing.add(predecessor);
+            dependsOn.set(successor, outgoing);
+            const incoming = dependedBy.get(predecessor) ?? new Set();
+            incoming.add(successor);
+            dependedBy.set(predecessor, incoming);
         }
         deps = visibleIds
             .map((itemId) => ({
@@ -1183,6 +1191,7 @@ function setupCommands(api) {
                 maxItems,
                 ranker,
                 packer,
+                relationshipRegistry: resolveWorkspaceRelationshipKindRegistry(),
             });
             if (explain) {
                 const explainReport = buildContextExplain([...pack.items, ...pack.neighbors], rankOptions);
@@ -1298,6 +1307,7 @@ function setupCommands(api) {
                 maxItems,
                 ranker,
                 packer,
+                relationshipRegistry: resolveWorkspaceRelationshipKindRegistry(),
             });
             const suggestedCommand = buildSuggestedAgentCommand({
                 commandName: "context-handoff",

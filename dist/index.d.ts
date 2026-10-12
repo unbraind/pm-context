@@ -1,4 +1,4 @@
-import type { ExtensionApi, RuntimeStatusRegistry } from "@unbrained/pm-cli/sdk";
+import type { ExtensionApi, RuntimeStatusRegistry, RelationshipKindRegistry } from "@unbrained/pm-cli/sdk";
 import { list as pmList } from "@unbrained/pm-cli/sdk/core";
 import type { ListResult } from "@unbrained/pm-cli/sdk/query";
 import type { ContextRelevanceReport } from "@unbrained/pm-cli/sdk/query";
@@ -112,6 +112,8 @@ export interface ContextPackOptions {
     generatedAt?: string;
     includeDeps?: boolean;
     maxItems?: number;
+    /** Kind semantics for ordering summaries; pure callers default to built-in kinds. */
+    relationshipRegistry?: RelationshipKindRegistry;
     /**
      * Override the focus-item ranking. Defaults to {@link sortContextItems} (the
      * deterministic priority-then-recency order used by the pure assembly path).
@@ -132,6 +134,7 @@ export interface ContextPackOptions {
         neighbors: PmItem[];
     };
 }
+/** Execution prerequisites and dependents for a visible item, excluding non-ordering links. */
 export interface ContextPackDepInfo {
     itemId: string;
     dependsOn: string[];

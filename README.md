@@ -72,6 +72,13 @@ Repeat the flag for multiple sections. Available sections:
 `dependedBy` arrays) to the context pack and handoff output. A `## Dependencies`
 section is rendered in markdown/agent output when present.
 
+These arrays summarize execution ordering according to the relationship kind
+registry: `blocked_by` (including `depends_on`) lists prerequisites, while
+`blocks` lists dependents. `related`, `implements`, hierarchy, and other
+non-ordering edges remain in typed relationships and neighborhood context but
+do not create prerequisites. Commands honor active extension kind definitions;
+`buildContextPack` accepts an optional `relationshipRegistry` for custom kinds.
+
 ### Max items
 
 `--max-items <n>` caps the total number of items (focus + neighbors) in the
