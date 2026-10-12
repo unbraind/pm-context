@@ -1426,7 +1426,7 @@ function setupCommands(api) {
 /** Register context commands and renderers with checked host behavior and package metadata. */
 export default {
     name: "pm-context",
-    version: "2026.10.11",
+    version: "2026.10.12",
     description: "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
     activate(api) {
         setupCommands(api);
