@@ -266,12 +266,14 @@ export declare function renderMarkdown(pack: ContextPack, options?: RenderOption
 export declare function buildAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
     suggestedCommand?: string;
+    relationshipRegistry?: RelationshipKindRegistry;
 }): AgentHandoff;
 export declare function renderAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
     suggestedCommand?: string;
     sections?: string[];
     compress?: boolean;
+    relationshipRegistry?: RelationshipKindRegistry;
 }): string;
 /**
  * Runtime shape of the SDK list result's omission receipt.

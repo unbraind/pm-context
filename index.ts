@@ -743,19 +743,26 @@ function updatedTimestamp(item: PmItem): number {
 
 export function buildAgentHandoff(
   pack: ContextPack,
-  options: { recentLimit?: number; suggestedCommand?: string } = {},
+  options: { recentLimit?: number; suggestedCommand?: string; relationshipRegistry?: RelationshipKindRegistry } = {},
 ): AgentHandoff {
   const allVisible = [...pack.items, ...pack.neighbors];
   const focusIds = new Set(pack.items.map((item) => item.id));
-  const blockers = pack.relationships
-    .filter((rel) => focusIds.has(rel.from) && (rel.kind === "blocked_by" || rel.kind === "depends_on"))
-    .map((rel) => ({
-      itemId: rel.from,
-      blockedBy: rel.to,
+  const registry = options.relationshipRegistry ?? createRelationshipKindRegistry();
+  const blockers = pack.relationships.flatMap((rel) => {
+    const definition = registry.resolve(rel.kind);
+    if (!definition?.ordering) return [];
+    const targetFirst = definition.precedence === "target_before_source";
+    const itemId = targetFirst ? rel.from : rel.to;
+    const blockedBy = targetFirst ? rel.to : rel.from;
+    if (!focusIds.has(itemId)) return [];
+    return [{
+      itemId,
+      blockedBy,
       kind: rel.kind,
-      title: titleFor(allVisible, rel.to),
-      status: statusFor(allVisible, rel.to),
-    }));
+      title: titleFor(allVisible, blockedBy),
+      status: statusFor(allVisible, blockedBy),
+    }];
+  });
   const blockedFocusIds = new Set(blockers.map((blocker) => blocker.itemId));
   const nextActions = pack.items
     .filter((item) => !isClosedStatus(itemStatus(item)))
@@ -813,7 +820,7 @@ export function buildAgentHandoff(
 
 export function renderAgentHandoff(
   pack: ContextPack,
-  options: { recentLimit?: number; suggestedCommand?: string; sections?: string[]; compress?: boolean } = {},
+  options: { recentLimit?: number; suggestedCommand?: string; sections?: string[]; compress?: boolean; relationshipRegistry?: RelationshipKindRegistry } = {},
 ): string {
   const handoff = buildAgentHandoff(pack, options);
   const sectionFilter = options.sections?.map((s) => s.toLowerCase());
@@ -1509,7 +1516,7 @@ function setupCommands(api: ExtensionApi): void {
         maxItems,
         sections: sections.length > 0 ? sections : undefined,
       });
-      const renderOpts = { recentLimit, suggestedCommand, compress, sections: sections.length > 0 ? sections : undefined };
+      const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry: resolveWorkspaceRelationshipKindRegistry(), sections: sections.length > 0 ? sections : undefined };
       let output = format === "json"
         ? `${JSON.stringify(pack, null, compress ? 0 : 2)}\n`
         : format === "agent"
@@ -1613,8 +1620,8 @@ function setupCommands(api: ExtensionApi): void {
         maxItems,
         sections: sections.length > 0 ? sections : undefined,
       });
-      const renderOpts = { recentLimit, suggestedCommand, compress, sections: sections.length > 0 ? sections : undefined };
-      const handoff = buildAgentHandoff(pack, { recentLimit, suggestedCommand });
+      const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry: resolveWorkspaceRelationshipKindRegistry(), sections: sections.length > 0 ? sections : undefined };
+      const handoff = buildAgentHandoff(pack, renderOpts);
       let output = format === "json"
         ? `${JSON.stringify(handoff, null, compress ? 0 : 2)}\n`
         : renderAgentHandoff(pack, renderOpts);

@@ -7,7 +7,7 @@ import test, { type TestContext } from "node:test";
 import { commitImportedItem, createRelationshipKindRegistry, emptyImportedDocument, init, readSettings } from "@unbrained/pm-cli/sdk";
 import type { ItemMetadata, RelationshipKindDefinition } from "@unbrained/pm-cli/sdk";
 import { create } from "@unbrained/pm-cli/sdk/core";
-import { buildContextPack, renderAgentHandoff, renderMarkdown } from "../index.ts";
+import { buildAgentHandoff, buildContextPack, renderAgentHandoff, renderMarkdown } from "../index.ts";
 import type { ContextPack, ContextPackDepInfo, PmItem } from "../index.ts";
 
 /** Package root used to install the committed distribution into a disposable tracker. */
@@ -141,10 +141,10 @@ export default { name: "custom-kinds", activate(api: ExtensionApi) {
   }
   const client = { cwd: root, pmRoot: initialized.path };
   /** Execute the real host CLI against the installed distribution and the isolated tracker. */
-  function run(command: string, format: string): string {
+  function run(command: string, format: string, focus = "deps-a", includeDeps = true): string {
     const result = spawnSync(process.execPath, [
       join(packageRoot, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js"),
-      command, "--id", "deps-a", "--include-deps", "--format", format,
+      command, "--id", focus, ...(includeDeps ? ["--include-deps"] : []), "--format", format,
     ], { cwd: root, encoding: "utf8", env: { ...process.env, PM_PATH: initialized.path, PM_AUTHOR: "integration-test" } });
     assert.equal(result.status, 0, result.stderr);
     return result.stdout;
@@ -213,3 +213,44 @@ test("installed CLI mixed edges preserve raw kinds and use active extension orde
   assert.deepEqual(handoff.deps, pack.deps);
   assert.deepEqual(storedBytes(f.pmRoot), before);
 });
+
+for (const includeDeps of [false, true]) {
+  test(`handoff blockers follow registered ordering with includeDeps=${includeDeps}`, async (t) => {
+    const f = await cliFixture(t, true);
+    const target = await create({ id: "b", title: "Successor", author: "integration-test" }, f.client);
+    const source = await create({ id: "a", title: "Predecessor", author: "integration-test" }, f.client);
+    const registry = createRelationshipKindRegistry();
+    for (const definition of customKinds) registry.register(definition);
+    for (const [kind, focus, blocker] of [
+      ["blocks", "deps-b", "deps-a"], ["custom_gates", "deps-b", "deps-a"],
+      ["custom_default", "deps-b", "deps-a"], ["custom_wait_alias", "deps-a", "deps-b"],
+      ["related", "deps-b", undefined], ["custom_evidence", "deps-b", undefined],
+      ["unknown_kind", "deps-b", undefined],
+    ] as const) {
+      const document = emptyImportedDocument();
+      document.metadata = { ...source.item, dependencies: [
+        { id: target.item.id, kind, created_at: source.item.created_at, author: "integration-test" },
+      ] } as unknown as ItemMetadata;
+      await commitImportedItem({ pmRoot: f.pmRoot, id: source.item.id,
+        itemPath: join(f.pmRoot, "tasks", `${source.item.id}.toon`), document,
+        author: "integration-test", message: "Import ordering handoff fixture",
+        settings: await readSettings(f.pmRoot), conflictWarningPrefix: "fixture_conflict" });
+      const before = storedBytes(f.pmRoot);
+      const pack = buildContextPack([document.metadata as unknown as PmItem, target.item as unknown as PmItem], { ids: [focus], includeDeps, relationshipRegistry: registry });
+      const expected = blocker ? [{ itemId: focus, blockedBy: blocker, kind,
+        title: blocker === "deps-a" ? "Predecessor" : "Successor", status: "open" }] : [];
+      const handoff = JSON.parse(f.run("context-handoff", "json", focus, includeDeps)) as ReturnType<typeof buildAgentHandoff>;
+      assert.deepEqual(handoff.blockers, expected, kind);
+      assert.deepEqual(buildAgentHandoff(pack, { relationshipRegistry: registry }).blockers, expected, kind);
+      assert.equal(handoff.nextActions[0]?.reason === "resolve blocker first", Boolean(blocker), kind);
+      for (const command of (kind === "blocks" || kind === "custom_gates" ? ["context-pack", "context-handoff"] : [])) {
+        const output = f.run(command, "agent", focus, includeDeps);
+        if (blocker) assert.ok(output.includes(`${focus} ${kind} ${blocker}`), output);
+        else assert.match(output, /No visible blockers/);
+      }
+      assert.deepEqual(storedBytes(f.pmRoot), before);
+    }
+    const nonFocus = buildContextPack([{ id: "a", dependencies: [{ id: "b", kind: "blocks" }] }, { id: "b" }], { ids: ["a"] });
+    assert.deepEqual(buildAgentHandoff(nonFocus).blockers, []);
+  });
+}

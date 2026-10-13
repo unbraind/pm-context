@@ -77,7 +77,10 @@ registry: `blocked_by` (including `depends_on`) lists prerequisites, while
 `blocks` lists dependents. `related`, `implements`, hierarchy, and other
 non-ordering edges remain in typed relationships and neighborhood context but
 do not create prerequisites. Commands honor active extension kind definitions;
-`buildContextPack` accepts an optional `relationshipRegistry` for custom kinds.
+`buildContextPack`, `buildAgentHandoff`, and `renderAgentHandoff` accept an optional
+`relationshipRegistry` for custom kinds. Commands supply the active workspace registry.
+Handoff blockers follow the same ordering and precedence semantics even without
+`--include-deps`, and retain each raw relationship kind.
 
 ### Max items
 
