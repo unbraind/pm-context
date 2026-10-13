@@ -1186,6 +1186,8 @@ function setupCommands(api) {
                 const rankedAll = rankContextItems(items, rankOptions);
                 packer = createSdkPacker(rankedAll, rankedAll);
             }
+            // One registry per command, so pack dependencies and rendered blockers share kind semantics.
+            const relationshipRegistry = resolveWorkspaceRelationshipKindRegistry();
             const pack = buildContextPack(items, {
                 ids: selection.ids,
                 status: selection.status,
@@ -1200,7 +1202,7 @@ function setupCommands(api) {
                 maxItems,
                 ranker,
                 packer,
-                relationshipRegistry: resolveWorkspaceRelationshipKindRegistry(),
+                relationshipRegistry,
             });
             if (explain) {
                 const explainReport = buildContextExplain([...pack.items, ...pack.neighbors], rankOptions);
@@ -1230,7 +1232,7 @@ function setupCommands(api) {
                 maxItems,
                 sections: sections.length > 0 ? sections : undefined,
             });
-            const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry: resolveWorkspaceRelationshipKindRegistry(), sections: sections.length > 0 ? sections : undefined };
+            const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
             let output = format === "json"
                 ? `${JSON.stringify(pack, null, compress ? 0 : 2)}\n`
                 : format === "agent"
@@ -1303,6 +1305,8 @@ function setupCommands(api) {
                 const rankedAll = rankContextItems(items, rankOptions);
                 packer = createSdkPacker(rankedAll, rankedAll);
             }
+            // One registry per command, so pack dependencies and rendered blockers share kind semantics.
+            const relationshipRegistry = resolveWorkspaceRelationshipKindRegistry();
             const pack = buildContextPack(items, {
                 ids: selection.ids,
                 status: selection.status,
@@ -1316,7 +1320,7 @@ function setupCommands(api) {
                 maxItems,
                 ranker,
                 packer,
-                relationshipRegistry: resolveWorkspaceRelationshipKindRegistry(),
+                relationshipRegistry,
             });
             const suggestedCommand = buildSuggestedAgentCommand({
                 commandName: "context-handoff",
@@ -1333,7 +1337,7 @@ function setupCommands(api) {
                 maxItems,
                 sections: sections.length > 0 ? sections : undefined,
             });
-            const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry: resolveWorkspaceRelationshipKindRegistry(), sections: sections.length > 0 ? sections : undefined };
+            const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
             const handoff = buildAgentHandoff(pack, renderOpts);
             let output = format === "json"
                 ? `${JSON.stringify(handoff, null, compress ? 0 : 2)}\n`
