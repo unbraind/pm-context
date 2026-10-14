@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Dependency projection relabels non-ordering relationships as depends_on and reverses blocks ([pm-context-github-356cb2a080ed-136](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-136.toon))
+
 ## 2026.10.12 - 2026-10-12
 
 ### Added
