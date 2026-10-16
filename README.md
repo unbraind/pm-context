@@ -290,13 +290,15 @@ content, so `reconcile` only re-greens the hash chain (no data loss) — see the
 older blunt `pm history-repair --all` remains available as a lower-level primitive.
 
 The existing quality owner, `pm-context-3s5f`, remains open. The native coverage
-gate enforces 100% lines, branches and functions for six configured files; it
-does not expose an independent statement counter. A separate c8 observation
-includes all ten authored TypeScript/JavaScript executables. Neither measurement
-covers the shell alert helper, so passing the release command does not establish
-whole-source 100/100/100/100.
+gate enforces 100% lines, branches and functions for eight configured files; it
+does not expose an independent statement counter. The same test run is wrapped
+by c8, which independently enforces 100% statements, lines and functions and
+99.9% branches across all ten authored TypeScript/JavaScript executables. The
+remaining c8 branch converts a non-Error exception from receipt usage into a
+command error. Neither measurement covers the shell alert helper, so passing
+the release command does not establish whole-source 100/100/100/100.
 
-| Authored executable | Native gate | Separate c8 observation |
+| Authored executable | Native gate | c8 release gate |
 | --- | --- | --- |
 | `index.ts` | Included | Included |
 | `context-receipts.ts` | Included | Included |
@@ -304,14 +306,20 @@ whole-source 100/100/100/100.
 | `scripts/coverage-gate.ts` | Included | Included |
 | `scripts/docstring-gate.ts` | Included | Included |
 | `scripts/verify-release-publish-attestation.ts` | Included | Included |
-| `scripts/main-invocation.ts` | Outside configured scope | Included |
+| `scripts/main-invocation.ts` | Included | Included |
 | `scripts/prepare-merge-driver.ts` | Outside configured scope | Included |
-| `scripts/verify-release-changelog-date.ts` | Outside configured scope | Included |
+| `scripts/verify-release-changelog-date.ts` | Included | Included |
 | `.agents/pm/verify-release-yaml.mjs` | Outside configured scope | Included |
 | `scripts/alert-on-release-failure.sh` | Unmeasured | Unmeasured |
 
 Coverage reports are removed before configuration validation and on runner or
 inventory failures, preventing an earlier report from surviving a failed gate.
+The c8 gate uses `all: true` to count unexecuted files in its configured scope;
+its subprocess collection includes the managed prepare launcher and the parsed
+workflow verifier. c8 currently reports zero function counters for those two
+scripts, so their reported function percentage does not certify their callbacks.
+Artifact preparation tests execute the unchanged managed launcher in disposable
+Git checkouts and prove `pack` and `publish` preserve local merge configuration.
 The parsed-workflow verifier has disposable real-file acceptance and rejection
 fixtures in `test/release-workflow-verifier.test.ts`; those tests never contact
 GitHub or mutate release controls.
