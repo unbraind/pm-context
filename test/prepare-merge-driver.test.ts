@@ -94,6 +94,23 @@ test("the prepare launcher is the unmodified pm-ops template", () => {
   assert.equal(readFileSync(launcher, "utf8"), canonical);
 });
 
+for (const command of ["pack", "publish"]) {
+  test(`artifact preparation for ${command} preserves local Git config even with broken pm-ops`, () => {
+    const directory = checkout(`artifact-${command}`, "no-manifest");
+    const before = readFileSync(join(directory, ".git", "config"), "utf8");
+    const result = spawnSync(process.execPath, [launcher], {
+      cwd: directory,
+      encoding: "utf8",
+      env: { ...process.env, PATH: hostPath, npm_command: command },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, `npm ${command}: skipping merge-driver install during artifact creation\n`);
+    assert.equal(result.stdout, "");
+    assert.equal(readFileSync(join(directory, ".git", "config"), "utf8"), before);
+    assert.deepEqual(registeredDrivers(directory), []);
+  });
+}
+
 test("a full install registers every merge driver .gitattributes declares", posixOnly, () => {
   const directory = checkout("full", "pinned");
   assert.deepEqual(registeredDrivers(directory), []);
