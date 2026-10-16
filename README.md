@@ -60,7 +60,8 @@ working set: the diff from `merge-base(base, HEAD)`, staged and unstaged changes
 and untracked files that Git does not ignore. The base defaults to the local
 `origin/HEAD` symbolic ref, falling back to `main`; fetch the default branch or
 pass a known base if it cannot be resolved. Renames consider both old and new
-paths so existing links still provide context.
+paths so existing links still provide context. Changes inside the resolved pm
+tracker root (including custom roots) are excluded from `--changed`.
 
 Use repeated `--files <path>` for an explicit working set, including paths that
 do not exist yet. Paths are relative to the repository root (native absolute

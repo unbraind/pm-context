@@ -1188,7 +1188,7 @@ function setupCommands(api) {
                 throw new CommandError("--format must be markdown, json, agent, or compact", EXIT_CODE.USAGE);
             }
             const selection = resolveSelectionOptions(options);
-            const fileFocus = resolveFileFocus(options, ctx.args, ctx.repo_root ?? ctx.source_workspace_root ?? process.cwd());
+            const fileFocus = resolveFileFocus(options, ctx.args, ctx.repo_root ?? ctx.source_workspace_root ?? process.cwd(), ctx.pm_root);
             const limit = intOption(options, "limit", contextPackDefaultLimit);
             const includeBody = boolOption(options, "include-body", "includeBody");
             const includeClosed = boolOption(options, "include-closed", "includeClosed");

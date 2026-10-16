@@ -15,8 +15,8 @@ export interface FileFocus {
 export class FileFocusError extends Error {
   readonly exitCode = 2;
   readonly code: "NOT_GIT_REPOSITORY" | "UNKNOWN_BASE" | "GIT_FAILED" | "INVALID_FILE_FOCUS" | "TRACKER_READ_FAILED";
-  constructor(code: FileFocusError["code"], message: string) {
-    super(message);
+  constructor(code: FileFocusError["code"], message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "CommandError";
     this.code = code;
   }
@@ -34,7 +34,7 @@ export function normalizeFocusPath(value: string, root: string): string | undefi
   if (!value || /^[a-z][a-z\d+.-]*:\/\//i.test(value)) return undefined;
   let path = value.replace(/\\/g, "/");
   const normalizedRoot = root.replace(/\\/g, "/");
-  if (win32.isAbsolute(path) && /^[A-Za-z]:/.test(path)) {
+  if (win32.isAbsolute(path) && (/^[A-Za-z]:/.test(path) || path.startsWith("//"))) {
     path = win32.relative(normalizedRoot, path).replace(/\\/g, "/");
     if (win32.isAbsolute(path)) return undefined;
   } else if (isAbsolute(path)) {
@@ -50,8 +50,18 @@ function quote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
+/** Check tracker containment using repository-relative paths on native and Windows roots. */
+export function isTrackerPath(path: string, pmRoot: string, repoRoot: string): boolean {
+  const tracker = normalizeFocusPath(pmRoot, repoRoot);
+  const normalized = normalizeFocusPath(path, repoRoot);
+  if (tracker === undefined || normalized === undefined) return false;
+  const [directory, file] = /^[A-Za-z]:/.test(repoRoot) || repoRoot.replace(/\\/g, "/").startsWith("//")
+    ? [tracker.toLowerCase(), normalized.toLowerCase()] : [tracker, normalized];
+  return directory === "." || file === directory || file.startsWith(`${directory}/`);
+}
+
 /** Resolve --changed and repeated --files using real Git; an empty working set remains an active filter. */
-export function resolveFileFocus(options: Record<string, unknown>, args: string[], cwd: string): FileFocus | undefined {
+export function resolveFileFocus(options: Record<string, unknown>, args: string[], cwd: string, pmRoot: string): FileFocus | undefined {
   const changed = options.changed !== undefined && options.changed !== false;
   const explicit = options.files === undefined ? [] : Array.isArray(options.files) ? options.files.map(String) : [String(options.files)];
   if (!changed && explicit.length === 0) {
@@ -64,7 +74,7 @@ export function resolveFileFocus(options: Record<string, unknown>, args: string[
   const files = new Set<string>();
   let refresh = "";
   if (changed) {
-    const base = typeof options.changed === "string" ? options.changed : args[0] ?? git(root, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"])?.trim() ?? "main";
+    const base = typeof options.changed === "string" ? options.changed : args[0] ?? git(root, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"])?.trim() ?? "main";
     const commit = git(root, ["rev-parse", "--verify", "--end-of-options", `${base}^{commit}`])?.trim();
     const mergeBase = commit && git(root, ["merge-base", commit, "HEAD"])?.trim();
     if (!mergeBase) throw new FileFocusError("UNKNOWN_BASE", "Cannot resolve the Git base or a common ancestor with HEAD. Fetch the base branch, then use --changed <known-base>.");
@@ -76,7 +86,9 @@ export function resolveFileFocus(options: Record<string, unknown>, args: string[
     ]) {
       const output = git(root, command);
       if (output === undefined) throw new FileFocusError("GIT_FAILED", "Cannot read the Git working set. Check repository access and retry --changed.");
-      for (const path of output.split("\0").filter(Boolean)) files.add(path);
+      for (const path of output.split("\0").filter(Boolean)) {
+        if (!isTrackerPath(path, pmRoot, root)) files.add(path);
+      }
     }
     refresh += ` --changed ${quote(base)}`;
   }
@@ -117,13 +129,15 @@ export function renderFileFocus(value: { unlinked_changed_files?: string[] }): s
 
 /** Enumerate all registered item folders through the canonical SDK parser without creating metadata caches. */
 export async function readFileFocusItems(pmRoot: string): Promise<PmItem[]> {
+  let itemPath = pmRoot;
   try {
     const settings = await readSettings(pmRoot);
     const registry = resolveItemTypeRegistry(settings, getActiveExtensionRegistrations());
     const items = new Map<string, PmItem>();
     for (const folder of registry.folders) {
       const type = registry.types.find((name) => registry.type_to_folder[name] === folder)!;
-      const entries = await readdir(join(pmRoot, folder), { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+      itemPath = join(pmRoot, folder);
+      const entries = await readdir(itemPath, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
         if (error.code === "ENOENT") return [];
         throw error;
       });
@@ -131,13 +145,15 @@ export async function readFileFocusItems(pmRoot: string): Promise<PmItem[]> {
         if (!entry.isFile() || !/\.(toon|md)$/.test(entry.name)) continue;
         const format = entry.name.endsWith(".toon") ? "toon" : "json_markdown";
         const id = entry.name.replace(/\.(toon|md)$/, "");
-        const { document } = await readLocatedItem({ id, type, itemPath: join(pmRoot, folder, entry.name), item_format: format }, { schema: settings.schema });
-        if (items.has(document.metadata.id)) throw new Error("Duplicate item identity");
+        itemPath = join(pmRoot, folder, entry.name);
+        const { document } = await readLocatedItem({ id, type, itemPath, item_format: format }, { schema: settings.schema });
+        if (items.has(document.metadata.id)) throw new Error(`Duplicate item identity: ${document.metadata.id}`);
         items.set(document.metadata.id, { ...document.metadata, body: document.body });
       }
     }
     return [...items.values()];
-  } catch {
-    throw new FileFocusError("TRACKER_READ_FAILED", "Cannot completely read tracker items. Run pm validate and resolve unreadable or duplicate documents before retrying file focus.");
+  } catch (error) {
+    const detail = String(error);
+    throw new FileFocusError("TRACKER_READ_FAILED", `Cannot completely read tracker items at ${itemPath}: ${detail}. Run pm validate and resolve unreadable or duplicate documents before retrying file focus.`, { cause: error });
   }
 }

@@ -9,7 +9,7 @@ import { init, readLocatedItem, serializeItemDocument } from "@unbrained/pm-cli/
 import { create } from "@unbrained/pm-cli/sdk/core";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 import extension, { buildContextPack, buildAgentHandoff, type ContextPack } from "../index.ts";
-import { FileFocusError, normalizeFocusPath, resolveFileFocus, readFileFocusItems } from "../file-focus.ts";
+import { FileFocusError, isTrackerPath, normalizeFocusPath, resolveFileFocus, readFileFocusItems } from "../file-focus.ts";
 
 const packageRoot = resolve(import.meta.dirname, "..");
 
@@ -33,7 +33,7 @@ function snapshot(root: string): Record<string, string> {
 }
 
 /** Real repository, tracker and installed distribution for parser-to-renderer acceptance. */
-async function fixture(t: TestContext) {
+async function fixture(t: TestContext, trackerPath = ".agents/pm") {
   const root = mkdtempSync(join(tmpdir(), "file-focus-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   git(root, "init", "-b", "main");
@@ -43,7 +43,7 @@ async function fixture(t: TestContext) {
   git(root, "add", ".");
   git(root, "commit", "-m", "Base");
   git(root, "switch", "-c", "feature");
-  const initialized = await init("focus", { defaults: true, author: "integration-test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
+  const initialized = await init("focus", { defaults: true, author: "integration-test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, trackerPath) });
   git(root, "add", ".gitattributes", ".gitignore");
   git(root, "commit", "--amend", "--no-edit");
   git(root, "branch", "-f", "main", "HEAD");
@@ -142,14 +142,17 @@ test("renames match both old and new linked paths and avoid directory-prefix fal
 
 test("default base honors origin/HEAD, falls back to main and finds changes from a subdirectory", async (t) => {
   const f = await fixture(t);
-  assert.deepEqual(resolveFileFocus({ changed: true }, [], f.root)!.files, []);
+  assert.deepEqual(resolveFileFocus({ changed: true }, [], f.root, f.pmRoot)!.files, []);
   writeFileSync(join(f.root, "src/one.ts"), "edit\n");
   git(f.root, "add", "src/one.ts");
   git(f.root, "commit", "-m", "Feature");
   git(f.root, "update-ref", "refs/remotes/origin/trunk", "HEAD");
   git(f.root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk");
-  assert.deepEqual(resolveFileFocus({ changed: true }, [], join(f.root, "src"))!.files, []);
-  assert.deepEqual(resolveFileFocus({ changed: "main" }, [], f.root)!.files, ["src/one.ts"]);
+  assert.deepEqual(resolveFileFocus({ changed: true }, [], join(f.root, "src"), f.pmRoot)!.files, []);
+  const refresh = f.run("--changed", "--format", "agent");
+  assert.match(refresh, /--changed 'origin\/trunk'/);
+  assert.doesNotMatch(refresh, /refs\/remotes/);
+  assert.deepEqual(resolveFileFocus({ changed: "main" }, [], f.root, f.pmRoot)!.files, ["src/one.ts"]);
 });
 
 test("Git routing environment cannot redirect discovery or index reads", async (t) => {
@@ -159,7 +162,7 @@ test("Git routing environment cannot redirect discovery or index reads", async (
   const saved = keys.map((key) => process.env[key]);
   try {
     for (const key of keys) process.env[key] = join(f.root, "missing");
-    assert.deepEqual(resolveFileFocus({ changed: true }, [], f.root)!.files, ["src/one.ts"]);
+    assert.deepEqual(resolveFileFocus({ changed: true }, [], f.root, f.pmRoot)!.files, ["src/one.ts"]);
   } finally {
     keys.forEach((key, index) => { if (saved[index] === undefined) delete process.env[key]; else process.env[key] = saved[index]; });
   }
@@ -179,13 +182,13 @@ test("file focus returns actionable typed errors for non-Git, unknown bases, inv
     [{ files: "src/one.ts" }, ["main"], f.root, "INVALID_FILE_FOCUS"],
     [{ changed: true }, ["main", "extra"], f.root, "INVALID_FILE_FOCUS"],
   ] as const) {
-    assert.throws(() => resolveFileFocus(options, [...args], cwd), (error: unknown) => error instanceof FileFocusError && error.exitCode === 2 && error.code === code);
+    assert.throws(() => resolveFileFocus(options, [...args], cwd, f.pmRoot), (error: unknown) => error instanceof FileFocusError && error.exitCode === 2 && error.code === code);
   }
   const failure = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), "context-pack", "--changed", "missing-branch"], { cwd: f.root, encoding: "utf8", env: { ...process.env, PM_PATH: f.pmRoot, PM_SOURCE_WORKSPACE_ROOT: f.root, PM_SOURCE_PM_PATH: f.pmRoot } });
   assert.equal(failure.status, 2, failure.stdout + failure.stderr);
   assert.match(failure.stdout + failure.stderr, /known-base/);
   writeFileSync(join(f.root, ".git/index"), "corrupt");
-  assert.throws(() => resolveFileFocus({ changed: true }, [], f.root), (error: unknown) => error instanceof FileFocusError && error.code === "GIT_FAILED");
+  assert.throws(() => resolveFileFocus({ changed: true }, [], f.root, f.pmRoot), (error: unknown) => error instanceof FileFocusError && error.code === "GIT_FAILED");
 });
 
 test("path normalization supports native absolute paths, Windows roots, containment and invalid links", () => {
@@ -214,8 +217,8 @@ test("empty focus stays empty and ranking uses status, priority and deterministi
 test("command uses source workspace and cwd fallbacks with file selectors", async (t) => {
   const f = await fixture(t);
   const harness = await createExtensionTestHarness(extension, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] });
-  assert.equal(resolveFileFocus({ changed: false }, [], f.root), undefined);
-  assert.ok(resolveFileFocus({ files: ["it's.ts"] }, [], f.root)!.refresh.includes("'\\''"));
+  assert.equal(resolveFileFocus({ changed: false }, [], f.root, f.pmRoot), undefined);
+  assert.ok(resolveFileFocus({ files: ["it's.ts"] }, [], f.root, f.pmRoot)!.refresh.includes("'\\''"));
   const previous = process.cwd();
   try {
     process.chdir(f.root);
@@ -231,7 +234,14 @@ test("read-only SDK enumeration supports markdown, skips non-items and fails clo
   const { document } = await readLocatedItem({ id: f.one, type: "Task", itemPath, item_format: "toon" });
   const markdownPath = join(f.pmRoot, "tasks", `${f.one}.md`);
   writeFileSync(markdownPath, serializeItemDocument(document, { format: "json_markdown" }));
-  await assert.rejects(readFileFocusItems(f.pmRoot), (error: unknown) => error instanceof FileFocusError && error.code === "TRACKER_READ_FAILED");
+  await assert.rejects(readFileFocusItems(f.pmRoot), (error: unknown) => {
+    assert.ok(error instanceof FileFocusError);
+    assert.equal(error.code, "TRACKER_READ_FAILED");
+    assert.match(error.message, /Duplicate item identity: focus-one/);
+    assert.ok(error.message.includes(`${f.one}.toon`) || error.message.includes(`${f.one}.md`));
+    assert.ok(error.cause instanceof Error);
+    return true;
+  });
   rmSync(itemPath);
   mkdirSync(join(f.pmRoot, "tasks", "nested"));
   writeFileSync(join(f.pmRoot, "tasks", "ignored.txt"), "not an item");
@@ -259,7 +269,7 @@ test("merge-base excludes base-only commits and retains staged reversions absent
   writeFileSync(join(f.root, "src/one.ts"), "initial\n");
   git(f.root, "add", "src/one.ts");
   writeFileSync(join(f.root, "src/two.ts"), "unstaged\n");
-  assert.deepEqual(resolveFileFocus({ changed: true }, [], f.root)!.files, ["src/one.ts", "src/two.ts"]);
+  assert.deepEqual(resolveFileFocus({ changed: true }, [], f.root, f.pmRoot)!.files, ["src/one.ts", "src/two.ts"]);
 });
 
 test("source command preserves file reasons, explanations, filters, refreshes and output writes across portable roots", async (t) => {
@@ -304,4 +314,61 @@ test("installed CLI includes type folders contributed by real extensions without
   const pack = JSON.parse(f.run("--files", "src/one.ts", "--format", "json")) as ContextPack;
   assert.ok(pack.items.some((item) => item.id === id && item.type === "FocusCase"));
   assert.deepEqual(snapshot(f.pmRoot), before);
+});
+
+
+test("changed excludes tracked items and history under default and custom pm roots", async (t) => {
+  for (const trackerPath of [".agents/pm", "project/tracker"]) {
+    const f = await fixture(t, trackerPath);
+    writeFileSync(join(f.root, "src/one.ts"), "branch edit\n");
+    git(f.root, "add", "src/one.ts");
+    git(f.root, "add", "-f", `${trackerPath}/tasks`, `${trackerPath}/history`);
+    git(f.root, "commit", "-m", "Code and tracker changes");
+    writeFileSync(join(f.root, `${trackerPath}-notes.ts`), "outside tracker\n");
+    git(f.root, "add", "-f", `${trackerPath}-notes.ts`);
+    const before = snapshot(f.pmRoot);
+    const pack = JSON.parse(f.run("--changed", "main", "--format", "json")) as ContextPack;
+    assert.deepEqual(pack.items.map((item) => item.id), [f.one]);
+    assert.deepEqual(pack.unlinked_changed_files, [`${trackerPath}-notes.ts`]);
+    for (const pmRoot of [f.pmRoot, trackerPath, trackerPath.replaceAll("/", "\\")]) {
+      assert.deepEqual(resolveFileFocus({ changed: "main" }, [], join(f.root, "src"), pmRoot)!.files,
+        [`${trackerPath}-notes.ts`, "src/one.ts"].sort());
+    }
+    assert.deepEqual(snapshot(f.pmRoot), before);
+  }
+});
+
+test("tracker containment handles Windows casing, separators, external roots and path boundaries", () => {
+  for (const [path, pmRoot, root, expected] of [
+    [".agents/pm/history/item.jsonl", ".agents/pm", "/repo", true],
+    [".agents/pm", "/repo/.agents/pm", "/repo", true],
+    [".agents/pm-notes.ts", ".agents/pm", "/repo", false],
+    ["src/one.ts", "/outside/tracker", "/repo", false],
+    ["../outside", ".agents/pm", "/repo", false],
+    ["src/one.ts", "/repo", "/repo", true],
+    [".agents/PM/history/item.jsonl", "C:\\Repo\\.agents\\pm", "C:\\Repo", true],
+    ["project\\tracker\\tasks\\item.toon", "project\\tracker", "C:\\Repo", true],
+    ["src/one.ts", "D:\\tracker", "C:\\Repo", false],
+    ["project/tracker/tasks/item.toon", "\\\\server\\repo\\project\\tracker", "\\\\server\\repo", true],
+    ["PROJECT/tracker/tasks/item.toon", "//server/repo/project/tracker", "//server/repo", true],
+  ] as const) assert.equal(isTrackerPath(path, pmRoot, root), expected);
+});
+
+test("malformed item errors retain the failing item path and original parser cause", async (t) => {
+  const f = await fixture(t);
+  const itemPath = join(f.pmRoot, "tasks", `${f.one}.toon`);
+  writeFileSync(itemPath, "not a valid item document");
+  let original: unknown;
+  try { await readLocatedItem({ id: f.one, type: "Task", itemPath, item_format: "toon" }); }
+  catch (error) { original = error; }
+  assert.ok(original instanceof Error);
+  await assert.rejects(readFileFocusItems(f.pmRoot), (error: unknown) => {
+    assert.ok(error instanceof FileFocusError);
+    assert.equal(error.code, "TRACKER_READ_FAILED");
+    assert.ok(error.message.includes(itemPath));
+    assert.ok(error.message.includes(original.message));
+    assert.ok(error.cause instanceof Error);
+    assert.equal(error.cause.message, original.message);
+    return true;
+  });
 });
