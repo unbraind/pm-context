@@ -29,7 +29,7 @@
     "prepublishOnly": "npm run release:check",
     "prepare": "node scripts/prepare-merge-driver.ts",
     "merge:install": "pm merge install",
-    "coverage": "npm run build && npm run build:test && node scripts/coverage-gate.ts",
+    "coverage": "npm run build && npm run build:test && c8 node scripts/coverage-gate.ts",
     "docstring": "node scripts/docstring-gate.ts",
     "verify:release-changelog-date": "node scripts/verify-release-changelog-date.ts"
   },
@@ -85,7 +85,9 @@
       ".",
       "scripts/coverage-gate.ts",
       "scripts/docstring-gate.ts",
-      "scripts/verify-release-publish-attestation.ts"
+      "scripts/verify-release-publish-attestation.ts",
+      "scripts/main-invocation.ts",
+      "scripts/verify-release-changelog-date.ts"
     ],
     "tests": [
       "test/*.test.ts"
@@ -96,5 +98,17 @@
       "functions": 100
     },
     "ignore": []
+  },
+  "c8": {
+    "all": true,
+    "include": ["*.ts", "scripts/*.ts", ".agents/pm/verify-release-yaml.mjs"],
+    "exclude": ["test/**"],
+    "reports-dir": "coverage/c8",
+    "reporter": ["text", "json-summary", "json"],
+    "check-coverage": true,
+    "statements": 100,
+    "branches": 99.9,
+    "functions": 100,
+    "lines": 100
   }
 }

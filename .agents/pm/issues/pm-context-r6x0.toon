@@ -6,7 +6,7 @@ status: open
 priority: 0
 tags: []
 created_at: "2026-08-07T16:55:11.230Z"
-updated_at: "2026-08-07T16:55:55.492Z"
+updated_at: "2026-10-16T12:25:42.910Z"
 assignee: maintainer
 author: "harness:codex"
 estimated_minutes: 240
@@ -22,6 +22,8 @@ actual_result: A non-allowlisted personal-domain identity is reachable in legacy
 affected_version: all reachable history through 2026.8.7
 component: release privacy
 customer_impact: Publication cannot satisfy the explicit no-personal-data history gate until remediated
+comments[1]{created_at,author,text}:
+  "2026-10-16T12:25:42.910Z",codex-agent,"Triage at main 684a6fa (released package 2026.10.16): the historical identity is in the fleet-wide approved allowlist .github/approved-git-identities.txt. The forward-only policy is recorded in .github/identity-baseline.txt and enforced by test/identity-audit.test.ts. Any history rewrite requires explicit maintainer approval. No history changes requested or performed."
 files[1]{path,scope,note}:
   .git,project,reachable commit metadata requiring coordinated rewrite
 docs[2]{path,scope,note}:
