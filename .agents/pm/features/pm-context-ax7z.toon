@@ -1,0 +1,33 @@
+id: pm-context-ax7z
+title: Focus context packs on changed and explicit files
+description: "Select and rank linked work from the real Git working set or repeated explicit paths, explain file matches and unlinked changes, and preserve existing neighborhood and packing behavior."
+type: Feature
+status: in_progress
+priority: 1
+tags: []
+created_at: "2026-10-16T16:03:52.838Z"
+updated_at: "2026-10-16T17:39:20.414Z"
+author: codex-agent
+comments[10]{created_at,author,text}:
+  "2026-10-16T16:04:05.107Z",codex-agent,"Implement real Git discovery with sanitized Git environment, repository-relative matching, overlap/status/priority ordering, read-only file-focused commands, and matching diagnostics across output formats. Validate real trackers and Git repositories, then prove regressions fail when selection functions are reverted."
+  "2026-10-16T16:11:53.764Z",codex-agent,"Real installed-CLI testing found that the SDK list path creates metadata-cache files while reading. File-focused requests now enumerate registered type folders with the SDK canonical item reader, reject unreadable or duplicate documents, and skip receipts/serving events. Full tracker-byte snapshots enforce this observational contract. Optional base syntax uses the pinned host command argument contract; repeated files preserve commas and spaces."
+  "2026-10-16T16:15:28.747Z",codex-agent,"Behavioral revert proof: replaced only buildContextPack with its origin/main implementation and rebuilt dist. node --test --test-name-pattern=\"explicit repeated files|linked directories rank|renames match|empty focus stays\" test/file-focus.test.ts failed 4/4 assertions (zero passes). Restored the implementation and rebuilt before positive verification. This proves file filtering, overlap ranking, rename selection and empty-set selection depend on the implementation."
+  "2026-10-16T16:20:29.139Z",codex-agent,Positive PM-linked run passed 13/13 with zero failures/skips. The first release gate passed all 340 functional tests but correctly rejected three uncovered explanation branches for neighbors without file matches. Added that source-path scenario. A real installed extension type exposed a reader enumeration gap; its regression failed before passing the active extension registry into the SDK type resolver. Thresholds and SDK pins remain unchanged.
+  "2026-10-16T16:30:29.313Z",codex-agent,"Final local verification: npm run release:check, bun run release:check, and env HOME=$(mktemp -d) GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 npm run release:check each passed 341/341 tests with zero failures, cancellations or skips. Native coverage is 100% lines/branches/functions; c8 is 100% statements/lines/functions and 99.92% branches at unchanged thresholds. PM-linked focused verification passed 14/14 with zero failures/skips. Tracker validation passed. Existing c8 non-Error exception branch remains outside this feature; file-focus.ts has 100% coverage in all reported dimensions. Ready for PR checks; item remains in progress."
+  "2026-10-16T17:13:29.150Z",codex-agent,"Round 1: merged current main and refreshed pinned dependencies. Fixing changed-file tracker exclusion using the resolved pm root, short origin default-base refresh arguments, and tracker read errors with item context and original cause. Regressions use real Git repositories and malformed tracker documents; each finding will receive a behavioural revert proof before the unchanged release gates."
+  "2026-10-16T17:16:56.697Z",codex-agent,"Behavioural revert proofs: after rebuilding, removing only tracker filtering from resolveFileFocus makes the real code-and-tracker branch test fail (0/1); removing only symbolic-ref --short makes the rendered origin/trunk refresh assertion fail (0/1); restoring only the prior readFileFocusItems function makes the malformed-item path/cause test fail (0/1). Each run exits 1 on an assertion. Fixed source was restored and rebuilt. Coverage thresholds remain unchanged."
+  "2026-10-16T17:18:22.840Z",codex-agent,"Live package-branch smoke passed with simultaneous code and tracker diffs: changed tracker paths are absent from the resolved working set, while file-focus.ts remains. Local strict health reports installed pm-github 2026.10.15 versus pinned host 2026.10.13; no tracked extension files are present, and integrity/history drift checks pass. Validation exits 0 with existing metadata and test-trust warnings. Dependency pins and historical records remain unchanged; CI will verify health on a clean checkout."
+  "2026-10-16T17:34:07.564Z",codex-agent,"Round 1 validation so far: linked npm run build && node --test test/file-focus.test.ts passed 17/17 with zero failures/skips. Both npm run release:check and bun run release:check passed 344/344 with zero failures/skips/cancellations/todos. Native coverage is 100% lines/branches/functions across nine configured sources; c8 is 100% statements/lines/functions and 99.92% branches, with file-focus.ts at 100% in every dimension. The required clean-home npm release gate is running next; all existing thresholds and pins are unchanged."
+  "2026-10-16T17:39:16.390Z",codex-agent,"Round 1 complete: the clean-home command env HOME=\"$(mktemp -d)\" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 npm run release:check also passed 344/344, with zero failures/skips/cancellations/todos and the same coverage as npm and Bun. All three findings have separate red revert proofs recorded above and green restored-source regressions. Real branch smoke and default/custom tracked-root acceptance pass. Existing history is byte-for-byte preserved as a prefix; added-line local-path and git diff --check inspections pass. Changelog generation/check is rerun after these final tracker writes. Delivery updates PR 151 and waits for its final-head checks; the item remains in_progress for orchestrator verification."
+files[6]{path,scope}:
+  dist/file-focus.js,project
+  dist/index.js,project
+  file-focus.ts,project
+  index.ts,project
+  README.md,project
+  test/file-focus.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm run build && node --test test/file-focus.test.ts,project,codex-agent,"2026-10-16T16:12:38.011Z",local_mutation,feat/changed-files-focus
+docs[1]{path,scope}:
+  README.md,project
+body: ""

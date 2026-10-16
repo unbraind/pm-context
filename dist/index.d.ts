@@ -1,3 +1,4 @@
+import type { FileFocus } from "./file-focus.ts";
 import type { ExtensionApi, RuntimeStatusRegistry, RelationshipKindRegistry } from "@unbrained/pm-cli/sdk";
 import { list as pmList } from "@unbrained/pm-cli/sdk/core";
 import type { ListResult } from "@unbrained/pm-cli/sdk/query";
@@ -56,6 +57,8 @@ export interface PmItem {
     updated_at?: string;
     docs?: unknown;
     files?: unknown;
+    /** Unique repository paths responsible for file-focused selection. */
+    matched_files?: string[];
     deps?: unknown;
     dependencies?: unknown;
     blocked_by?: unknown;
@@ -101,6 +104,8 @@ export declare const AGENT_SECTIONS: readonly ["focus", "blockers", "next-action
  */
 export interface ContextPackOptions {
     ids?: string[];
+    /** Normalized repository working set for file-focused selection. */
+    fileFocus?: FileFocus;
     status?: string;
     type?: string;
     tag?: string;
@@ -175,6 +180,7 @@ export interface ContextPack {
         to: string;
         kind: string;
     }>;
+    unlinked_changed_files?: string[];
     deps?: ContextPackDepInfo[];
 }
 export interface AgentHandoff {
@@ -194,6 +200,7 @@ export interface AgentHandoff {
         type: string;
         priority?: number;
         deadline?: string;
+        matched_files?: string[];
     }>;
     blockers: Array<{
         itemId: string;
@@ -219,6 +226,7 @@ export interface AgentHandoff {
         value: string;
     }>;
     deps?: ContextPackDepInfo[];
+    unlinked_changed_files?: string[];
     suggestedCommand: string;
 }
 export interface SelectionOptions {
@@ -403,6 +411,7 @@ export interface ContextExplainEntry {
     rank: number;
     score: number;
     contributions: Record<string, number>;
+    matched_files?: string[];
 }
 /** Relevance explanation report surfaced by `pm context-pack --explain`. */
 export interface ContextExplainReport {
@@ -412,6 +421,7 @@ export interface ContextExplainReport {
     ranking_scope: "emitted_pack";
     available_signals: readonly string[];
     entries: ContextExplainEntry[];
+    unlinked_changed_files?: string[];
 }
 /**
  * Build the `--explain` report from the SDK relevance model for the emitted

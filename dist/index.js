@@ -1,4 +1,5 @@
 import { writeFileSync } from "node:fs";
+import { resolveFileFocus, matchFileFocus, rankFileFocus, renderFileFocus, readFileFocusItems } from "./file-focus.js";
 import { createRelationshipKindRegistry, readSettings, resolveRuntimeStatusRegistry, resolveWorkspaceRelationshipKindRegistry, } from "@unbrained/pm-cli/sdk";
 import { list as pmList } from "@unbrained/pm-cli/sdk/core";
 import { buildItemContextRelevanceCandidates, defaultScoreContextCandidates, packContextCandidates, recordContextUsageServing, } from "@unbrained/pm-cli/sdk/query";
@@ -310,10 +311,13 @@ export function buildContextPack(allItems, options = {}) {
     const ids = Array.from(new Set((options.ids ?? []).map((id) => id.trim()).filter(Boolean)));
     const byId = new Map(allItems.map((item) => [item.id, item]));
     const allRelationships = allItems.flatMap(extractRelationships);
-    const selected = ids.length > 0
+    const fileMatches = options.fileFocus ? matchFileFocus(allItems, options.fileFocus, extractLinkValues) : undefined;
+    let selected = ids.length > 0
         ? ids.map((id) => byId.get(id)).filter((item) => Boolean(item))
         : allItems.filter((item) => matchesFilters(item, options));
-    const ranker = options.ranker ?? sortContextItems;
+    if (fileMatches)
+        selected = selected.filter((item) => matchesFilters(item, options) && fileMatches.has(item.id));
+    const ranker = fileMatches ? (items) => rankFileFocus(items, fileMatches) : options.ranker ?? sortContextItems;
     const limited = ranker(selected).slice(0, options.limit ?? 25);
     const selectedIds = new Set(limited.map((item) => item.id));
     // Resolve the neighborhood depth. --without-neighborhood (neighborhood === false)
@@ -375,7 +379,10 @@ export function buildContextPack(allItems, options = {}) {
         }
     }
     const focusIdsFinal = new Set(focusItems.map((item) => item.id));
-    const packItems = focusItems.map((item) => options.includeBody ? item : { ...item, body: undefined, description: undefined });
+    const packItems = focusItems.map((item) => ({
+        ...(options.includeBody ? item : { ...item, body: undefined, description: undefined }),
+        ...(fileMatches ? { matched_files: fileMatches.get(item.id) } : {}),
+    }));
     const packNeighbors = neighbors.map((item) => options.includeBody ? item : { ...item, body: undefined, description: undefined });
     const selectedAndNeighbors = [...packItems, ...packNeighbors];
     const byStatus = {};
@@ -434,6 +441,7 @@ export function buildContextPack(allItems, options = {}) {
             byStatus,
             byType,
         },
+        ...(fileMatches ? { unlinked_changed_files: options.fileFocus.files.filter((file) => ![...fileMatches.values()].some((matches) => matches.includes(file))) } : {}),
         items: packItems,
         neighbors: packNeighbors,
         links: buildLinks(selectedAndNeighbors),
@@ -457,6 +465,8 @@ function renderItemList(items, includeBody) {
             item.deadline ? `due ${item.deadline}` : "",
         ].filter(Boolean).join(" | ");
         lines.push(`- **${item.id}** ${markdownEscape(item.title || "(untitled)")} (${meta})`);
+        if (Array.isArray(item.matched_files))
+            lines.push(`  - matched_files: ${item.matched_files.map(markdownEscape).join(", ")}`);
         const tags = normalizeTags(item.tags);
         if (tags.length > 0)
             lines.push(`  - tags: ${tags.join(", ")}`);
@@ -488,6 +498,7 @@ export function renderMarkdown(pack, options = {}) {
     if (include("focus")) {
         lines.push("", "## Focus Items", "");
         lines.push(...renderItemList(pack.items, pack.items.some((item) => Boolean(item.body || item.description))));
+        lines.push(...renderFileFocus(pack));
     }
     if (include("neighborhood")) {
         lines.push("", "## Dependency Neighborhood", "");
@@ -608,12 +619,14 @@ export function buildAgentHandoff(pack, options = {}) {
             type: itemType(item),
             priority: typeof item.priority === "number" ? item.priority : undefined,
             deadline: normalizeText(item.deadline) || undefined,
+            ...(Array.isArray(item.matched_files) ? { matched_files: item.matched_files } : {}),
         })),
         blockers,
         nextActions,
         recent,
         links: pack.links.slice(0, 12),
         deps: pack.deps,
+        ...(pack.unlinked_changed_files ? { unlinked_changed_files: pack.unlinked_changed_files } : {}),
         suggestedCommand,
     };
 }
@@ -642,9 +655,13 @@ export function renderAgentHandoff(pack, options = {}) {
                     item.deadline ? `due ${item.deadline}` : "",
                 ].filter(Boolean).join(" | ");
                 lines.push(`- ${item.id}: ${markdownEscape(item.title)} (${meta})`);
+                if (item.matched_files)
+                    lines.push(`  - matched_files: ${item.matched_files.map(markdownEscape).join(", ")}`);
             }
         }
     }
+    if (include("focus"))
+        lines.push(...renderFileFocus(pack));
     if (include("blockers")) {
         lines.push("", "## Blockers", "");
         if (handoff.blockers.length === 0) {
@@ -1004,9 +1021,12 @@ export function renderContextExplain(report, options = {}) {
                 .map(([signal, value]) => `${signal}=${value.toFixed(3)}`)
                 .join(", ");
             lines.push(`- **${entry.id}** rank ${entry.rank} score ${entry.score.toFixed(3)} — ${contributions}`);
+            if (entry.matched_files)
+                lines.push(`  - matched_files: ${entry.matched_files.map(markdownEscape).join(", ")}`);
         }
         lines.push("");
     }
+    lines.push(...renderFileFocus(report));
     let output = `${lines.join("\n")}\n`;
     if (options.compress) {
         output = `${output.split("\n").filter((line) => line.trim() !== "").join("\n")}\n`;
@@ -1134,7 +1154,10 @@ function setupCommands(api) {
             "pm context-pack --id pm-1234 --max-items 10",
             "pm context-pack --status in_progress --explain",
         ],
+        arguments: [{ name: "base", required: false, description: "Git base for --changed (defaults to origin/HEAD, then main)" }],
         flags: [
+            { long: "--changed", description: "Focus linked files changed from an optional Git base, including working changes", type: "boolean" },
+            { long: "--files", value_name: "path", description: "Explicit repository-relative file path (repeatable)", type: "string", repeatable: true },
             { long: "--session", value_name: "id", description: "Usage session id (defaults to PM_CONTEXT_SESSION or the receipt id)", type: "string" },
             { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
             { long: "--ids", value_name: "ids", description: "Comma-separated focus ids (alias for repeated --id)", type: "string" },
@@ -1165,6 +1188,7 @@ function setupCommands(api) {
                 throw new CommandError("--format must be markdown, json, agent, or compact", EXIT_CODE.USAGE);
             }
             const selection = resolveSelectionOptions(options);
+            const fileFocus = resolveFileFocus(options, ctx.args, ctx.repo_root ?? ctx.source_workspace_root ?? process.cwd(), ctx.pm_root);
             const limit = intOption(options, "limit", contextPackDefaultLimit);
             const includeBody = boolOption(options, "include-body", "includeBody");
             const includeClosed = boolOption(options, "include-closed", "includeClosed");
@@ -1176,7 +1200,7 @@ function setupCommands(api) {
             const maxItems = intOptionMin0(options, ["max-items", "maxItems"], 0) || undefined;
             const explain = boolOption(options, "explain");
             const sections = validateSections(format, [...asArray(options.section), ...asArray(options.sections)]);
-            const items = await readPmItems(ctx.pm_root);
+            const items = fileFocus ? await readFileFocusItems(ctx.pm_root) : await readPmItems(ctx.pm_root);
             const rankOptions = await resolveSdkRankOptions(ctx);
             const ranker = createSdkRanker(items, rankOptions);
             // Pre-rank the full corpus so the token-budgeted packer has relevance ranks
@@ -1189,6 +1213,7 @@ function setupCommands(api) {
             // One registry per command, so pack dependencies and rendered blockers share kind semantics.
             const relationshipRegistry = resolveWorkspaceRelationshipKindRegistry();
             const pack = buildContextPack(items, {
+                fileFocus,
                 ids: selection.ids,
                 status: selection.status,
                 type: selection.type,
@@ -1206,6 +1231,16 @@ function setupCommands(api) {
             });
             if (explain) {
                 const explainReport = buildContextExplain([...pack.items, ...pack.neighbors], rankOptions);
+                if (fileFocus) {
+                    explainReport.entries = [...pack.items, ...pack.neighbors].map((item, index) => ({
+                        id: item.id, rank: index + 1, score: item.matched_files?.length ?? 0,
+                        contributions: { file_overlap: item.matched_files?.length ?? 0 },
+                        ...(item.matched_files ? { matched_files: item.matched_files } : {}),
+                    }));
+                    explainReport.available_signals = ["file_overlap", "status", "priority"];
+                    explainReport.unlinked_changed_files = pack.unlinked_changed_files;
+                    explainReport.model = "file_overlap_status_priority";
+                }
                 const output = format === "json"
                     ? `${JSON.stringify(explainReport, null, compress ? 0 : 2)}\n`
                     : renderContextExplain(explainReport, { compress });
@@ -1216,7 +1251,7 @@ function setupCommands(api) {
                 }
                 return renderedCommandResult(output);
             }
-            const suggestedCommand = buildSuggestedAgentCommand({
+            let suggestedCommand = buildSuggestedAgentCommand({
                 commandName: "context-pack",
                 selection,
                 limit,
@@ -1232,6 +1267,17 @@ function setupCommands(api) {
                 maxItems,
                 sections: sections.length > 0 ? sections : undefined,
             });
+            if (fileFocus) {
+                suggestedCommand += fileFocus.refresh;
+                if (selection.ids.length > 0) {
+                    if (selection.status)
+                        suggestedCommand += ` --status ${shellQuote(selection.status)}`;
+                    if (selection.type)
+                        suggestedCommand += ` --type ${shellQuote(selection.type)}`;
+                    if (selection.tag)
+                        suggestedCommand += ` --tag ${shellQuote(selection.tag)}`;
+                }
+            }
             const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
             let output = format === "json"
                 ? `${JSON.stringify(pack, null, compress ? 0 : 2)}\n`
@@ -1239,7 +1285,13 @@ function setupCommands(api) {
                     ? renderAgentHandoff(pack, renderOpts)
                     : renderMarkdown(pack, renderOpts);
             const outputPath = stringOption(options, "output");
-            output = await measureContextOutput(ctx, pack, output, format, "context-pack", compress, outputPath);
+            if (fileFocus) {
+                if (outputPath)
+                    writeFileSync(outputPath, output, "utf8");
+            }
+            else {
+                output = await measureContextOutput(ctx, pack, output, format, "context-pack", compress, outputPath);
+            }
             if (outputPath) {
                 const reportedFormat = requestedFormat === "compact" ? "compact" : format;
                 return format === "json" ? JSON.parse(output) : { ok: true, format: reportedFormat, selected: pack.summary.selectedItems, neighbors: pack.summary.neighborItems };
