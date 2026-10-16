@@ -25,6 +25,9 @@ pm context-pack --id pm-1234 --neighborhood-depth 2
 pm context-pack --id pm-1234 --compress --format json
 pm context-pack --id pm-1234 --include-deps --section focus --section blockers
 pm context-pack --id pm-1234 --max-items 10
+pm context-pack --changed --format agent
+pm context-pack --changed origin/main --format json
+pm context-pack --files src/parser.ts --files test/parser.test.ts
 ```
 
 The command reads workspace data in-process through the typed pm SDK, so packs
@@ -49,6 +52,37 @@ Agent handoff packs (`--format agent` or `--format compact`) are intentionally
 compact. They focus on the current work, visible blockers, next actions, recent
 activity, linked files/docs, and the exact refresh command another agent should
 run before continuing.
+
+### Focus on the files being changed
+
+`pm context-pack --changed [<base>]` focuses on items linked to the branch and
+working set: the diff from `merge-base(base, HEAD)`, staged and unstaged changes,
+and untracked files that Git does not ignore. The base defaults to the local
+`origin/HEAD` symbolic ref, falling back to `main`; fetch the default branch or
+pass a known base if it cannot be resolved. Renames consider both old and new
+paths so existing links still provide context.
+
+Use repeated `--files <path>` for an explicit working set, including paths that
+do not exist yet. Paths are relative to the repository root (native absolute
+paths inside that root are also accepted), and backslashes are normalized.
+`--files` and `--changed` combine their unique paths. Linked directories match
+contained files with path boundaries, so `src` matches `src/parser.ts` but
+`sr` does not. File selection intersects any id/status/type/tag filters.
+
+Focus items rank by the number of unique matching paths, then status
+(`in_progress`, `open`, `blocked`, `closed` with `--include-closed`), then
+ascending priority and id. Existing neighborhood depth, focus limit, max-items
+and token packing apply afterward. An empty working set selects no focus items.
+
+Every focus item exposes `matched_files`. `unlinked_changed_files` lists working
+set paths with no linked item anywhere in the tracker, independently of filters
+and packing; link them with `pm files <id> --add path=<path>`. These diagnostics
+appear in JSON, markdown, agent/compact and `--explain`; text diagnostics follow
+the `focus` section when using `--section`. Explain ranks follow the emitted
+file-focused pack. File-focused requests are observational: they create no
+tracker receipts or serving events, including when an author is set.
+`--output` writes only the requested output file. A non-Git directory, invalid
+base or path outside the repository produces an actionable usage error.
 
 ### Compress mode
 
@@ -98,6 +132,8 @@ Options:
 
 - `--session <id>` usage session (also available on `context-handoff`); defaults to
   `PM_CONTEXT_SESSION`, then a fresh receipt id for each bundle
+- `--changed [<base>]` focus linked files from a Git base plus the working set
+- `--files <path>` explicit repository-relative working set (repeatable)
 - `--id <id>` repeatable item ids to focus
 - `--ids <id,id>` comma-separated focus item ids (alias for repeated `--id`)
 - `--status <status>` filter by status
@@ -156,6 +192,9 @@ agents can reduce unused context in their next request.
 
 ```bash
 export PM_CONTEXT_SESSION=review-42
+# Start a branch task with its actual working set:
+pm context-pack --changed --format agent
+# For receipt-based usage measurement, request a regular item pack:
 pm context-pack --ids pm-1234,pm-5678 --section focus
 # Copy the actual receipt/fact identifiers from the returned bundle:
 pm context-usage --receipt RECEIPT_ID --cite FACT_ID --json
@@ -290,10 +329,10 @@ content, so `reconcile` only re-greens the hash chain (no data loss) — see the
 older blunt `pm history-repair --all` remains available as a lower-level primitive.
 
 The existing quality owner, `pm-context-3s5f`, remains open. The native coverage
-gate enforces 100% lines, branches and functions for eight configured files; it
+gate enforces 100% lines, branches and functions for nine configured files; it
 does not expose an independent statement counter. The same test run is wrapped
 by c8, which independently enforces 100% statements, lines and functions and
-99.9% branches across all ten authored TypeScript/JavaScript executables. The
+99.9% branches across all eleven authored TypeScript/JavaScript executables. The
 remaining c8 branch converts a non-Error exception from receipt usage into a
 command error. Neither measurement covers the shell alert helper, so passing
 the release command does not establish whole-source 100/100/100/100.
@@ -301,6 +340,7 @@ the release command does not establish whole-source 100/100/100/100.
 | Authored executable | Native gate | c8 release gate |
 | --- | --- | --- |
 | `index.ts` | Included | Included |
+| `file-focus.ts` | Included | Included |
 | `context-receipts.ts` | Included | Included |
 | `context-usage.ts` | Included | Included |
 | `scripts/coverage-gate.ts` | Included | Included |
