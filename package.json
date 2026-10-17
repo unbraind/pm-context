@@ -1,6 +1,6 @@
 {
   "name": "pm-context",
-  "version": "2026.10.16",
+  "version": "2026.10.17",
   "description": "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
   "type": "module",
   "main": "dist/index.js",
@@ -101,10 +101,20 @@
   },
   "c8": {
     "all": true,
-    "include": ["*.ts", "scripts/*.ts", ".agents/pm/verify-release-yaml.mjs"],
-    "exclude": ["test/**"],
+    "include": [
+      "*.ts",
+      "scripts/*.ts",
+      ".agents/pm/verify-release-yaml.mjs"
+    ],
+    "exclude": [
+      "test/**"
+    ],
     "reports-dir": "coverage/c8",
-    "reporter": ["text", "json-summary", "json"],
+    "reporter": [
+      "text",
+      "json-summary",
+      "json"
+    ],
     "check-coverage": true,
     "statements": 100,
     "branches": 99.9,
