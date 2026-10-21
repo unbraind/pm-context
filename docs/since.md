@@ -50,8 +50,13 @@ Cursors are scoped to the tracker and author. A deterministic sequence number
 ensures even an empty refresh returns a new token; retries of the same input
 cursor and corpus return the same response. Disposable, content-addressed
 snapshots live under the ignored tracker `runtime/context-since` directory, with
-at most 200 snapshots and 4 MiB total retained state. The cursor carries no file
-path. Losing/evicting runtime state produces `CURSOR_EXPIRED`; pruning or changing
+at most 200 snapshots and 4 MiB total retained state. History checkpoints store
+one count and ordered prefix hash per nonempty item stream, rather than one key
+per event, so retained history state scales with stream count.
+Pending rows still consume retention capacity. A later `--from` reduces pending
+rows; an oversized stream inventory requires a smaller tracker. Cursors from the
+older event-key checkpoint format expire with an explicit restart remedy. The
+cursor carries no file path. Losing/evicting runtime state produces `CURSOR_EXPIRED`; pruning or changing
 history covered by a cursor produces `HISTORY_EXPIRED`. Both refuse to invent a
 complete delta and instruct callers to reorient with `pm context --for handoff`,
 then restart with an appropriate `--from` timestamp. A timestamp predating a
@@ -93,3 +98,7 @@ internal filesystem-read counts or latency.
 Own-claim snapshots include `blocked: true` and bounded current blocker context,
 including free-text `blocked_by` reasons, even on an empty refresh. Historical
 replay uses certified current metadata only for items without retained streams.
+
+Causal replay scans indexed stream frontiers in timestamp/item-ID order, retaining
+physical order within each stream even for backdated writes. Pending pages only
+validate stored stream prefixes; they skip causal merging and classification.

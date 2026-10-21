@@ -197,7 +197,7 @@ test("registered handler uses the author and default budget from host context", 
 
 /** Build adversarial runtime state while leaving SDK-owned item histories untouched. */
 function checkpoint(pmRoot: string, pending: SincePack["changes"]) {
-  const state = { generation: 0, author: "agent-a", seen: [], pending };
+  const state = { generation: 0, author: "agent-a", streams: [], pending };
   const raw = JSON.stringify(state);
   const token = `s1_${createHash("sha256").update(raw).digest("hex")}`;
   const directory = join(pmRoot, SINCE_RETENTION.directory);
@@ -339,4 +339,129 @@ test("deleting terminal work does not invent a reopen or reprioritization", asyn
   assert.ok(pack.changes.some((row) => row.op === "delete"));
   assert.ok(pack.changes.some((row) => row.text.includes("final handoff")));
   assert.ok(!pack.changes.some((row) => row.kinds.includes("reopened") || row.kinds.includes("reprioritized")));
+});
+
+
+test("receipt budgeting drops the last row at an exact serialized boundary", async (t) => {
+  const f = await fixture(t);
+  const id = (await create({ title: "Receipt boundary", author: "agent-a" }, f.client)).item.id;
+  const baseline = await f.pack({ from: epoch });
+  for (let index = 0; index < 2; index++) await comments(id, { add: `${index}: ${"x".repeat(2400)}`, author: "agent-a" }, f.client);
+  const complete = await f.pack({ cursor: baseline.cursor });
+  assert.equal(complete.changes.length, 2);
+  complete.budget.ceiling = 3000;
+  let exact = Buffer.byteLength(encodeSincePack(complete));
+  complete.budget.ceiling = exact;
+  exact = Buffer.byteLength(encodeSincePack(complete));
+  const page = await f.pack({ cursor: baseline.cursor, tokenBudget: exact - 1 });
+  assert.equal(page.changes.length, 1, "an oversized last row must leave a usable page");
+  assert.equal(page.omission_receipt.deferred_rows, 1);
+  assert.equal(page.omission_receipt.excerpt_omitted_chars, page.changes[0]!.excerpt_omitted_chars);
+  assert.ok(Buffer.byteLength(encodeSincePack(page)) <= exact - 1);
+  assert.deepEqual((await f.pack({ cursor: page.cursor })).changes, complete.changes.slice(1));
+  assert.equal((await f.pack({ cursor: baseline.cursor, tokenBudget: exact })).changes.length, 2, "a complete receipt fits at its exact byte ceiling");
+});
+
+
+test("checkpoint size stays compact beyond the old 4 MiB event-key limit", async (t) => {
+  const f = await fixture(t);
+  const empty = emptyImportedDocument();
+  const entry = createHistoryEntry({ nowIso: epoch, author: "agent-a", op: "update", before: empty, after: empty });
+  const count = 65000;
+  writeFileSync(join(f.pmRoot, "history", "delta-large.jsonl"), `${JSON.stringify(entry)}\n`.repeat(count));
+  const pack = await f.pack({ from: "2099-01-01T00:00:00Z" });
+  const raw = readFileSync(join(f.pmRoot, SINCE_RETENTION.directory, `${pack.cursor}.json`), "utf8");
+  const state = JSON.parse(raw) as { streams: Array<{ id: string; count: number; hash: string }> };
+  const large = state.streams.find((stream) => stream.id === "delta-large")!;
+  assert.equal(state.streams.length, 2, "one large item stream plus SDK workspace history");
+  assert.equal(large.count, count);
+  assert.match(large.hash, /^[a-f0-9]{64}$/);
+  assert.ok(Buffer.byteLength(raw) < 512, "retained history fingerprints must scale with streams rather than events");
+});
+
+
+test("stream prefixes detect rewrite, truncation and removal while retaining late appends", async (t) => {
+  const f = await fixture(t);
+  const id = (await create({ title: "Prefix integrity", author: "agent-a" }, f.client)).item.id;
+  await comments(id, { add: "Retained prefix", author: "agent-a" }, f.client);
+  const baseline = await f.pack({ from: epoch });
+  const path = join(f.pmRoot, "history", `${id}.jsonl`);
+  const original = readFileSync(path, "utf8");
+  const entries = original.trim().split("\n");
+  const changed = JSON.parse(entries[0]!) as { author: string };
+  changed.author = "agent-b";
+  writeFileSync(path, [JSON.stringify(changed), ...entries.slice(1)].join("\n") + "\n");
+  await assert.rejects(f.pack({ cursor: baseline.cursor }), errorCode("HISTORY_EXPIRED"));
+  writeFileSync(path, entries.slice(0, -1).join("\n") + "\n");
+  await assert.rejects(f.pack({ cursor: baseline.cursor }), errorCode("HISTORY_EXPIRED"));
+  writeFileSync(path, "");
+  await assert.rejects(f.pack({ cursor: baseline.cursor }), errorCode("HISTORY_EXPIRED"));
+  rmSync(path);
+  await assert.rejects(f.pack({ cursor: baseline.cursor }), errorCode("HISTORY_EXPIRED"));
+  writeFileSync(path, original);
+  const empty = emptyImportedDocument();
+  await appendHistoryEntry(path, createHistoryEntry({ nowIso: "1999-01-01T00:00:00Z", author: "agent-a", op: "update", before: empty, after: empty, message: "Late physical append" }));
+  const resumed = await f.pack({ cursor: baseline.cursor });
+  assert.equal(resumed.changes.length, 1);
+  assert.ok(resumed.changes[0]!.text.includes("Late physical append"));
+});
+
+
+test("indexed causal merging avoids per-event stream shifts and frontier sorting", async (t) => {
+  const f = await fixture(t);
+  const a = (await create({ title: "Merge A", author: "agent-a" }, f.client)).item.id;
+  const b = (await create({ title: "Merge B", author: "agent-a" }, f.client)).item.id;
+  await comments(a, { add: "Merge prose", author: "agent-a" }, f.client);
+  const originalShift = Array.prototype.shift;
+  const originalSort = Array.prototype.sort;
+  let shifts = 0;
+  let sorts = 0;
+  let scans = 0;
+  const originalEntries = Array.prototype.entries;
+  /** Identify only delta-owned event arrays; SDK activity and unrelated arrays stay untouched. */
+  function isEvent(value: unknown): boolean {
+    return value !== null && typeof value === "object" && "ordinal" in value && "key" in value;
+  }
+  try {
+    Array.prototype.entries = function <T>(this: T[]): ArrayIterator<[number, T]> {
+      if (Array.isArray(this[0]) && isEvent(this[0][0])) scans++;
+      return originalEntries.call(this) as ArrayIterator<[number, T]>;
+    };
+    Array.prototype.shift = function <T>(this: T[]): T | undefined {
+      if (isEvent(this[0])) shifts++;
+      return originalShift.call(this) as T | undefined;
+    };
+    Array.prototype.sort = function <T>(this: T[], compareFn?: (a: T, b: T) => number): T[] {
+      if (Array.isArray(this[0]) && isEvent(this[0][0])) sorts++;
+      return originalSort.call(this, compareFn) as T[];
+    };
+    const pack = await f.pack({ from: epoch });
+    assert.ok(pack.changes.some((row) => row.id === a) && pack.changes.some((row) => row.id === b));
+    assert.equal(shifts, 0, "delta event streams must not move remaining entries per event");
+    assert.equal(sorts, 0, "delta stream frontiers must not be sorted per event");
+    assert.ok(scans > 0, "new windows perform a causal frontier scan");
+    scans = 0;
+    const frozen = checkpoint(f.pmRoot, pack.changes);
+    const resumed = await f.pack({ cursor: frozen, tokenBudget: 1300 });
+    assert.ok(resumed.omission_receipt.deferred_rows > 0);
+    assert.equal(shifts, 0, "pending pages must skip the event merge");
+    assert.equal(sorts, 0);
+    assert.equal(scans, 0, "pending pages only validate history prefixes");
+  } finally {
+    Array.prototype.shift = originalShift;
+    Array.prototype.sort = originalSort;
+    Array.prototype.entries = originalEntries;
+  }
+});
+
+
+test("obsolete event-key cursors expire with an explicit restart remedy", async (t) => {
+  const f = await fixture(t);
+  const state = { generation: 0, author: "agent-a", seen: [], pending: [] };
+  const raw = JSON.stringify(state);
+  const cursor = `s1_${createHash("sha256").update(raw).digest("hex")}`;
+  const directory = join(f.pmRoot, SINCE_RETENTION.directory);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, `${cursor}.json`), raw);
+  await assert.rejects(f.pack({ cursor }), (error: unknown) => errorCode("CURSOR_EXPIRED")(error) && error instanceof SinceError && error.remedy.includes("--from"));
 });

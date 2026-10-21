@@ -33,7 +33,7 @@ function compare(a, b) {
     return a < b ? -1 : a > b ? 1 : 0;
 }
 /** Apply SDK history policy/read hooks, then retain physical stream order for equal/backdated timestamps. */
-async function readEvents(pmRoot) {
+async function readStreams(pmRoot) {
     const streams = [];
     await runActivity({ raw: true, compact: true, limit: "1" }, { path: pmRoot });
     for (const file of readdirSync(join(pmRoot, "history")).filter((name) => name.endsWith(".jsonl")).sort()) {
@@ -41,13 +41,42 @@ async function readEvents(pmRoot) {
         const entries = await readHistoryEntries(join(pmRoot, "history", file), id);
         streams.push(entries.map((entry, ordinal) => ({ ...entry, id, ordinal, key: digest([id, ordinal, entry]) })));
     }
-    // Merge stream frontiers, preserving causality even when a writer's clock regresses.
+    return streams;
+}
+/** Merge indexed frontiers without sorting or moving the remaining stream entries. */
+function mergeEvents(streams) {
+    const indices = streams.map(() => 0);
     const events = [];
     for (;;) {
-        const stream = streams.filter((entries) => entries.length).sort((a, b) => compare(a[0].ts, b[0].ts) || compare(a[0].id, b[0].id))[0];
-        if (!stream)
+        let next;
+        let selected = -1;
+        for (const [index, stream] of streams.entries()) {
+            const candidate = stream[indices[index]];
+            if (candidate && (!next || (compare(candidate.ts, next.ts) || compare(candidate.id, next.id)) < 0)) {
+                next = candidate;
+                selected = index;
+            }
+        }
+        if (!next)
             return events;
-        events.push(stream.shift());
+        events.push(next);
+        indices[selected]++;
+    }
+}
+/** Hash physical event order, including ordinals, to reject prefix rewrites. */
+function fingerprint(streams) {
+    return streams.filter((stream) => stream.length > 0).map((stream) => ({
+        id: stream[0].id, count: stream.length, hash: digest(stream.map((event) => event.key)),
+    }));
+}
+/** Check retained prefixes without merging; later ordinals remain eligible even if backdated. */
+function validatePrefixes(streams, previous) {
+    const current = new Map(streams.filter((stream) => stream.length > 0).map((stream) => [stream[0].id, stream]));
+    for (const prefix of previous) {
+        const stream = current.get(prefix.id);
+        if (!stream || stream.length < prefix.count || digest(stream.slice(0, prefix.count).map((event) => event.key)) !== prefix.hash) {
+            throw new SinceError("HISTORY_EXPIRED", "Retained history changed or was pruned. Reorient with pm context --for handoff, then restart with --from <ISO timestamp>.");
+        }
     }
 }
 /** Derive active blockers from tracker-owned statuses and explicit blocking edges. */
@@ -214,6 +243,8 @@ function readCheckpoint(directory, token, author) {
     }
     if (`s1_${digest(state)}` !== token)
         throw new SinceError("INVALID_CURSOR", "Restart with --from <ISO timestamp>; cursor state is damaged.");
+    if (!Array.isArray(state.streams))
+        throw new SinceError("CURSOR_EXPIRED", "Restart with --from <ISO timestamp>; this cursor uses an obsolete checkpoint format.");
     if (state.author !== author)
         throw new SinceError("CURSOR_AUTHOR_MISMATCH", "Resume with the original --author or start a new --from session.");
     return state;
@@ -222,7 +253,7 @@ function readCheckpoint(directory, token, author) {
 function saveCheckpoint(directory, state) {
     const raw = JSON.stringify(state);
     if (Buffer.byteLength(raw) > SINCE_RETENTION.bytes)
-        throw new SinceError("CURSOR_CAPACITY", "Use a smaller --from window or compact history after reorienting; checkpoint exceeds the runtime retention capacity.");
+        throw new SinceError("CURSOR_CAPACITY", "Restart with a later --from timestamp to reduce pending rows; if the stream inventory alone exceeds capacity, use a smaller tracker. Checkpoint exceeds the runtime retention capacity.");
     const token = `s1_${digest(state)}`;
     mkdirSync(directory, { recursive: true });
     const temporary = join(directory, `${token}.${randomUUID()}.tmp`);
@@ -268,25 +299,24 @@ export async function buildSincePack(pmRoot, items, terminal, options) {
         throw new SinceError("INVALID_BUDGET", "--token-budget must be an integer of at least 512.");
     const directory = join(pmRoot, SINCE_RETENTION.directory);
     const previous = options.cursor ? readCheckpoint(directory, options.cursor, options.author) : undefined;
-    const events = await readEvents(pmRoot);
-    const seen = events.map((event) => event.key).sort();
-    const current = new Set(seen);
-    if (previous?.seen.some((key) => !current.has(key)))
-        throw new SinceError("HISTORY_EXPIRED", "Retained history changed or was pruned. Reorient with pm context --for handoff, then restart with --from <ISO timestamp>.");
+    const streams = await readStreams(pmRoot);
+    if (previous)
+        validatePrefixes(streams, previous.streams);
     let rows;
     let snapshot;
     if (previous && previous.pending.length) {
         rows = previous.pending;
-        snapshot = previous.seen;
+        snapshot = previous.streams;
     }
     else {
+        const events = mergeEvents(streams);
         const from = options.from === undefined ? undefined : Date.parse(options.from);
         if (from !== undefined && !Number.isFinite(from))
             throw new SinceError("INVALID_FROM", "--from must be an ISO timestamp.");
         if (from !== undefined && events.some((event) => event.op === "history_compact_baseline" && Date.parse(event.ts) >= from))
             throw new SinceError("HISTORY_EXPIRED", "Requested time predates retained history. Reorient with pm context --for handoff and restart after the compacted baseline.");
-        const prior = new Set(previous?.seen);
-        const selected = new Set(events.filter((event) => from === undefined ? !prior.has(event.key) : Date.parse(event.ts) >= from).map((event) => event.key));
+        const prior = new Map(previous?.streams.map((stream) => [stream.id, stream.count]));
+        const selected = new Set(events.filter((event) => from === undefined ? event.ordinal >= (prior.get(event.id) ?? 0) : Date.parse(event.ts) >= from).map((event) => event.key));
         const classified = classify(events, selected, terminal, items);
         rows = classified.rows;
         const snapshots = new Map(items.map((item) => [item.id, item]));
@@ -304,7 +334,7 @@ export async function buildSincePack(pmRoot, items, terminal, options) {
             }
         }
         rows.sort((a, b) => rank(a) - rank(b) || a.priority - b.priority || compare(b.ts, a.ts) || compare(a.key, b.key));
-        snapshot = seen;
+        snapshot = fingerprint(streams);
     }
     const pack = {
         protocol: "pm-context-since/v1", cursor: `s1_${"0".repeat(64)}`, changes: [],
@@ -314,6 +344,10 @@ export async function buildSincePack(pmRoot, items, terminal, options) {
     let included = 0;
     for (const row of rows) {
         pack.changes.push(row);
+        pack.omission_receipt.deferred_rows--;
+        if (row.op === "own_claim")
+            pack.omission_receipt.deferred_own_claims--;
+        pack.omission_receipt.excerpt_omitted_chars += row.excerpt_omitted_chars;
         if (Buffer.byteLength(encodeSincePack(pack)) > options.tokenBudget) {
             pack.changes.pop();
             break;
@@ -325,7 +359,7 @@ export async function buildSincePack(pmRoot, items, terminal, options) {
     pack.omission_receipt.excerpt_omitted_chars = pack.changes.reduce((sum, row) => sum + row.excerpt_omitted_chars, 0);
     if ((rows.length > 0 && included === 0) || Buffer.byteLength(encodeSincePack(pack)) > options.tokenBudget)
         throw new SinceError("BUDGET_TOO_SMALL", "Increase --token-budget to fit the receipt and at least one complete delta row; no cursor advanced.");
-    pack.cursor = saveCheckpoint(directory, { generation: (previous?.generation ?? -1) + 1, author: options.author, seen: snapshot, pending: rows.slice(included) });
+    pack.cursor = saveCheckpoint(directory, { generation: (previous?.generation ?? -1) + 1, author: options.author, streams: snapshot, pending: rows.slice(included) });
     encodeSincePack(pack);
     return pack;
 }
