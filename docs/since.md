@@ -12,7 +12,9 @@ pm context-pack since --cursor "$cursor" --token-budget 4000
 The starting timestamp is inclusive. Subsequent calls identify immutable history
 entries rather than comparing timestamps, so equal timestamps and backdated
 appends do not disappear. Every event gets an operation, author, timestamp,
-changed-field inventory and stable key. Lifecycle, priority and assignee
+changed-field inventory, type, status and stable key. Derived graph transitions
+use `blocked`/`unblocked` operations; closing or deleting the waiting item does
+not manufacture newly actionable work. Lifecycle, priority and assignee
 transitions are stated explicitly. Blocking edges follow the SDK relationship
 registry; closing a prerequisite also identifies affected dependents.
 
@@ -20,7 +22,9 @@ Blockers rank first, followed by your claims, handoffs, unblocked work, other
 claims, reopened/reprioritized/new items, comments and closures. Priority, event
 time and key break ties deterministically. Reversed blocker/unblock rows carry `superseded: true` and rank last. A claim
 event may also have been released later in the same window; read its transitions
-and timestamps together. Own claims describe the serving snapshot, including
+and timestamps together. Own claims come from the same SDK history replay as the delta, so a competing
+claim between metadata and history reads cannot remain listed as your own.
+Claims describe the serving snapshot, including
 open and in-progress statuses and excluding the workspace's terminal statuses.
 
 Each response includes an omission receipt. Rows that do not fit remain in the
@@ -42,7 +46,9 @@ input is 512; a ceiling that cannot fit the envelope and one full row fails with
 `BUDGET_TOO_SMALL` without advancing a cursor. Increase the ceiling and retry.
 No random usage-receipt footer is appended to this deterministic surface.
 
-Cursors are scoped to the tracker and author. Disposable, content-addressed
+Cursors are scoped to the tracker and author. A deterministic sequence number
+ensures even an empty refresh returns a new token; retries of the same input
+cursor and corpus return the same response. Disposable, content-addressed
 snapshots live under the ignored tracker `runtime/context-since` directory, with
 at most 200 snapshots and 4 MiB total retained state. The cursor carries no file
 path. Losing/evicting runtime state produces `CURSOR_EXPIRED`; pruning or changing

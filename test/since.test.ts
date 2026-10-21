@@ -6,7 +6,7 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import test, { type TestContext } from "node:test";
 import { init, historyCompact, createHistoryEntry, appendHistoryEntry, emptyImportedDocument } from "@unbrained/pm-cli/sdk";
-import { create, comments, claim, release, update, close, reopen } from "@unbrained/pm-cli/sdk/core";
+import { create, comments, claim, release, update, close, reopen, deleteItem } from "@unbrained/pm-cli/sdk/core";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 import extension, { readPmItems } from "../index.ts";
 import { buildSincePack, encodeSincePack, SinceError, SINCE_RETENTION } from "../since.ts";
@@ -103,6 +103,9 @@ test("bad arguments, wrong author, corrupt or missing cursors fail with explicit
   await assert.rejects(f.pack({ cursor: "../../outside" }), errorCode("INVALID_CURSOR"));
   await assert.rejects(f.pack({ cursor: `s1_${"0".repeat(64)}` }), errorCode("CURSOR_EXPIRED"));
   const pack = await f.pack({ from: epoch });
+  const emptyRefresh = await f.pack({ cursor: pack.cursor });
+  assert.notEqual(emptyRefresh.cursor, pack.cursor, "even an empty refresh returns a new cursor");
+  assert.deepEqual(await f.pack({ cursor: pack.cursor }), emptyRefresh, "retrying a cursor stays deterministic");
   await assert.rejects(f.pack({ cursor: pack.cursor, author: "agent-b" }), errorCode("CURSOR_AUTHOR_MISMATCH"));
   writeFileSync(join(f.pmRoot, SINCE_RETENTION.directory, `${pack.cursor}.json`), "{}");
   await assert.rejects(f.pack({ cursor: pack.cursor }), errorCode("INVALID_CURSOR"));
@@ -179,7 +182,7 @@ test("registered handler uses the author and default budget from host context", 
 
 /** Build adversarial runtime state while leaving SDK-owned item histories untouched. */
 function checkpoint(pmRoot: string, pending: SincePack["changes"]) {
-  const state = { author: "agent-a", seen: [], pending };
+  const state = { generation: 0, author: "agent-a", seen: [], pending };
   const raw = JSON.stringify(state);
   const token = `s1_${createHash("sha256").update(raw).digest("hex")}`;
   const directory = join(pmRoot, SINCE_RETENTION.directory);
@@ -229,12 +232,31 @@ test("equal-time, backdated, inverse-edge and sparse historical records retain c
   }
   await stream("delta-a", [
     { id: "delta-a", status: "blocked", blocked_reason: "Waiting on access", comments: [], dependencies: [] },
-    { id: "delta-a", title: "Repaired title", status: "open", dependencies: [{ id: "delta-b", kind: "blocks" }] },
-    { id: "delta-a", status: "closed" },
+    { id: "delta-a", status: "open", dependencies: [{ id: "delta-b", kind: "blocks" }] },
+    {},
   ]);
   await stream("delta-b", [
     { id: "delta-b", status: "open", dependencies: [{ id: "missing", kind: "related" }] },
     { id: "delta-b", status: "closed" },
+  ]);
+  await stream("delta-wait", [
+    { id: "delta-wait", status: "open", dependencies: [{ id: "missing", kind: "blocked_by" }] },
+    { id: "delta-wait", status: "closed" },
+  ]);
+  await stream("delta-done", [
+    { id: "delta-done", status: "blocked" },
+    { id: "delta-done", status: "open" },
+    { id: "delta-done", status: "closed" },
+  ]);
+  await stream("delta-ready", [
+    { id: "delta-ready", status: "blocked" },
+    { id: "delta-ready", status: "open" },
+  ]);
+  const repeated = { created_at: time, author: "agent-a", text: "Same-time repeated comment" };
+  await stream("delta-repeated", [
+    { id: "delta-repeated", status: "open", comments: [repeated] },
+    { id: "delta-repeated", status: "open", comments: [repeated, repeated] },
+    { id: "delta-repeated", status: "closed", comments: [repeated, repeated] },
   ]);
   // Append a structurally valid legacy record with malformed optional collections.
   // Activity can surface it; the delta must safely omit non-prose collection values.
@@ -244,15 +266,46 @@ test("equal-time, backdated, inverse-edge and sparse historical records retain c
     patch: [{ op: "add", path: "/metadata/comments", value: [null] }, { op: "add", path: "/metadata/dependencies", value: [null] }],
   });
   writeFileSync(join(f.pmRoot, "history", ".keep"), "not a history stream");
-  const pack = await buildSincePack(f.pmRoot, [{ id: "delta-own", assignee: "agent-a", status: "open" }], terminal, { author: "agent-a", from: epoch, tokenBudget: 100000 });
+  const pack = await buildSincePack(f.pmRoot, [{ id: "delta-own", assignee: "agent-a" }], terminal, { author: "agent-a", from: epoch, tokenBudget: 100000 });
   assert.ok(pack.changes.some((row) => row.id === "delta-b" && row.kinds.includes("blocked")));
-  assert.ok(pack.changes.some((row) => row.id === "delta-a" && row.kinds.includes("unblocked")));
+  assert.ok(!pack.changes.some((row) => row.id === "delta-wait" && row.kinds.includes("unblocked")), "closing blocked work does not create actionable work");
+  assert.ok(pack.changes.some((row) => row.id === "delta-a" && row.kinds.includes("unblocked") && row.superseded));
+  assert.ok(pack.changes.some((row) => row.id === "delta-done" && row.kinds.includes("unblocked") && row.superseded));
+  assert.ok(pack.changes.some((row) => row.id === "delta-ready" && row.kinds.includes("unblocked") && row.superseded === false));
   assert.ok(pack.changes.some((row) => row.title === "delta-b"));
   assert.ok(pack.changes.some((row) => row.ts < time));
+  assert.equal(pack.changes.filter((row) => row.id === "delta-repeated" && row.kinds.includes("comment")).length, 2, "identical same-time comments are counted as separate additions");
   const cursor = pack.cursor;
   const before = emptyImportedDocument();
   const after = { metadata: { id: "delta-c", title: "Late old-clock event", status: "open", priority: 4 } as unknown as ItemMetadata, body: "" };
   await appendHistoryEntry(join(f.pmRoot, "history", "delta-c.jsonl"), createHistoryEntry({ nowIso: "2020-01-01T00:00:00Z", author: "agent-a", op: "create", before, after }));
   const late = await buildSincePack(f.pmRoot, [], terminal, { author: "agent-a", cursor, tokenBudget: 100000 });
   assert.ok(late.changes.some((row) => row.id === "delta-c"));
+});
+
+
+test("claim ownership uses the same history snapshot when another agent claims between reads", async (t) => {
+  const f = await fixture(t);
+  const id = (await create({ title: "Concurrent claim snapshot", author: "agent-a" }, f.client)).item.id;
+  await claim(id, { author: "agent-a" }, f.client);
+  const baseline = await f.pack({ from: epoch });
+  const staleMetadata = await readPmItems(f.pmRoot);
+  await claim(id, { author: "agent-b", force: true }, f.client);
+  const pack = await buildSincePack(f.pmRoot, staleMetadata, terminal, { author: "agent-a", cursor: baseline.cursor, tokenBudget: 10000 });
+  assert.ok(pack.changes.some((row) => row.op === "claim" && row.author === "agent-b"));
+  assert.ok(!pack.changes.some((row) => row.op === "own_claim" && row.id === id));
+});
+
+
+test("deleting terminal work does not invent a reopen or reprioritization", async (t) => {
+  const f = await fixture(t);
+  const id = (await create({ title: "Deleted terminal work", author: "agent-a" }, f.client)).item.id;
+  await close(id, "Finished", { author: "agent-a" }, f.client);
+  const baseline = await f.pack({ from: epoch });
+  await comments(id, { add: "Retain this final handoff before cleanup", author: "agent-a" }, f.client);
+  await deleteItem(id, { author: "agent-a" }, f.client);
+  const pack = await f.pack({ cursor: baseline.cursor });
+  assert.ok(pack.changes.some((row) => row.op === "delete"));
+  assert.ok(pack.changes.some((row) => row.text.includes("final handoff")));
+  assert.ok(!pack.changes.some((row) => row.kinds.includes("reopened") || row.kinds.includes("reprioritized")));
 });

@@ -25,6 +25,8 @@ export interface DeltaRow {
     author: string;
     kinds: string[];
     title: string;
+    type: string;
+    status: string;
     priority: number;
     fields: string[];
     text: string;

@@ -41,7 +41,8 @@ try {
   const publicSha = execFileSync("git", ["-C", source, "rev-parse", ref], { encoding: "utf8" }).trim();
   console.log(JSON.stringify({ item_count: items.length, public_sha: publicSha, cli_version: execFileSync(cli, ["--version"], { encoding: "utf8" }).trim() }));
   const client = { cwd: root, pmRoot };
-  const id = (await create({ title: "Synthetic resume session on a public tracker copy", author }, client)).item.id;
+  const seeded = (await create({ title: "Synthetic resume session on a public tracker copy", author }, client)).item;
+  const id = seeded.id;
   await claim(id, { author }, client);
   const baseline = await buildSincePack(pmRoot, await readPmItems(pmRoot), new Set(["closed", "canceled"]), {
     author, tokenBudget: 12000, from: new Date(Date.now() + 86_400_000).toISOString(),
@@ -61,6 +62,7 @@ try {
     const missing = oracle.compact_activity.filter((event) => !pack.changes.some((row) => row.id === event.id && row.op === event.op && row.ts === event.ts && row.author === event.author));
     assert.deepEqual(missing, []);
     assert.ok(pack.changes.some((row) => row.text.includes(text)));
+    assert.ok(pack.changes.some((row) => row.id === id && row.title === seeded.title && row.status === seeded.status && row.type === seeded.type));
     assert.equal(pack.omission_receipt.deferred_rows, 0);
     const directory = join(output, `session-${session}`);
     mkdirSync(directory, { recursive: true });

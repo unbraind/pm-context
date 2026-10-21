@@ -2,7 +2,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { PmCliError, applyHistoryPatch, readHistoryEntries, resolveWorkspaceRelationshipKindRegistry } from "@unbrained/pm-cli/sdk";
+import { PmCliError, applyHistoryPatch, readHistoryEntries, resolveWorkspaceRelationshipKindRegistry, runActiveOnReadHooks } from "@unbrained/pm-cli/sdk";
 /** Runtime snapshots are disposable, bounded, and never stored in item history. */
 export const SINCE_RETENTION = { count: 200, bytes: 4_194_304, directory: "runtime/context-since" };
 /** Explicit recovery contracts for expired history, bad input, and impossible budgets. */
@@ -34,6 +34,7 @@ function compare(a, b) {
 /** Read all validated SDK streams, with no activity default limit or Git dependency. */
 async function readEvents(pmRoot) {
     const streams = [];
+    await runActiveOnReadHooks({ path: join(pmRoot, "history"), scope: "project" });
     for (const file of readdirSync(join(pmRoot, "history")).filter((name) => name.endsWith(".jsonl")).sort()) {
         const id = file.slice(0, -6);
         const entries = await readHistoryEntries(join(pmRoot, "history", file), id);
@@ -74,13 +75,21 @@ function blockers(documents, terminal, registry) {
 function addedProse(before, after) {
     const text = [];
     for (const field of ["comments", "notes", "learnings"]) {
-        const old = new Set((Array.isArray(before[field]) ? before[field] : []).map((value) => JSON.stringify(value)));
+        const remaining = new Map();
+        for (const value of Array.isArray(before[field]) ? before[field] : []) {
+            const key = JSON.stringify(value);
+            remaining.set(key, (remaining.get(key) ?? 0) + 1);
+        }
         for (const value of Array.isArray(after[field]) ? after[field] : []) {
-            if (!old.has(JSON.stringify(value))) {
-                const prose = record(value).text;
-                if (typeof prose === "string")
-                    text.push(prose);
+            const key = JSON.stringify(value);
+            const count = remaining.get(key) ?? 0;
+            if (count > 0) {
+                remaining.set(key, count - 1);
+                continue;
             }
+            const prose = record(value).text;
+            if (typeof prose === "string")
+                text.push(prose);
         }
     }
     return text;
@@ -108,9 +117,9 @@ function classify(events, selected, terminal) {
                 kinds.push("created");
             if (terminal.has(String(after.status)) && !terminal.has(String(before.status)))
                 kinds.push("closed");
-            if (terminal.has(String(before.status)) && !terminal.has(String(after.status)))
+            if (terminal.has(String(before.status)) && typeof after.status === "string" && !terminal.has(after.status))
                 kinds.push("reopened");
-            if (event.op !== "create" && before.priority !== after.priority)
+            if (event.op !== "create" && after.priority !== undefined && before.priority !== after.priority)
                 kinds.push("reprioritized");
             const prose = addedProse(before, after);
             if (prose.length)
@@ -126,7 +135,7 @@ function classify(events, selected, terminal) {
             const title = excerpt(String(after.title ?? before.title ?? event.id), 128);
             const row = {
                 key: event.key, id: event.id, op: event.op, ts: event.ts, author: event.author,
-                kinds: [...new Set(kinds)], title: title.text, priority: Number(after.priority ?? 4),
+                kinds: [...new Set(kinds)], title: title.text, type: String(after.type ?? before.type ?? "unknown"), status: String(after.status ?? before.status ?? "unknown"), priority: Number(after.priority ?? 4),
                 fields: [...new Set(event.patch.map((patch) => patch.path))], text: clipped.text,
                 excerpt_omitted_chars: clipped.omitted + title.omitted,
             };
@@ -140,13 +149,14 @@ function classify(events, selected, terminal) {
             for (const [key, id] of nextBlocked) {
                 if (!blocked.has(key)) {
                     const title = excerpt(String(documents.get(id)?.title ?? id), 128);
-                    rows.push({ ...row, key: `${row.key}:blocked:${key}`, id, kinds: ["blocked"], title: title.text, text: key, priority: Number(documents.get(id)?.priority ?? 4), excerpt_omitted_chars: title.omitted });
+                    rows.push({ ...row, key: `${row.key}:blocked:${key}`, id, op: "blocked", kinds: ["blocked"], title: title.text, type: String(documents.get(id)?.type ?? "unknown"), status: String(documents.get(id)?.status ?? "unknown"), text: key, priority: Number(documents.get(id)?.priority ?? 4), excerpt_omitted_chars: title.omitted });
                 }
             }
             for (const [key, id] of blocked) {
-                if (!nextBlocked.has(key)) {
+                const status = documents.get(id)?.status;
+                if (!nextBlocked.has(key) && typeof status === "string" && !terminal.has(status)) {
                     const title = excerpt(String(documents.get(id)?.title ?? id), 128);
-                    rows.push({ ...row, key: `${row.key}:unblocked:${key}`, id, kinds: ["unblocked"], title: title.text, text: key, priority: Number(documents.get(id)?.priority ?? 4), excerpt_omitted_chars: title.omitted });
+                    rows.push({ ...row, key: `${row.key}:unblocked:${key}`, id, op: "unblocked", kinds: ["unblocked"], title: title.text, type: String(documents.get(id)?.type ?? "unknown"), status, text: key, priority: Number(documents.get(id)?.priority ?? 4), excerpt_omitted_chars: title.omitted });
                 }
             }
             rows.push(row);
@@ -156,10 +166,12 @@ function classify(events, selected, terminal) {
     for (const row of rows) {
         if (row.kinds[0] === "blocked")
             row.superseded = !blocked.has(row.text);
-        if (row.kinds[0] === "unblocked")
-            row.superseded = blocked.has(row.text);
+        if (row.kinds[0] === "unblocked") {
+            const status = documents.get(row.id)?.status;
+            row.superseded = blocked.has(row.text) || typeof status !== "string" || terminal.has(status);
+        }
     }
-    return rows;
+    return { rows, snapshots: [...documents].map(([id, metadata]) => ({ ...metadata, id })) };
 }
 /** Prioritize blockers, own work, handoffs and newly actionable work, then priority. */
 function rank(row) {
@@ -261,13 +273,17 @@ export async function buildSincePack(pmRoot, items, terminal, options) {
             throw new SinceError("HISTORY_EXPIRED", "Requested time predates retained history. Reorient with pm context --for handoff and restart after the compacted baseline.");
         const prior = new Set(previous?.seen);
         const selected = new Set(events.filter((event) => from === undefined ? !prior.has(event.key) : Date.parse(event.ts) >= from).map((event) => event.key));
-        rows = selected.size ? classify(events, selected, terminal) : [];
-        for (const item of items) {
+        const classified = classify(events, selected, terminal);
+        rows = classified.rows;
+        const snapshots = new Map(items.map((item) => [item.id, item]));
+        for (const item of classified.snapshots)
+            snapshots.set(item.id, item);
+        for (const item of snapshots.values()) {
             if (item.assignee === options.author && !terminal.has(String(item.status))) {
                 const title = excerpt(String(item.title ?? item.id), 128);
                 rows.push({
                     key: `own:${item.id}`, id: item.id, op: "own_claim", ts: String(item.updated_at), author: options.author,
-                    kinds: ["own_claim"], title: title.text, priority: Number(item.priority ?? 4), fields: [], text: String(item.status), excerpt_omitted_chars: title.omitted,
+                    kinds: ["own_claim"], title: title.text, type: String(item.type ?? "unknown"), status: String(item.status ?? "unknown"), priority: Number(item.priority ?? 4), fields: [], text: "", excerpt_omitted_chars: title.omitted,
                 });
             }
         }
@@ -293,7 +309,7 @@ export async function buildSincePack(pmRoot, items, terminal, options) {
     pack.omission_receipt.excerpt_omitted_chars = pack.changes.reduce((sum, row) => sum + row.excerpt_omitted_chars, 0);
     if ((rows.length > 0 && included === 0) || Buffer.byteLength(encodeSincePack(pack)) > options.tokenBudget)
         throw new SinceError("BUDGET_TOO_SMALL", "Increase --token-budget to fit the receipt and at least one complete delta row; no cursor advanced.");
-    pack.cursor = saveCheckpoint(directory, { author: options.author, seen: snapshot, pending: rows.slice(included) });
+    pack.cursor = saveCheckpoint(directory, { generation: (previous?.generation ?? -1) + 1, author: options.author, seen: snapshot, pending: rows.slice(included) });
     encodeSincePack(pack);
     return pack;
 }
