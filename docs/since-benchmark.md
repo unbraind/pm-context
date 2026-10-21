@@ -13,10 +13,10 @@ Neither route reread the full tracker into the agent context.
 
 | Session | Core calls | Delta calls | Core output tokens | Delta output tokens | Core bytes | Delta bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| First resume | 3 | 1 | 499 | 385 | 1,450 | 1,225 |
-| Next resume | 3 | 1 | 543 | 386 | 1,599 | 1,227 |
+| First resume | 3 | 1 | 502 | 392 | 1,450 | 1,226 |
+| Next resume | 3 | 1 | 546 | 392 | 1,599 | 1,228 |
 
-Calls fall by **66.7%**; output tokens fall by **22.8%** and **28.9%**.
+Calls fall by **66.7%**; output tokens fall by **21.9%** and **28.2%**.
 Tokens were counted from the complete actual stdout using `tiktoken==0.14.0`,
 `o200k_base`, with special-token interpretation disabled. Each core response is
 counted separately and the counts are summed. These are output tokens, excluding
@@ -24,7 +24,10 @@ prompts, tool-call framing, setup/checkpoint calls and oracle instrumentation.
 Counts vary with generated IDs/timestamps and tokenizer. The runtime ceiling is
 the stricter complete-response byte-token upper bound, independent of this
 benchmark tokenizer. Both responses also fit a 4,000-byte ceiling, although this
-measurement requested 12,000.
+measurement requested and verified a 12,000 ceiling. An earlier run used the
+default ceiling because the handler missed the host's normalized option name;
+these results replace it after the installed-CLI fix and an explicit runner
+assertion for the requested ceiling.
 
 The measured three-call route was:
 
@@ -46,7 +49,8 @@ classification, the current own claim and **0 deferred rows**. An additional
 unbounded raw JSON activity read served only as the oracle: each matching event's
 item ID, operation, timestamp and author had to appear in the delta, and its new
 comment had to appear in full. Type, status and title were checked against the
-SDK-created item as well. Earlier-session comments that a plain comments
+SDK-created item as well. The saved responses were also checked for the handoff
+classification and own-claim reminder. Earlier-session comments that a plain comments
 read repeats are intentionally outside the next delta. Full historical patch
 payloads are not the completeness unit; the pack explicitly identifies changed
 fields and provides a remedy for full patch reads.
