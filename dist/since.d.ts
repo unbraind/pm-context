@@ -33,6 +33,8 @@ export interface DeltaRow {
     excerpt_omitted_chars: number;
     /** A later graph transition reversed this historical blocker/unblock fact. */
     superseded?: boolean;
+    /** Current own-claim snapshot is blocked, rather than a newly added blocker event. */
+    blocked?: boolean;
 }
 /** Exact JSON response; the bound includes the cursor and omission receipt. */
 export interface SincePack {

@@ -84,3 +84,12 @@ reads continue to work everywhere.
 
 See [the public-copy measurement](since-benchmark.md) for calls, tokenizer counts,
 completeness checks, reproducible commands and the limits of the experiment.
+
+An internal SDK activity preflight applies core history policy and read hooks.
+Physical stream reads then preserve append order for equal or backdated timestamps.
+The call/token measurement concerns agent invocations and output, rather than
+internal filesystem-read counts or latency.
+
+Own-claim snapshots include `blocked: true` and bounded current blocker context,
+including free-text `blocked_by` reasons, even on an empty refresh. Historical
+replay uses certified current metadata only for items without retained streams.

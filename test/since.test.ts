@@ -43,6 +43,10 @@ test("real tracker delta includes lifecycle, prose, handoffs, claims and indirec
   await claim(a, { author: "agent-a" }, f.client);
   const baseline = await f.pack({ from: epoch });
   await comments(a, { add: "The acceptance check found a substantive missing case.", author: "agent-a" }, f.client);
+  await update(a, { blockedBy: "Waiting for review", author: "agent-a" }, f.client);
+  const intermediate = await f.pack({ cursor: baseline.cursor });
+  assert.ok(intermediate.changes.some((row) => row.op === "own_claim" && row.blocked && row.text.includes("Waiting for review")));
+  await update(a, { blockedReason: "Waiting for CI", author: "agent-a" }, f.client);
   await update(b, { priority: "0", author: "agent-a" }, f.client);
   await update(c, { dep: [`id=${b},kind=blocked_by`], author: "agent-a" }, f.client);
   await close(b, "Prerequisite passed", { author: "agent-a" }, f.client);
@@ -50,6 +54,7 @@ test("real tracker delta includes lifecycle, prose, handoffs, claims and indirec
   await claim(c, { author: "agent-b" }, f.client);
   await release(c, { author: "agent-b", message: "handoff: resume after the fixture repair" }, f.client);
   const created = (await create({ title: "Newly ready", author: "agent-a" }, f.client)).item.id;
+  await claim(c, { author: "agent-a" }, f.client);
   const pack = await f.pack({ cursor: baseline.cursor });
   const kinds = new Set(pack.changes.flatMap((row) => row.kinds));
   for (const kind of ["created", "closed", "reopened", "reprioritized", "blocked", "unblocked", "comment", "claim", "release", "handoff", "own_claim"]) assert.ok(kinds.has(kind), kind);
@@ -57,12 +62,14 @@ test("real tracker delta includes lifecycle, prose, handoffs, claims and indirec
   assert.ok(pack.changes.some((row) => row.id === c && row.kinds.includes("unblocked")));
   assert.ok(pack.changes.some((row) => row.id === c && row.author === "agent-b" && row.op === "claim"));
   assert.ok(pack.changes.some((row) => row.id === created && row.kinds.includes("created")));
-  assert.equal(pack.changes[0]!.kinds[0], "blocked");
+  assert.ok(pack.changes[0]!.kinds.includes("blocked") || pack.changes[0]!.blocked);
   assert.ok(pack.changes.filter((row) => row.kinds.includes("unblocked")).every((row) => row.superseded));
   assert.equal(pack.omission_receipt.deferred_rows, 0);
   assert.deepEqual(await f.pack({ cursor: baseline.cursor }), pack, "same cursor and corpus yield byte-identical output");
   const next = await f.pack({ cursor: pack.cursor });
-  assert.deepEqual(next.changes.map((row) => row.op), ["own_claim"]);
+  assert.deepEqual(next.changes.map((row) => row.op), ["own_claim", "own_claim"]);
+  assert.ok(next.changes.every((row) => row.blocked));
+  assert.ok(next.changes.some((row) => row.text.includes("Waiting for CI")));
   assert.equal(existsSync(join(f.root, ".git")), false);
 });
 
@@ -200,9 +207,10 @@ test("retention enforces count and byte capacity without evicting the returned s
     writeFileSync(path, " ".repeat(22000));
     utimesSync(path, new Date("2099-01-01"), new Date("2099-01-01"));
   }
+  symlinkSync("evicted-snapshot", join(directory, `s1_${"f".repeat(64)}.json`));
   const refreshed = await f.pack({ cursor: pack.cursor });
   assert.ok(existsSync(join(directory, `${refreshed.cursor}.json`)));
-  const files = readdirSync(directory);
+  const files = readdirSync(directory).filter((file) => existsSync(join(directory, file)));
   assert.ok(files.length <= SINCE_RETENTION.count);
   assert.ok(files.reduce((sum, file) => sum + readFileSync(join(directory, file)).length, 0) <= SINCE_RETENTION.bytes);
   await create({ title: "Capacity row", author: "agent-a" }, f.client);
@@ -252,6 +260,16 @@ test("equal-time, backdated, inverse-edge and sparse historical records retain c
     { id: "delta-ready", status: "blocked" },
     { id: "delta-ready", status: "open" },
   ]);
+  await stream("delta-partial", [
+    { id: "delta-partial", status: "open", dependencies: [{ id: "missing-a", kind: "blocked_by", created_at: time, author: "agent-a" }, { id: "missing-b", kind: "blocked_by", created_at: time, author: "agent-a" }] },
+    { id: "delta-partial", status: "open", dependencies: [{ id: "missing-b", kind: "blocked_by", created_at: time, author: "agent-a" }] },
+  ]);
+  await stream("delta-multi", [
+    { id: "delta-multi", status: "open", dependencies: [{ id: "missing-a", kind: "blocked_by", created_at: time, author: "agent-a" }, { id: "missing-b", kind: "blocked_by", created_at: time, author: "agent-a" }] },
+    { id: "delta-multi", status: "open" },
+  ]);
+  await stream("delta-00-terminal", [{ id: "delta-00-terminal", status: "closed" }]);
+  await stream("delta-legacy-closed", [{ id: "delta-legacy-closed", status: "open", blocked_by: "delta-00-terminal" }]);
   const repeated = { created_at: time, author: "agent-a", text: "Same-time repeated comment" };
   await stream("delta-repeated", [
     { id: "delta-repeated", status: "open", comments: [repeated] },
@@ -266,13 +284,18 @@ test("equal-time, backdated, inverse-edge and sparse historical records retain c
     patch: [{ op: "add", path: "/metadata/comments", value: [null] }, { op: "add", path: "/metadata/dependencies", value: [null] }],
   });
   writeFileSync(join(f.pmRoot, "history", ".keep"), "not a history stream");
-  const pack = await buildSincePack(f.pmRoot, [{ id: "delta-own", assignee: "agent-a" }], terminal, { author: "agent-a", from: epoch, tokenBudget: 100000 });
+  const pack = await buildSincePack(f.pmRoot, [{ id: "delta-own", assignee: "agent-a" }, { id: "delta-owned-blocked", assignee: "agent-a", status: "blocked" }], terminal, { author: "agent-a", from: epoch, tokenBudget: 100000 });
   assert.ok(pack.changes.some((row) => row.id === "delta-b" && row.kinds.includes("blocked")));
   assert.ok(!pack.changes.some((row) => row.id === "delta-wait" && row.kinds.includes("unblocked")), "closing blocked work does not create actionable work");
   assert.ok(pack.changes.some((row) => row.id === "delta-a" && row.kinds.includes("unblocked") && row.superseded));
   assert.ok(pack.changes.some((row) => row.id === "delta-done" && row.kinds.includes("unblocked") && row.superseded));
   assert.ok(pack.changes.some((row) => row.id === "delta-ready" && row.kinds.includes("unblocked") && row.superseded === false));
   assert.ok(pack.changes.some((row) => row.title === "delta-b"));
+  assert.ok(!pack.changes.some((row) => row.id === "delta-partial" && row.kinds.includes("unblocked")), "remaining prerequisites keep an item blocked");
+  const multi = pack.changes.filter((row) => row.id === "delta-multi" && row.kinds.includes("unblocked"));
+  assert.equal(multi.length, 1, "clearing several blockers emits one newly actionable item");
+  assert.ok(multi[0]!.text.includes("missing-a") && multi[0]!.text.includes("missing-b"));
+  assert.ok(!pack.changes.some((row) => row.id === "delta-legacy-closed" && row.kinds.includes("blocked")), "closed legacy blocker references do not block work");
   assert.ok(pack.changes.some((row) => row.ts < time));
   assert.equal(pack.changes.filter((row) => row.id === "delta-repeated" && row.kinds.includes("comment")).length, 2, "identical same-time comments are counted as separate additions");
   const cursor = pack.cursor;
