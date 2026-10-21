@@ -151,6 +151,7 @@ test("installed built command works with no Git executable and preserves source 
   const pack = JSON.parse(result.stdout) as SincePack;
   assert.ok(pack.changes.some((row) => row.text.includes("exported parser")));
   assert.ok(Buffer.byteLength(result.stdout) <= 8000);
+  assert.equal(pack.budget.ceiling, 8000, "the installed CLI must honor the explicit flag");
   assert.equal(history, readFileSync(join(f.pmRoot, "history", `${id}.jsonl`), "utf8"));
   const invalid = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"),
     "context-pack", "since", "--cursor", "bad", "--json"], {
@@ -160,6 +161,13 @@ test("installed built command works with no Git executable and preserves source 
   const failure = JSON.parse(invalid.stderr) as { code: string; next_steps: string[] };
   assert.equal(failure.code, "INVALID_CURSOR");
   assert.ok(failure.next_steps.length > 0);
+  const small = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"),
+    "context-pack", "since", "--from", epoch, "--token-budget", "512", "--json"], {
+    cwd: f.root, encoding: "utf8", env: { ...process.env, PM_PATH: f.pmRoot, PM_AUTHOR: "agent-a", PATH: emptyPath, GIT_CEILING_DIRECTORIES: tmpdir() },
+  });
+  assert.equal(small.status, 2);
+  assert.equal((JSON.parse(small.stderr) as { code: string }).code, "BUDGET_TOO_SMALL");
+
 
 });
 

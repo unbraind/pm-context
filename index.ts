@@ -1602,7 +1602,7 @@ function setupCommands(api: ExtensionApi): void {
         cursor: stringOption(ctx.options, "cursor"),
         from: stringOption(ctx.options, "from"),
         author: ctx.global.author ?? process.env.PM_AUTHOR ?? settings.author_default,
-        tokenBudget: Number(stringOption(ctx.options, "token-budget") ?? "4000"),
+        tokenBudget: Number(stringOption(ctx.options, "token-budget", "tokenBudget") ?? "4000"),
       });
       return renderedCommandResult(encodeSincePack(pack));
     },

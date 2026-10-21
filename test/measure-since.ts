@@ -55,6 +55,7 @@ try {
     const core = [run(["activity", "--from", from]), run(["activity", "--from", from, "--raw"]), run(["comments", id])];
     const delta = run(["context-pack", "since", "--cursor", cursor, "--token-budget", "12000"]);
     const pack = JSON.parse(delta) as SincePack;
+    assert.equal(pack.budget.ceiling, 12000, "CLI must honor the requested ceiling");
     // This fourth, oracle-only read is validation instrumentation, not part of either measured route.
     const oracle = JSON.parse(run(["activity", "--from", from, "--raw", "--json", "--unbounded"])) as {
       compact_activity: Array<{ id: string; op: string; ts: string; author: string }>;
