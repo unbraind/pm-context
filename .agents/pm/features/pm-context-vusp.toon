@@ -1,0 +1,32 @@
+id: pm-context-vusp
+title: Validate only context assumptions invalidated on resume
+description: "Record section-to-source digests for context packets and return only invalidated assumptions on resume. Acceptance: changed dependencies invalidate dependent packet sections; unchanged packets reuse safely; deleted or unreadable sources fail with a bounded receipt. Provide typed SDK and CLI, compact TOON/JSON, typed refusals with remedies, documentation and non-git public-tracker validation."
+type: Feature
+status: in_progress
+priority: 1
+tags: []
+created_at: "2026-10-21T22:14:51.863Z"
+updated_at: "2026-10-21T22:27:44.606Z"
+assignee: codex-agent
+claim_principal: codex-agent
+author: codex-agent
+comments[5]{created_at,author,text}:
+  "2026-10-21T22:15:14.936Z",codex-agent,"Overlap recheck: SDK workspace snapshots retain complete files and revisions; core context usage/improvement ledgers record observations and delivery. pm-brief since and pm-context context-pack since report events; pm-memory verify checks memory claims. None validates a declared packet section against item/settings/evidence digests and propagates invalidation through section dependencies. Implement a portable digest-only manifest, typed SDK and context-freshness record/resume commands, with bounded fail-closed receipts. Builds on PR #164; no snapshot store or second delta stream."
+  "2026-10-21T22:23:42.686Z",codex-agent,"Implementation uses portable digest-only packet manifests with declared item/settings field projections, exact evidence byte digests, acyclic section dependencies and transitive invalidation. Stateless authoritative SDK readers avoid stale adapter caches and usage-ledger writes. Targeted regressions cover SDK and installed no-git CLI with no Git executable, compact TOON round trips, JSON byte ceilings, typed refusals, missing sources and concurrent file changes. Full release gates are delegated to the existing CI npm/Bun matrix because the host is saturated."
+  "2026-10-21T22:24:44.395Z",codex-agent,"Read-only public-tracker experiment at upstream base 42de04b: 82 real items, 85 sections, 84 sources; complete manifest 10791 JSON bytes, record 821.89 ms. Unchanged: 85 reused, 0 invalidated, 394 JSON / 381 TOON bytes, 1424.83 ms. Item/settings/evidence changed: 4 invalidated, 81 unchanged, 770 / 778 bytes, 2076.98 ms. Deleted prerequisite plus unreadable evidence: SOURCE_UNAVAILABLE, 3 invalidated, 82 unchanged, 2 unavailable sources, 718 / 721 bytes, 733.70 ms. All checked trees remained byte-identical. No Git executable was available. Methodology and reproducible script are linked; timings are observations on the saturated shared host."
+  "2026-10-21T22:26:11.051Z",codex-agent,"Behavioral revert proof: removed only the changed-source digest comparison from resumeFreshness, leaving real source reads and all other logic intact. node --test --test-name-pattern=\"same adapter\" test/freshness.test.ts failed 0/1 (exit 1): FRESH was returned where STALE was required after an authoritative item change. Restored the comparison; the targeted suite passes. No histories were rewritten and no stash was used."
+  "2026-10-21T22:27:44.605Z",codex-agent,"Final local linked checks passed 3/3 through pm test --run --progress --workspace-context source --pm-context schema: npm run typecheck; npm run docstring; node --test test/freshness.test.ts test/context-pack.test.ts test/renderer-ownership.test.ts (72/72, zero failures/skips). New freshness.ts targeted source coverage measures 100% statements, branches, functions and lines; unchanged package thresholds remain for CI. Tracker test-result tracking is disabled, so this comment preserves the execution receipt without changing configuration. Test-only fixes isolated child CLI environment from the linked-runner source-workspace context and asserted expected SDK harness rejections."
+files[4]{path,scope}:
+  freshness.ts,project
+  index.ts,project
+  test/freshness.test.ts,project
+  test/measure-freshness.ts,project
+tests[3]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  npm run typecheck,project,codex-agent,"2026-10-21T22:25:54.766Z",local_mutation,feat/resume-freshness
+  npm run docstring,project,codex-agent,"2026-10-21T22:26:00.281Z",local_mutation,feat/resume-freshness
+  node --test test/freshness.test.ts test/context-pack.test.ts test/renderer-ownership.test.ts,project,codex-agent,"2026-10-21T22:26:04.536Z",local_mutation,feat/resume-freshness
+docs[3]{path,scope}:
+  docs/freshness-benchmark.md,project
+  docs/freshness.md,project
+  README.md,project
+body: ""
