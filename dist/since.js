@@ -43,7 +43,7 @@ function excerpt(value, max) {
 }
 /** Use code-unit ordering, independent of process locale. */
 function compare(a, b) {
-    return a < b ? -1 : a > b ? 1 : 0;
+    return Number(a > b) - Number(a < b);
 }
 /** Apply SDK history policy/read hooks, then retain physical stream order for equal/backdated timestamps. */
 async function readStreams(pmRoot) {
@@ -337,7 +337,10 @@ async function readCheckpoint(directory, token, author) {
         }
         let state;
         try {
-            state = JSON.parse(raw);
+            const parsed = JSON.parse(raw);
+            if (parsed === null || typeof parsed !== "object")
+                throw new Error("Invalid checkpoint object");
+            state = parsed;
         }
         catch {
             throw new SinceError("INVALID_CURSOR", "Restart with --from <ISO timestamp>; cursor state is damaged.");
@@ -368,29 +371,45 @@ async function readCheckpoint(directory, token, author) {
         await unlock();
     }
 }
+/** Publish runtime bytes by rename while the SDK cursor lock protects readers and collectors. */
+function publishRuntimeFile(directory, file, bytes) {
+    const temporary = join(directory, `${file}.${randomUUID()}.tmp`);
+    writeFileSync(temporary, bytes, { mode: 0o600 });
+    renameSync(temporary, join(directory, file));
+}
 /** Atomically publish a shared inventory and bounded checkpoints using the SDK writer lock. */
 export async function saveCheckpoint(directory, state) {
     const unlock = await acquireLock(directory, "context-since", 30, state.author, false, false, 10000);
     try {
+        const servedTime = state.served_at === undefined ? Date.now() : parseFromTimestamp(state.served_at);
+        if (!Number.isFinite(servedTime))
+            throw new SinceError("INVALID_CURSOR", "Checkpoint serving time must be an explicit-zone ISO timestamp.");
         const inventory = JSON.stringify(state.streams);
         const ref = createHash("sha256").update(inventory).digest("hex");
         const compressed = gzipSync(inventory);
-        const stored = { ...state, version: 2, served_at: state.served_at ?? new Date().toISOString(), streams: ref };
+        const stored = { ...state, version: 2, served_at: new Date(servedTime).toISOString(), streams: ref };
         const raw = JSON.stringify(stored);
         if (Buffer.byteLength(raw) + compressed.length > SINCE_RETENTION.bytes)
             throw new SinceError("CURSOR_CAPACITY", "Restart with a later --from timestamp to reduce pending rows; the compressed stream inventory plus pending rows exceeds runtime retention capacity.");
         const token = `s1_${checkpointDigest(stored)}`;
         const target = join(directory, `${token}.json`);
-        if (statSync(target, { throwIfNoEntry: false })) {
-            const existing = JSON.parse(readFileSync(target, "utf8"));
-            return { cursor: token, served_at: existing.served_at };
-        }
         const inventoryPath = join(directory, `i1_${ref}.gz`);
-        if (!statSync(inventoryPath, { throwIfNoEntry: false }))
-            writeFileSync(inventoryPath, compressed, { mode: 0o600 });
-        const temporary = join(directory, `${token}.${randomUUID()}.tmp`);
-        writeFileSync(temporary, raw, { mode: 0o600 });
-        renameSync(temporary, target);
+        let retained;
+        try {
+            retained = readFileSync(inventoryPath);
+        }
+        catch { /* Missing disposable inventory is republished. */ }
+        if (!retained?.equals(compressed))
+            publishRuntimeFile(directory, `i1_${ref}.gz`, compressed);
+        if (statSync(target, { throwIfNoEntry: false })) {
+            try {
+                const existing = JSON.parse(readFileSync(target, "utf8"));
+                if (checkpointDigest(existing) === token.slice(3) && typeof existing.served_at === "string" && existing.served_at.length === 24 && Number.isFinite(parseFromTimestamp(existing.served_at)))
+                    return { cursor: token, served_at: existing.served_at };
+            }
+            catch { /* A fresh from-window can replace damaged disposable metadata. */ }
+        }
+        publishRuntimeFile(directory, `${token}.json`, raw);
         const refs = new Map();
         const files = readdirSync(directory).filter((file) => /^s1_[a-f0-9]{64}\.json$/.test(file)).flatMap((file) => {
             const stats = statSync(join(directory, file), { throwIfNoEntry: false });
@@ -399,7 +418,7 @@ export async function saveCheckpoint(directory, state) {
             let reference;
             try {
                 const checkpoint = JSON.parse(readFileSync(join(directory, file), "utf8"));
-                if (typeof checkpoint.streams === "string")
+                if (typeof checkpoint.streams === "string" && /^[a-f0-9]{64}$/.test(checkpoint.streams))
                     reference = checkpoint.streams;
             }
             catch { /* Collect malformed disposable snapshots normally. */ }

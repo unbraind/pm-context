@@ -72,6 +72,7 @@ export function parseFreshnessPacket(value) {
         ids.add(section.id);
     }
     const packet = value;
+    const sectionsById = new Map(packet.sections.map((section) => [section.id, section]));
     const done = new Set();
     const visiting = new Set();
     /** A depth-first check bounds dependency traversal by the declared section ceiling. */
@@ -81,7 +82,7 @@ export function parseFreshnessPacket(value) {
         if (visiting.has(id) || !ids.has(id))
             throw fail();
         visiting.add(id);
-        for (const dep of packet.sections.find((section) => section.id === id).depends_on)
+        for (const dep of sectionsById.get(id).depends_on)
             visit(dep);
         visiting.delete(id);
         done.add(id);
@@ -141,13 +142,14 @@ export async function resumeFreshness(packet, manifest, read) {
             changed.set(key, `unavailable:${key}`);
         }
     }
+    const sectionsById = new Map(packet.sections.map((section) => [section.id, section]));
     const causes = new Map();
     /** Memoize transitive causes once so shared and diamond dependencies stay deterministic. */
     function reasons(id) {
         const existing = causes.get(id);
         if (existing)
             return existing;
-        const section = packet.sections.find((section) => section.id === id);
+        const section = sectionsById.get(id);
         const result = new Set(section.sources.map((source) => changed.get(sourceKey(source))).filter((cause) => cause !== undefined));
         for (const dep of section.depends_on)
             for (const cause of reasons(dep))
@@ -187,12 +189,26 @@ export function encodeFreshness(result, format, budget) {
     // Manifests are always JSON artifacts: object-valued source declarations have no compact TOON projection.
     if (!("invalidated" in value) && format === "toon")
         throw new FreshnessError("INVALID_ARGUMENT", "Record manifests with --format json; resume supports both json and toon.");
-    let output = encode();
-    while (Buffer.byteLength(output) > budget && "invalidated" in value && value.invalidated.length > 0) {
-        value.invalidated.pop();
-        value.omitted_sections++;
-        output = encode();
+    if ("invalidated" in value) {
+        const rows = value.invalidated;
+        value.invalidated = [];
+        const fixed = Buffer.byteLength(encode()) - String(value.omitted_sections).length - Number(format === "toon");
+        let included = 0;
+        let bytes = 0;
+        for (const row of rows) {
+            const encoded = format === "json" ? JSON.stringify(row) : `  - section: ${JSON.stringify(row.section)}\n    causes[${row.causes.length}]: ${row.causes.map((cause) => JSON.stringify(cause)).join(",")}\n`;
+            const next = bytes + Buffer.byteLength(encoded) + Number(format === "json" && included > 0);
+            const omitted = value.omitted_sections + rows.length - included - 1;
+            const size = fixed + next + String(omitted).length + (format === "toon" ? String(included + 1).length : 0);
+            if (size > budget)
+                break;
+            included++;
+            bytes = next;
+        }
+        value.invalidated = rows.slice(0, included);
+        value.omitted_sections += rows.length - included;
     }
+    const output = encode();
     if (Buffer.byteLength(output) > budget || ("invalidated" in value && value.invalidated_sections > 0 && value.invalidated.length === 0))
         throw new FreshnessError("BUDGET_TOO_SMALL", "Increase --byte-budget to fit the complete manifest or at least one invalidated section; no state was changed.");
     return output;

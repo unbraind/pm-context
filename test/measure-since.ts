@@ -50,7 +50,7 @@ try {
   let cursor = baseline.cursor;
   for (const session of [1, 2]) {
     const from = new Date().toISOString();
-    const text = `handoff session ${session}: acceptance is ready; next implement the parser edge case and rerun focused checks.`;
+    const text = `handoff: session ${session} acceptance is ready; next implement the parser edge case and rerun focused checks.`;
     await comments(id, { add: text, author }, client);
     const core = [run(["activity", "--from", from]), run(["activity", "--from", from, "--raw"]), run(["comments", id])];
     const delta = run(["context-pack", "since", "--cursor", cursor, "--token-budget", "12000"]);
@@ -62,9 +62,12 @@ try {
     };
     const missing = oracle.compact_activity.filter((event) => !pack.changes.some((row) => row.id === event.id && row.op === event.op && row.ts === event.ts && row.author === event.author));
     assert.deepEqual(missing, []);
-    assert.ok(pack.changes.some((row) => row.text.includes(text)));
+    assert.ok(pack.changes.some((row) => row.text.includes(text) && row.kinds.includes("handoff")));
+    assert.ok(pack.changes.some((row) => row.id === id && row.op === "own_claim"));
     assert.ok(pack.changes.some((row) => row.id === id && row.title === seeded.title && row.status === seeded.status && row.type === seeded.type));
     assert.equal(pack.omission_receipt.deferred_rows, 0);
+    assert.equal(pack.omission_receipt.invalid_timestamp_rows, 0, "timestamp omissions invalidate a complete comparison");
+    assert.deepEqual(pack.omission_receipt.expired_streams, [], "compaction omissions invalidate a complete comparison");
     const directory = join(output, `session-${session}`);
     mkdirSync(directory, { recursive: true });
     core.forEach((value, index) => writeFileSync(join(directory, `core-${index + 1}.txt`), value));

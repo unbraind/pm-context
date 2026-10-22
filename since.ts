@@ -119,7 +119,7 @@ function excerpt(value: string, max: number): { text: string; omitted: number } 
 }
 /** Use code-unit ordering, independent of process locale. */
 function compare(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+  return Number(a > b) - Number(a < b);
 }
 /** Apply SDK history policy/read hooks, then retain physical stream order for equal/backdated timestamps. */
 async function readStreams(pmRoot: string): Promise<Event[][]> {
@@ -368,7 +368,11 @@ async function readCheckpoint(directory: string, token: string, author: string):
     try { raw = readFileSync(join(directory, `${token}.json`), "utf8"); }
     catch { throw new SinceError("CURSOR_EXPIRED", "Restart using the previous response's inclusive --from restart_from value; retained cursor state is unavailable."); }
     let state: DiskCheckpoint;
-    try { state = JSON.parse(raw) as DiskCheckpoint; }
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed === null || typeof parsed !== "object") throw new Error("Invalid checkpoint object");
+      state = parsed as DiskCheckpoint;
+    }
     catch { throw new SinceError("INVALID_CURSOR", "Restart with --from <ISO timestamp>; cursor state is damaged."); }
     if (`s1_${checkpointDigest(state)}` !== token) throw new SinceError("INVALID_CURSOR", "Restart with --from <ISO timestamp>; cursor state is damaged.");
     if (state.author !== author) throw new SinceError("CURSOR_AUTHOR_MISMATCH", "Resume with the original --author or start a new --from session.");
@@ -385,26 +389,37 @@ async function readCheckpoint(directory: string, token: string, author: string):
     return { ...state, streams: state.streams };
   } finally { await unlock(); }
 }
+/** Publish runtime bytes by rename while the SDK cursor lock protects readers and collectors. */
+function publishRuntimeFile(directory: string, file: string, bytes: string | Uint8Array): void {
+  const temporary = join(directory, `${file}.${randomUUID()}.tmp`);
+  writeFileSync(temporary, bytes, { mode: 0o600 });
+  renameSync(temporary, join(directory, file));
+}
 /** Atomically publish a shared inventory and bounded checkpoints using the SDK writer lock. */
 export async function saveCheckpoint(directory: string, state: Checkpoint): Promise<{ cursor: string; served_at: string }> {
   const unlock = await acquireLock(directory, "context-since", 30, state.author, false, false, 10000);
   try {
+    const servedTime = state.served_at === undefined ? Date.now() : parseFromTimestamp(state.served_at);
+    if (!Number.isFinite(servedTime)) throw new SinceError("INVALID_CURSOR", "Checkpoint serving time must be an explicit-zone ISO timestamp.");
     const inventory = JSON.stringify(state.streams);
     const ref = createHash("sha256").update(inventory).digest("hex");
     const compressed = gzipSync(inventory);
-    const stored: DiskCheckpoint = { ...state, version: 2, served_at: state.served_at ?? new Date().toISOString(), streams: ref };
+    const stored: DiskCheckpoint = { ...state, version: 2, served_at: new Date(servedTime).toISOString(), streams: ref };
     const raw = JSON.stringify(stored);
     if (Buffer.byteLength(raw) + compressed.length > SINCE_RETENTION.bytes) throw new SinceError("CURSOR_CAPACITY", "Restart with a later --from timestamp to reduce pending rows; the compressed stream inventory plus pending rows exceeds runtime retention capacity.");
     const token = `s1_${checkpointDigest(stored)}`;
     const target = join(directory, `${token}.json`);
-    if (statSync(target, { throwIfNoEntry: false })) {
-      const existing = JSON.parse(readFileSync(target, "utf8")) as DiskCheckpoint;
-      return { cursor: token, served_at: existing.served_at! };
-    }
     const inventoryPath = join(directory, `i1_${ref}.gz`);
-    if (!statSync(inventoryPath, { throwIfNoEntry: false })) writeFileSync(inventoryPath, compressed, { mode: 0o600 });
-    const temporary = join(directory, `${token}.${randomUUID()}.tmp`);
-    writeFileSync(temporary, raw, { mode: 0o600 }); renameSync(temporary, target);
+    let retained: Buffer | undefined;
+    try { retained = readFileSync(inventoryPath); } catch { /* Missing disposable inventory is republished. */ }
+    if (!retained?.equals(compressed)) publishRuntimeFile(directory, `i1_${ref}.gz`, compressed);
+    if (statSync(target, { throwIfNoEntry: false })) {
+      try {
+        const existing = JSON.parse(readFileSync(target, "utf8")) as DiskCheckpoint;
+        if (checkpointDigest(existing) === token.slice(3) && typeof existing.served_at === "string" && existing.served_at.length === 24 && Number.isFinite(parseFromTimestamp(existing.served_at))) return { cursor: token, served_at: existing.served_at };
+      } catch { /* A fresh from-window can replace damaged disposable metadata. */ }
+    }
+    publishRuntimeFile(directory, `${token}.json`, raw);
     const refs = new Map<string, number>();
     const files = readdirSync(directory).filter((file) => /^s1_[a-f0-9]{64}\.json$/.test(file)).flatMap((file) => {
       const stats = statSync(join(directory, file), { throwIfNoEntry: false });

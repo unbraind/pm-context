@@ -81,8 +81,8 @@ format expire with an explicit restart remedy. The
 cursor carries no file path. Losing/evicting runtime state produces `CURSOR_EXPIRED`; pruning or changing
 history without a compaction baseline produces `HISTORY_EXPIRED`.
 
-Every response provides `served_at`, the first publication time of that immutable
-response, and `restart_from`, a conservative inclusive restart boundary covering
+Every response provides `served_at`, the read-start time of the first publication
+of that immutable response, and `restart_from`, a conservative inclusive restart boundary covering
 the requested start and the earliest valid retained timestamp. Persist both with
 the cursor. On cursor loss, use `--from "$restart_from"`; replay can repeat events,
 so deduplicate by event key. `served_at` is diagnostic clock metadata excluded

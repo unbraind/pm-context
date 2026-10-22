@@ -167,6 +167,48 @@ test("byte budgets retain complete invalidation rows and disclose omissions in J
   assert.equal((JSON.parse(encodeFreshness(f.manifest, "json", 4000)) as FreshnessManifest).protocol, f.manifest.protocol);
 });
 
+test("wide freshness packets avoid repeated section searches and quadratic JSON or TOON trimming", async (t) => {
+  const f = await fixture(t);
+  const packet: FreshnessPacket = { sections: Array.from({ length: 256 }, (_, index) => ({ id: `wide-${index}-${"x".repeat(80)}`, content: "Declared assumption", sources: [{ kind: "item", id: f.a, fields: ["title"] }], depends_on: [] })) };
+  const originalFind = Array.prototype.find;
+  let searches = 0;
+  let report: FreshnessResult;
+  try {
+    Array.prototype.find = (function <T>(this: T[], predicate: (value: T, index: number, array: T[]) => unknown, thisArg?: unknown): T | undefined {
+      const first: unknown = this[0];
+      if (first && typeof first === "object" && "id" in first && typeof first.id === "string" && first.id.startsWith("wide-")) searches++;
+      return Reflect.apply(originalFind, this, [predicate, thisArg]) as T | undefined;
+    }) as typeof Array.prototype.find;
+    const baseline = await recordFreshness(packet, f.read);
+    await update(f.a, { title: "Changed assumption", author: "agent-a" }, f.client);
+    report = await resumeFreshness(packet, baseline, f.read);
+    assert.equal(searches, 0, "section traversal must use the ID index");
+  } finally { Array.prototype.find = originalFind; }
+  for (const format of ["json", "toon"] as const) {
+    const original = JSON.stringify;
+    let whole = 0; let sections = 0;
+    let output: string;
+    try {
+      JSON.stringify = ((value: unknown) => {
+        if (value && typeof value === "object" && "protocol" in value && value.protocol === "pm-context-freshness/v1") whole++;
+        if ((typeof value === "string" && value.startsWith("wide-")) || (value && typeof value === "object" && "section" in value)) sections++;
+        return original(value);
+      }) as typeof JSON.stringify;
+      output = encodeFreshness(report!, format, 4000);
+    } finally { JSON.stringify = original; }
+    const result = (format === "json" ? JSON.parse(output!) : decodeToon(output!)) as FreshnessResult;
+    assert.ok(result.invalidated.length > 0 && result.invalidated.length < 256);
+    assert.equal(result.omitted_sections, 256 - result.invalidated.length);
+    assert.deepEqual(result.invalidated, report!.invalidated.slice(0, result.invalidated.length));
+    assert.ok(whole <= 2 && sections <= 512, `${format}: ${whole} complete encodes, ${sections} section encodes`);
+    assert.ok(Buffer.byteLength(output!) <= 4000);
+    assert.equal(encodeFreshness(report!, format, Buffer.byteLength(output!)), output!);
+    const smaller = encodeFreshness(report!, format, Buffer.byteLength(output!) - 1);
+    assert.ok(Buffer.byteLength(smaller) < Buffer.byteLength(output!));
+  }
+  assert.equal(report!.omitted_sections, 0);
+});
+
 test("installed CLI records/resumes without a Git executable and returns typed refusals", async (t) => {
   const f = await fixture(t);
   const packageRoot = resolve(import.meta.dirname, "..");

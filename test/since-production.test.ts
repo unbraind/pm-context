@@ -45,9 +45,9 @@ test("history timestamps require zones, disclose invalid rows and order offsets 
   await stream(f.pmRoot, "delta-time-a", [{ ts: "2020-01-01T10:00:00+02:00", op: "create", metadata: { id: "delta-time-a", title: "Waiting", status: "open", dependencies: [{ id: "delta-time-b", kind: "blocked_by" }] } }]);
   await stream(f.pmRoot, "delta-time-b", [{ ts: "2020-01-01T08:30:00Z", op: "create", metadata: { id: "delta-time-b", title: "Prerequisite", status: "closed" } }]);
   await stream(f.pmRoot, "delta-bad", [
-    { ts: "2020-01-01T10:00:00", metadata: {} }, { ts: "unparseable", metadata: {} },
+    { ts: "2020-01-01T07:30:00", metadata: {} }, { ts: "unparseable", metadata: {} },
   ]);
-  await stream(f.pmRoot, "delta-baseline", [{ ts: "2020-01-01T10:00:00", op: "history_compact_baseline", metadata: {} }]);
+  await stream(f.pmRoot, "delta-baseline", [{ ts: "2020-01-01T07:30:00", op: "history_compact_baseline", metadata: {} }]);
   const originalTZ = process.env.TZ;
   const packs: SincePack[] = [];
   try {
@@ -94,6 +94,8 @@ test("shared checkpoint inventories retain an idle agent through 199 polls and s
   const entry = createHistoryEntry({ nowIso: epoch, author: "agent-a", op: "update", before: empty, after: empty });
   for (let index = 0; index < 1261; index++) writeFileSync(join(f.pmRoot, "history", `delta-scale-${index}.jsonl`), JSON.stringify(entry) + "\n");
   const first = await f.pack({ from: "2099-01-01T00:00:00Z" });
+  assert.equal(typeof first.served_at, "string", "the response must expose its serving boundary");
+  assert.equal(typeof first.restart_from, "string", "the response must expose a conservative restart boundary");
   assert.match(first.served_at, /^\d{4}-\d\d-\d\dT.*Z$/);
   assert.equal(first.restart_from, epoch);
   const stored = JSON.parse(readFileSync(join(f.directory, `${first.cursor}.json`), "utf8")) as { streams: string | StreamFingerprint[] };
@@ -202,16 +204,41 @@ test("shared inventory corruption expires safely and invalid timestamp diagnosti
   assert.equal(pack.omission_receipt.invalid_timestamp_rows, 12);
   assert.equal(pack.omission_receipt.invalid_timestamp_examples.length, 8);
   assert.ok(pack.omission_receipt.invalid_timestamp_examples.every((row) => row.ts.length === 128));
-  const stored = JSON.parse(readFileSync(join(f.directory, `${pack.cursor}.json`), "utf8")) as { streams: string };
+  const raw = readFileSync(join(f.directory, `${pack.cursor}.json`), "utf8");
+  const stored = JSON.parse(raw) as Omit<Checkpoint, "streams"> & { streams: string };
   const path = join(f.directory, `i1_${stored.streams}.gz`);
   for (const bytes of [Buffer.from("bad gzip"), gzipSync("[]")]) {
     writeFileSync(path, bytes);
     await assert.rejects(f.pack({ cursor: pack.cursor }), (error: unknown) => error instanceof SinceError && error.code === "CURSOR_EXPIRED");
+    assert.equal((await f.pack()).cursor, pack.cursor, "a fresh window repairs damaged inventory atomically");
   }
   rmSync(path);
   await assert.rejects(f.pack({ cursor: pack.cursor }), (error: unknown) => error instanceof SinceError && error.code === "CURSOR_EXPIRED");
+  assert.equal((await f.pack()).cursor, pack.cursor);
+  const malformed = { ...stored, streams: "../outside", generation: 20 };
+  const { served_at: _servedAt, ...identity } = malformed;
+  const badCursor = `s1_${createHash("sha256").update(JSON.stringify(identity)).digest("hex")}`;
+  writeFileSync(join(f.directory, `${badCursor}.json`), JSON.stringify(malformed));
+  await assert.rejects(f.pack({ cursor: badCursor }), (error: unknown) => error instanceof SinceError && error.code === "CURSOR_EXPIRED");
+  for (const damaged of ["{", JSON.stringify({ ...stored, served_at: undefined }), JSON.stringify({ ...stored, served_at: "bad" }), JSON.stringify({ ...stored, served_at: epoch }), JSON.stringify({ ...stored, served_at: "9999-99-99T99:99:99.999Z" }), JSON.stringify({ ...stored, generation: 400 })]) {
+    writeFileSync(join(f.directory, `${pack.cursor}.json`), damaged);
+    assert.match((await f.pack()).served_at, /^\d{4}-/);
+  }
+  for (const value of [null, 5]) {
+    const bad = JSON.stringify(value);
+    const token = `s1_${createHash("sha256").update(bad).digest("hex")}`;
+    writeFileSync(join(f.directory, `${token}.json`), bad);
+    await assert.rejects(f.pack({ cursor: token }), (error: unknown) => error instanceof SinceError && error.code === "INVALID_CURSOR");
+    rmSync(join(f.directory, `${token}.json`));
+  }
+  // Force collection of both missing and last-referenced valid inventories.
+  rmSync(path);
   writeFileSync(join(f.directory, `i1_${"f".repeat(64)}.gz`), gzipSync("[]"));
   const state: Checkpoint = { generation: 100, author: "agent-a", streams: [], pending: [] };
-  await saveCheckpoint(f.directory, state);
+  await assert.rejects(saveCheckpoint(f.directory, { ...state, served_at: "bad" }), (error: unknown) => error instanceof SinceError && error.code === "INVALID_CURSOR");
+  assert.equal((await saveCheckpoint(f.directory, { ...state, served_at: epoch })).served_at, "2000-01-01T00:00:00.000Z");
+  await saveCheckpoint(f.directory, { ...state, generation: 101, streams: [{ id: "delta-old", count: 1, hash: "0".repeat(64) }] });
+  for (let index = 0; index < 201; index++) writeFileSync(join(f.directory, `s1_${index.toString(16).padStart(64, "0")}.json`), " ".repeat(22000));
+  await saveCheckpoint(f.directory, { ...state, generation: 102 });
   assert.ok(!existsSync(join(f.directory, `i1_${"f".repeat(64)}.gz`)));
 });
