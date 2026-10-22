@@ -465,3 +465,54 @@ test("obsolete event-key cursors expire with an explicit restart remedy", async 
   writeFileSync(join(directory, `${cursor}.json`), raw);
   await assert.rejects(f.pack({ cursor }), (error: unknown) => errorCode("CURSOR_EXPIRED")(error) && error instanceof SinceError && error.remedy.includes("--from"));
 });
+
+
+test("unrelated history does not rescan blocker documents, including empty windows", async (t) => {
+  const f = await fixture(t);
+  const id = (await create({ title: "Graph scan sentinel", author: "agent-a" }, f.client)).item.id;
+  const waiting = (await create({ title: "Waiting sentinel", author: "agent-a" }, f.client)).item.id;
+  await update(waiting, { dep: [`id=${id},kind=blocked_by`], author: "agent-a" }, f.client);
+  const baseline = await f.pack({ from: epoch });
+  const original = Map.prototype[Symbol.iterator];
+  let scans = 0;
+  /** Count document traversals only; leave SDK maps and their values intact. */
+  Map.prototype[Symbol.iterator] = function <K, V>(this: Map<K, V>): MapIterator<[K, V]> {
+    const value: unknown = this.get(id as K);
+    if (value !== null && typeof value === "object" && "title" in value && value.title === "Graph scan sentinel") scans++;
+    return original.call(this) as MapIterator<[K, V]>;
+  };
+  try {
+    await f.pack({ cursor: baseline.cursor });
+    const before = scans;
+    for (let index = 0; index < 8; index++) {
+      await comments(id, { add: `Graph-neutral comment ${index}`, author: "agent-a" }, f.client);
+    }
+    await update(id, { title: "Graph scan sentinel", priority: "1", author: "agent-a" }, f.client);
+    scans = 0;
+    const delta = await f.pack({ cursor: baseline.cursor });
+    assert.equal(scans, before, "prose and priority changes must not add graph traversals");
+    assert.equal(delta.changes.filter((row) => row.kinds.includes("comment")).length, 8);
+    assert.ok(!delta.changes.some((row) => row.kinds.includes("unblocked")));
+    scans = 0;
+    await f.pack({ from: "2099-01-01T00:00:00Z" });
+    assert.equal(scans, before, "empty selection must not rescan for unrelated history either");
+  } finally {
+    Map.prototype[Symbol.iterator] = original;
+  }
+});
+
+
+test("metadata ancestor replacements still recompute indirect blockers", async (t) => {
+  const f = await fixture(t);
+  const id = (await create({ title: "Ancestor prerequisite", author: "agent-a" }, f.client)).item.id;
+  const waiting = (await create({ title: "Ancestor dependent", author: "agent-a" }, f.client)).item.id;
+  await update(waiting, { dep: [`id=${id},kind=blocked_by`], author: "agent-a" }, f.client);
+  const baseline = await f.pack({ from: epoch });
+  const empty = emptyImportedDocument();
+  const entry = createHistoryEntry({ nowIso: "2090-01-01T00:00:00Z", author: "agent-a", op: "update", before: empty, after: empty });
+  await appendHistoryEntry(join(f.pmRoot, "history", `${id}.jsonl`), {
+    ...entry, patch: [{ op: "replace", path: "/metadata", value: { id, title: "Ancestor prerequisite", status: "closed" } }],
+  });
+  const delta = await f.pack({ cursor: baseline.cursor });
+  assert.ok(delta.changes.some((row) => row.id === waiting && row.kinds.includes("unblocked")));
+});
