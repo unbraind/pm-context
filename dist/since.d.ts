@@ -36,12 +36,38 @@ export interface DeltaRow {
     /** Current own-claim snapshot is blocked, rather than a newly added blocker event. */
     blocked?: boolean;
 }
+/** One ordered prefix digest per stream keeps cursor size independent of event count. */
+export interface StreamFingerprint {
+    id: string;
+    count: number;
+    hash: string;
+}
+/** Frozen continuation state; prefix hashes detect pruning and backdated appends. */
+export interface Checkpoint {
+    version?: 2;
+    served_at?: string;
+    restart_from?: string;
+    receipt?: Pick<SincePack["omission_receipt"], "invalid_timestamp_rows" | "invalid_timestamp_examples" | "expired_streams">;
+    generation: number;
+    author: string;
+    streams: StreamFingerprint[];
+    pending: DeltaRow[];
+}
 /** Exact JSON response; the bound includes the cursor and omission receipt. */
 export interface SincePack {
     protocol: "pm-context-since/v1";
     cursor: string;
+    served_at: string;
+    restart_from: string;
     changes: DeltaRow[];
     omission_receipt: {
+        invalid_timestamp_rows: number;
+        invalid_timestamp_examples: Array<{
+            id: string;
+            ordinal: number;
+            ts: string;
+        }>;
+        expired_streams: string[];
         deferred_rows: number;
         deferred_own_claims: number;
         excerpt_omitted_chars: number;
@@ -60,8 +86,15 @@ export interface SinceOptions {
     author: string;
     tokenBudget: number;
 }
+/** Atomically publish a shared inventory and bounded checkpoints using the SDK writer lock. */
+export declare function saveCheckpoint(directory: string, state: Checkpoint): Promise<{
+    cursor: string;
+    served_at: string;
+}>;
 /** Serialize with a conservative byte-token upper bound, including its own digits. */
 export declare function encodeSincePack(pack: SincePack): string;
+/** Select a prefix in linear serialization work, including exact counter and byte-count digits. */
+export declare function packSinceRows(pack: SincePack, rows: DeltaRow[]): number;
 /**
  * Serve one deterministic ranked page. Pending pages freeze their source window;
  * writes arriving while they drain are collected after the last pending page.

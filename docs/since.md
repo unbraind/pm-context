@@ -23,6 +23,16 @@ not manufacture newly actionable work. Lifecycle, priority and assignee
 transitions are stated explicitly. Blocking edges follow the SDK relationship
 registry; closing a prerequisite also identifies affected dependents.
 
+History timestamps also require valid explicit-zone timestamps. Each is parsed
+once; cross-stream replay and ranked time ordering compare instants, so different
+offset spellings do not change causal order. Physical append order within each
+stream still wins for backdated entries. Invalid timestamps cannot be assigned
+to a time window: the omission receipt reports `invalid_timestamp_rows` and up
+to eight `invalid_timestamp_examples` (item, zero-based ordinal and at most 128
+timestamp characters). Their patches still contribute to current-state replay,
+but those event rows are omitted. A positive count prevents a completeness claim;
+inspect the referenced histories before relying on time-window transitions.
+
 Blockers rank first, followed by your claims, handoffs, unblocked work, other
 claims, reopened/reprioritized/new items, comments and closures. Priority, event
 time and key break ties deterministically. Reversed blocker/unblock rows carry `superseded: true` and rank last. A claim
@@ -31,6 +41,9 @@ and timestamps together. Own claims come from the same SDK history replay as the
 claim between metadata and history reads cannot remain listed as your own.
 Claims describe the serving snapshot, including
 open and in-progress statuses and excluding the workspace's terminal statuses.
+Handoffs are explicit release operations or prose lines starting with `handoff:`,
+`hand over:` or `hand-over:`. Ordinary comments and closure messages about release
+notes retain their normal rank.
 
 Each response includes an omission receipt. Rows that do not fit remain in the
 cursor and are returned by the next call. Pages drain a frozen snapshot before
@@ -55,17 +68,35 @@ Cursors are scoped to the tracker and author. A deterministic sequence number
 ensures even an empty refresh returns a new token; retries of the same input
 cursor and corpus return the same response. Disposable, content-addressed
 snapshots live under the ignored tracker `runtime/context-since` directory, with
-at most 200 snapshots and 4 MiB total retained state. History checkpoints store
-one count and ordered prefix hash per nonempty item stream, rather than one key
-per event, so retained history state scales with stream count.
-Pending rows still consume retention capacity. A later `--from` reduces pending
-rows; an oversized stream inventory requires a smaller tracker. Cursors from the
-older event-key checkpoint format expire with an explicit restart remedy. The
+at most 200 snapshots and 4 MiB total retained state. Checkpoints reference shared,
+compressed, content-addressed inventories containing one count and ordered prefix
+hash per nonempty stream. Unchanged polls by different agents share that inventory
+instead of copying it into every checkpoint. The count is an upper bound: distinct
+inventories and pending rows also consume the byte allowance and can reduce the
+number retained. Unreferenced inventories are collected with evicted checkpoints;
+SDK locks serialize publication and protect inventory reads across processes.
+A later `--from` reduces pending rows; exceptionally large compressed inventories
+can still require a smaller tracker. Cursors from the older event-key checkpoint
+format expire with an explicit restart remedy. The
 cursor carries no file path. Losing/evicting runtime state produces `CURSOR_EXPIRED`; pruning or changing
-history covered by a cursor produces `HISTORY_EXPIRED`. Both refuse to invent a
-complete delta and instruct callers to reorient with `pm context --for handoff`,
-then restart with an appropriate `--from` timestamp. A timestamp predating a
-compacted history baseline also refuses. `INVALID_CURSOR`,
+history without a compaction baseline produces `HISTORY_EXPIRED`.
+
+Every response provides `served_at`, the first publication time of that immutable
+response, and `restart_from`, a conservative inclusive restart boundary covering
+the requested start and the earliest valid retained timestamp. Persist both with
+the cursor. On cursor loss, use `--from "$restart_from"`; replay can repeat events,
+so deduplicate by event key. `served_at` is diagnostic clock metadata excluded
+from replay identity; retries reuse its persisted first-publication value.
+Do not restart at the later serving time when a page still has deferred rows.
+Backdated writes earlier than the saved boundary require an earlier start.
+
+Compaction of one stream reports its item ID in `expired_streams` while continuing
+unaffected streams. Frozen pages remain deliverable even if their source was
+compacted; the next refresh reports the affected stream and resumes after its
+baseline. A `--from` start predating a baseline also reports that stream instead
+of refusing the whole tracker. Missing pruned events cannot be reconstructed:
+any expired stream or invalid timestamp requires history inspection or
+`pm context --for handoff` before claiming a complete delta. `INVALID_CURSOR`,
 `CURSOR_AUTHOR_MISMATCH`, `INVALID_ARGUMENT`, `INVALID_FROM`, `INVALID_BUDGET` and
 `CURSOR_CAPACITY` provide specific remedies through the exported `SinceError`
 contract (`code`, `remedy`, `exitCode=2`) and the CLI diagnostic.
@@ -107,3 +138,7 @@ replay uses certified current metadata only for items without retained streams.
 Causal replay scans indexed stream frontiers in timestamp/item-ID order, retaining
 physical order within each stream even for backdated writes. Pending pages only
 validate stored stream prefixes; they skip causal merging and classification.
+Blocker updates use reverse references and per-owner edge contributions, so graph
+events refresh only the changed document and its referrers. Shared and inverse
+edges retain all owners. Packing serializes each row once, adjusts byte counts
+and receipt digits incrementally, then serializes the complete response once.

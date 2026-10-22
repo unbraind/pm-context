@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { gunzipSync } from "node:zlib";
 import test, { type TestContext } from "node:test";
 import { init, historyCompact, createHistoryEntry, appendHistoryEntry, emptyImportedDocument } from "@unbrained/pm-cli/sdk";
 import { create, comments, claim, release, update, close, reopen, deleteItem } from "@unbrained/pm-cli/sdk/core";
@@ -151,15 +152,15 @@ test("since preserves early years, leap days and inclusive explicit-offset bound
   assert.deepEqual((await f.pack({ from: "2020-02-29T12:34:56.124Z" })).changes.filter((row) => row.id.startsWith("delta-")), []);
 });
 
-test("history compaction invalidates old cursors and predating --from", async (t) => {
+test("history compaction reports the affected stream without expiring every cursor", async (t) => {
   const f = await fixture(t);
   const id = (await create({ title: "Retained history", author: "agent-a" }, f.client)).item.id;
   await comments(id, { add: "old session", author: "agent-a" }, f.client);
   await comments(id, { add: "another session", author: "agent-a" }, f.client);
   const old = await f.pack({ from: epoch });
   await historyCompact(id, { author: "agent-a" }, f.client);
-  await assert.rejects(f.pack({ cursor: old.cursor }), errorCode("HISTORY_EXPIRED"));
-  await assert.rejects(f.pack({ from: epoch }), errorCode("HISTORY_EXPIRED"));
+  assert.deepEqual((await f.pack({ cursor: old.cursor })).omission_receipt.expired_streams, [id]);
+  assert.deepEqual((await f.pack({ from: epoch })).omission_receipt.expired_streams, [id]);
   assert.equal((await f.pack({ from: "2099-01-01T00:00:00Z" })).changes.length, 0);
 });
 
@@ -251,8 +252,8 @@ test("retention enforces count and byte capacity without evicting the returned s
   symlinkSync("evicted-snapshot", join(directory, `s1_${"f".repeat(64)}.json`));
   const refreshed = await f.pack({ cursor: pack.cursor });
   assert.ok(existsSync(join(directory, `${refreshed.cursor}.json`)));
-  const files = readdirSync(directory).filter((file) => existsSync(join(directory, file)));
-  assert.ok(files.length <= SINCE_RETENTION.count);
+  const files = readdirSync(directory).filter((file) => /^(?:s1_.*\.json|i1_.*\.gz)$/.test(file) && existsSync(join(directory, file)));
+  assert.ok(files.filter((file) => file.startsWith("s1_")).length <= SINCE_RETENTION.count);
   assert.ok(files.reduce((sum, file) => sum + readFileSync(join(directory, file)).length, 0) <= SINCE_RETENTION.bytes);
   await create({ title: "Capacity row", author: "agent-a" }, f.client);
   const realRow = (await f.pack({ from: epoch })).changes[0]!;
@@ -404,7 +405,8 @@ test("checkpoint size stays compact beyond the old 4 MiB event-key limit", async
   writeFileSync(join(f.pmRoot, "history", "delta-large.jsonl"), `${JSON.stringify(entry)}\n`.repeat(count));
   const pack = await f.pack({ from: "2099-01-01T00:00:00Z" });
   const raw = readFileSync(join(f.pmRoot, SINCE_RETENTION.directory, `${pack.cursor}.json`), "utf8");
-  const state = JSON.parse(raw) as { streams: Array<{ id: string; count: number; hash: string }> };
+  const stored = JSON.parse(raw) as { streams: string };
+  const state = { streams: JSON.parse(gunzipSync(readFileSync(join(f.pmRoot, SINCE_RETENTION.directory, `i1_${stored.streams}.gz`))).toString("utf8")) as Array<{ id: string; count: number; hash: string }> };
   const large = state.streams.find((stream) => stream.id === "delta-large")!;
   assert.equal(state.streams.length, 2, "one large item stream plus SDK workspace history");
   assert.equal(large.count, count);
