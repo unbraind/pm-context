@@ -101,6 +101,77 @@ test("canonical property order, source sharing and field absence are stable", as
   await assert.rejects(resumeFreshness(same, f.manifest, f.read), code("INVALID_MANIFEST"));
 });
 
+test("corrupt settings history projections refuse reuse instead of certifying SDK defaults", async (t) => {
+  const f = await fixture(t);
+  const packet: FreshnessPacket = { sections: [
+    { id: "history", content: "History policy", sources: [{ kind: "settings", fields: ["history"] }], depends_on: [] },
+    { id: "dependent", content: "Uses the policy", sources: [], depends_on: ["history"] },
+    { id: "independent", content: "Evidence", sources: [{ kind: "evidence", path: "evidence.txt" }], depends_on: [] },
+  ] };
+  const baseline = await recordFreshness(packet, f.read);
+  const path = join(f.pmRoot, "settings.json");
+  const original = readFileSync(path);
+  assert.equal((await resumeFreshness(packet, baseline, f.read)).code, "FRESH");
+  for (const corrupt of ["{", '{"id_prefix":3}', Buffer.from('{"ignored":"\xff"}', "binary")]) {
+    writeFileSync(path, corrupt);
+    const result = await resumeFreshness(packet, baseline, f.read);
+    assert.equal(result.code, "SOURCE_UNAVAILABLE");
+    assert.equal(result.reusable, false);
+    assert.equal(result.unavailable_sources, 1);
+    assert.equal(result.unchanged_sections, 1);
+    assert.deepEqual(result.invalidated.map((row) => row.section), ["history", "dependent"]);
+    assert.ok(result.invalidated.every((row) => row.causes.every((cause) => cause.startsWith("unavailable:"))));
+    assert.match(result.remedy, /Restore.*sources.*record a new manifest.*Do not reuse/);
+    assert.ok(!JSON.stringify(result).includes(f.root));
+    await assert.rejects(f.read({ kind: "settings", fields: ["history"] }), code("SOURCE_UNAVAILABLE"));
+    await assert.rejects(recordFreshness(packet, f.read), code("SOURCE_UNAVAILABLE"));
+    writeFileSync(path, original);
+    assert.equal((await resumeFreshness(packet, baseline, f.read)).code, "FRESH");
+  }
+  chmodSync(path, 0);
+  const unreadable = await resumeFreshness(packet, baseline, f.read);
+  assert.equal(unreadable.code, "SOURCE_UNAVAILABLE");
+  assert.equal(unreadable.reusable, false);
+  assert.equal(unreadable.unavailable_sources, 1);
+  chmodSync(path, 0o644);
+  assert.equal((await resumeFreshness(packet, baseline, f.read)).reusable, true);
+});
+
+test("item projections also refuse corrupt settings rather than using fallback schemas", async (t) => {
+  const f = await fixture(t);
+  writeFileSync(join(f.pmRoot, "settings.json"), "{");
+  const result = await resumeFreshness(f.packet, f.manifest, f.read);
+  assert.equal(result.code, "SOURCE_UNAVAILABLE");
+  assert.equal(result.reusable, false);
+  assert.equal(result.unavailable_sources, 3);
+  assert.equal(result.invalidated_sections, 5);
+});
+
+test("settings changes between guarded reads refuse unchanged history projections", async (t) => {
+  const f = await fixture(t);
+  const packet: FreshnessPacket = { sections: [{ id: "history", content: "Policy", sources: [{ kind: "settings", fields: ["history"] }], depends_on: [] }] };
+  const baseline = await recordFreshness(packet, f.read);
+  const path = join(f.pmRoot, "settings.json");
+  const settings = readFreshnessJson(path) as Record<string, unknown>;
+  const original = fs.openSync;
+  let reads = 0;
+  try {
+    fs.openSync = ((...args: Parameters<typeof fs.openSync>) => {
+      if (args[0] === path && ++reads === 2) {
+        writeFileSync(path, JSON.stringify({ ...settings, author_default: "agent-b" }));
+      }
+      return Reflect.apply(original, fs, args);
+    }) as typeof fs.openSync;
+    syncBuiltinESMExports();
+    const result = await resumeFreshness(packet, baseline, f.read);
+    assert.equal(reads, 2);
+    assert.equal(result.code, "SOURCE_UNAVAILABLE");
+    assert.equal(result.reusable, false);
+    assert.equal(result.unavailable_sources, 1);
+  } finally { fs.openSync = original; syncBuiltinESMExports(); }
+  assert.equal((await resumeFreshness(packet, baseline, f.read)).code, "FRESH");
+});
+
 test("packet parser refuses malformed, oversized, cyclic and unknown dependency declarations", () => {
   const valid = { sections: [{ id: "one", content: "fact", sources: [{ kind: "settings" }], depends_on: [] }] };
   const invalid: unknown[] = [undefined, null, [], {}, { sections: [] }, { ...valid, extra: true }, { sections: [null] }];

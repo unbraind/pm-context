@@ -3,7 +3,7 @@ import { isUtf8 } from "node:buffer";
 import { createHash } from "node:crypto";
 import { constants, closeSync, fstatSync, openSync, readSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
-import { PmCliError, readSettings, locateItem, readLocatedItem, resolveItemTypeRegistry } from "@unbrained/pm-cli/sdk";
+import { PmCliError, readSettingsWithMetadata, locateItem, readLocatedItem, resolveItemTypeRegistry } from "@unbrained/pm-cli/sdk";
 /** Hard ceilings for untrusted packet inputs and agent-sized resume output. */
 export const FRESHNESS_LIMITS = { input_bytes: 262144, sections: 256, sources: 1024, evidence_bytes: 8388608 };
 /** Expected refusals never include underlying paths, source values or exception messages. */
@@ -164,7 +164,7 @@ export async function resumeFreshness(packet, manifest, read) {
         reusable: invalidated.length === 0, checked_sources: baseline.sources.length,
         unchanged_sections: packet.sections.length - invalidated.length, invalidated_sections: invalidated.length,
         unavailable_sources: unavailable, invalidated, omitted_sections: 0,
-        remedy: unavailable > 0 ? "Restore missing/unreadable sources, regenerate invalidated sections and record a new manifest. Do not reuse the packet." : invalidated.length > 0 ? "Regenerate invalidated sections and record a new manifest; retain unchanged sections." : "Reuse this packet for the declared sources at this read boundary; revalidate after later changes.",
+        remedy: unavailable > 0 ? "Restore missing, unreadable or corrupt sources, regenerate invalidated sections and record a new manifest. Do not reuse the packet." : invalidated.length > 0 ? "Regenerate invalidated sections and record a new manifest; retain unchanged sections." : "Reuse this packet for the declared sources at this read boundary; revalidate after later changes.",
     };
 }
 /** Bound a complete JSON or compact TOON response; omission never implies safe reuse. */
@@ -269,10 +269,15 @@ export function createFreshnessReader(pmRoot, evidenceRoot) {
                 throw new Error("Outside evidence root");
             return readFreshnessFile(path, FRESHNESS_LIMITS.evidence_bytes).toString("base64");
         }
+        const settingsPath = resolve(pmRoot, "settings.json");
+        const settingsBytes = readFreshnessFile(settingsPath);
+        const { settings, warnings: settingsWarnings } = await readSettingsWithMetadata(pmRoot);
+        // SDK defaults are usable only after a complete, stable, warning-free source read.
+        if (!isUtf8(settingsBytes) || settingsWarnings.length > 0 || !settingsBytes.equals(readFreshnessFile(settingsPath))) {
+            throw new FreshnessError("SOURCE_UNAVAILABLE", "Repair settings.json and its schema sources, then record a new manifest. Do not reuse the packet.");
+        }
         let value;
         if (source.kind === "item") {
-            readFreshnessFile(resolve(pmRoot, "settings.json"));
-            const settings = await readSettings(pmRoot);
             const located = await locateItem(pmRoot, source.id, settings.id_prefix, settings.item_format, resolveItemTypeRegistry(settings).type_to_folder);
             if (!located)
                 throw new Error("Missing source");
@@ -284,9 +289,7 @@ export function createFreshnessReader(pmRoot, evidenceRoot) {
             value = { ...document.metadata, body: document.body };
         }
         else {
-            // readSettings supplies defaults for missing files; absence cannot certify reuse.
-            readFreshnessFile(resolve(pmRoot, "settings.json"));
-            value = await readSettings(pmRoot);
+            value = settings;
         }
         if (!source.fields)
             return value;

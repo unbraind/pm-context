@@ -61,6 +61,11 @@ files, unreadable files and oversized files cannot certify reuse. Evidence is
 limited to 8 MiB per file; packet, manifest, settings and item files to 256 KiB.
 Remote URLs are not fetched; provide a pinned local artifact or a backend
 adapter. Source contents and underlying exception messages never enter receipts.
+Settings and item reads also require a stable, valid settings source with no SDK
+read warnings. Corrupt JSON, invalid schema, invalid UTF-8 or an unreadable
+settings file yields `SOURCE_UNAVAILABLE`, even when a selected field such as
+`history` would otherwise match SDK defaults. Repair the source before recording
+a new manifest; defaults cannot certify reuse after a failed settings read.
 
 The response lists only invalidated section IDs, each with a deduplicated set
 of changed/unavailable source coordinates. Causes propagate transitively
