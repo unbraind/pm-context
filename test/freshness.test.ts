@@ -11,7 +11,7 @@ import { init, locateItem } from "@unbrained/pm-cli/sdk";
 import { create, update, comments, deleteItem } from "@unbrained/pm-cli/sdk/core";
 import { createExtensionTestHarness, decodeToon } from "@unbrained/pm-cli/sdk/testing";
 import extension, { createFreshnessReader, encodeFreshness, FRESHNESS_LIMITS, FreshnessError, parseFreshnessPacket, readFreshnessFile, readFreshnessJson, recordFreshness, resumeFreshness } from "../index.ts";
-import type { FreshnessManifest, FreshnessPacket, FreshnessResult, FreshnessSource } from "../index.ts";
+import type { FreshnessManifest, FreshnessPacket, FreshnessResult } from "../index.ts";
 
 /** Persist real SDK trackers without any parent Git discovery. */
 async function fixture(t: TestContext) {
