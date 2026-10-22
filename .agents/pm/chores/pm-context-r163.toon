@@ -1,0 +1,28 @@
+id: pm-context-r163
+title: Correct tracker reconciliation review evidence for PR 163
+description: "Verify the five unresolved review threads against main, correct evidence fields with append-only events, and recheck every reconciled record for the same citation class. Tracker-only scope; retain delivery status and prior history."
+type: Chore
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-22T10:05:30.187Z"
+updated_at: "2026-10-22T10:13:45.273Z"
+author: codex-agent
+comments[2]{created_at,author,text}:
+  "2026-10-22T10:06:12.838Z",codex-agent,"Verified five unresolved threads: PRRT_kwDOSzDuFs6vBuTz and PRRT_kwDOSzDuFs6vBuT- require publishing-guard citations; PRRT_kwDOSzDuFs6vBuT8 and PRRT_kwDOSzDuFs6vBuT_ require implementation versus verification attribution; PRRT_kwDOSzDuFs6vBuT5 requires both successful CodeQL workflow and analysis receipts. All valid. Main remains 7d156cd179b1; every delivery commit is in main ancestry. CodeQL main run 39410986052 succeeds and analysis 1987756727 has empty error at the same ancestor bbc33ecb6d6d. Self-review covers all ten closeouts; correct the same citation mismatch in p965, a9iw, 05ub and ht20 too. Preserve every prior history byte. No outside-diff findings in the latest CodeRabbit review."
+  "2026-10-22T10:13:30.593Z",codex-agent,"Tracker-only evidence verification complete. All five threads are valid and addressed by seven snapshot corrections: publishing guard (594y and self-review p965), merge-wait implementation versus later test (jjbl), paired CodeQL success and analysis (f4tl), deterministic date artifacts (a9iw), both reusable callers (05ub), and historical certification package/launcher artifacts (ht20). Three other closeouts already cite relevant artifacts. All eleven distinct delivery/verification/analysis commits are in unchanged main 7d156cd179b1 ancestry. Each of seven existing PR history streams preserves every prior byte and appends exactly one event; all ten original changed streams preserve main prefixes. Both evidence fields match intended corrections and existing terminal status remains unchanged. This mainline evidence is the tracker-only substitute for behavioral revert proofs. Linked pm test passes 3/3 ancestry commands; npm ci, changelog generation/check, inventory, snapshot, privacy and whitespace checks pass. pm health --check-only --json exits 0 but reports ok=false for existing host-extension version skew and legacy provenance-domain advisory; no strict-health certification or history repair. No runtime or dist edits, no new closure operations, and no review replies, resolutions, mentions, merge or release."
+files[7]{path,scope}:
+  .agents/pm/issues/pm-context-594y.toon,project
+  .agents/pm/issues/pm-context-jjbl.toon,project
+  .agents/pm/chores/pm-context-f4tl.toon,project
+  .agents/pm/issues/pm-context-p965.toon,project
+  .agents/pm/issues/pm-context-a9iw.toon,project
+  .agents/pm/chores/pm-context-05ub.toon,project
+  .agents/pm/chores/pm-context-ht20.toon,project
+tests[3]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  git merge-base --is-ancestor 009dd68f4cd0034b5ed5e46c0a9a042242b8d022 origin/main,project,900,codex-agent,"2026-10-22T10:09:03.287Z",local_mutation,chore/reconcile-tracker-1021
+  git merge-base --is-ancestor 83b7923157b590a1c98c38fd56e7c0f43d99f4bd origin/main,project,900,codex-agent,"2026-10-22T10:09:03.287Z",local_mutation,chore/reconcile-tracker-1021
+  git merge-base --is-ancestor bbc33ecb6d6d61475b72b756395b87d47f68126a origin/main,project,900,codex-agent,"2026-10-22T10:09:03.287Z",local_mutation,chore/reconcile-tracker-1021
+docs[1]{path,scope}:
+  "https://github.com/unbraind/pm-context/pull/163",project
+body: ""

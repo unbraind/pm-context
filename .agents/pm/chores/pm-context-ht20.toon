@@ -6,13 +6,13 @@ status: closed
 priority: 2
 tags[2]: cert,deps
 created_at: "2026-10-04T10:41:17.939Z"
-updated_at: "2026-10-21T18:42:09.183Z"
+updated_at: "2026-10-22T10:08:16.251Z"
 closed_at: "2026-10-21T18:42:02.051Z"
 completed_at: "2026-10-21T18:42:02.051Z"
 author: pi-cert-a
 resolution: Delivered by the audit-linked mainline implementation.
 expected_result: Certify pm-context on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates.
-actual_result: "Re-verified unchanged main 7d156cd179b1: delivery 3da931742937 remains in main ancestry; .github/workflows/codeql.yml, test/prepare-merge-driver.test.ts remain present."
+actual_result: "Main 7d156cd179b1 recheck: Historical certification delivery: PR #128, 3da931742937, is in main ancestry and changed package.json, package-lock.json, scripts/prepare-merge-driver.ts and test/prepare-merge-driver.test.ts. The delivery snapshot pins the 2026.10.4 toolchain; main subsequently advances those pins. Retained historical npm/Bun and launcher receipts describe that dated candidate, not new current-head certification. Current launcher and regression artifacts remain present."
 comments[6]{created_at,author,text}:
   "2026-10-04T10:43:28.046Z",pi-cert-a,"Gate evidence: npm run release:check green 283/283 (typecheck, release-workflow, build, docstring, coverage, audit:prod, pack:dry-run, changelog:check with pm-changelog 2026.10.4, publish-attestation, changelog-date ok); ./node_modules/.bin/pm health --strict-exit exits 0; npm audit and npm audit --omit=dev both 0 vulnerabilities. Dependabot security alert #5 (brace-expansion GHSA-q2hr-2g5m-vwhr, dev/transitive) resolved via npm audit fix -> brace-expansion 5.0.12. Launcher re-copied byte-identical from pm-ops@2026.10.4 templates.\n\nDogfood (pm-context-2026.10.3.tgz installed into a scratch copy of this repo's real tracker):\n- npm: 'npx -y @unbrained/pm-cli@2026.10.4 context-pack --status in_progress --format compact --limit 3' -> focus 3 with neighbors/links/recent sections; 'context-pack --tag cert --format json' -> structured JSON including this item.\n- bun: 'bunx --bun @unbrained/pm-cli@2026.10.4 context-pack --id pm-context-ht20 --neighborhood-depth 1 --format compact' -> agent handoff pack; 'context-pack --status open --limit 2 --output pack.md' -> wrote file (selected: 2).\nScratch copy deleted afterwards.\n\npm-github: installed as managed extension pm-github@2026.10.4; read-only preview 'pm github sync --repo unbraind/pm-context --dry-run' -> 'No pm items linked to unbraind/pm-context' planned 0. No issues created/modified, no scheduled sync."
   "2026-10-04T10:52:57.826Z",codex-sol,"Restart verification: retained changes and existing evidence inspected; exact-pin all devDependencies, use published pm-changelog 2026.10.4, then rerun the full CI gate, pinned health, audits and packed real-tracker npm/Bun acceptance. Preserve prior comments and avoid duplicate Dependabot superseded comments."
@@ -29,5 +29,5 @@ files[5]{path,scope,note}:
 tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   "npm run release:check",project,pi-cert-a,"2026-10-04T10:43:26.829Z",local_mutation,chore/pm-context-pm-cli-2026-10-4
   node --test test/prepare-merge-driver.test.ts,project,codex-sol,"2026-10-04T10:55:58.554Z",local_mutation,chore/pm-context-pm-cli-2026-10-4
-close_reason: "Re-verified unchanged main 7d156cd179b1: delivery 3da931742937 remains in main ancestry; .github/workflows/codeql.yml, test/prepare-merge-driver.test.ts remain present. Audit delivery: Certify pm-context on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates. [PR #128](https://github.com/unbraind/pm-context/pull/128) (3da9317) delivers the dated certification; current main subsequently advances the toolchain."
+close_reason: "Main 7d156cd179b1 recheck: Historical certification delivery: PR #128, 3da931742937, is in main ancestry and changed package.json, package-lock.json, scripts/prepare-merge-driver.ts and test/prepare-merge-driver.test.ts. The delivery snapshot pins the 2026.10.4 toolchain; main subsequently advances those pins. Retained historical npm/Bun and launcher receipts describe that dated candidate, not new current-head certification. Current launcher and regression artifacts remain present."
 body: ""

@@ -6,13 +6,13 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-08-10T15:09:48.910Z"
-updated_at: "2026-10-21T18:37:16.334Z"
+updated_at: "2026-10-22T10:07:23.945Z"
 closed_at: "2026-10-21T18:37:11.833Z"
 completed_at: "2026-10-21T18:37:11.833Z"
 author: pi-agent
 resolution: Delivered by the audit-linked mainline implementation.
 expected_result: Harden the release merge wait against mergeStateStatus deadlock.
-actual_result: "Re-verified unchanged main 7d156cd179b1: delivery cc12869326f7 remains in main ancestry; package.json, test/prepare-merge-driver.test.ts remain present."
+actual_result: "Main 7d156cd179b1 recheck: Implementation: PR #61, commit 83b7923157b5, introduced the SHA-guarded merge-API retry loop retained in .github/workflows/release.yml; BLOCKED and UNKNOWN do not suppress merge attempts, while DIRTY and BEHIND fail closed. Verification: PR #150, commit cc12869326f7, added test/release-merge-wait.test.ts for that existing behavior. Both commits are in main ancestry; package.json and prepare-merge-driver tests are not merge-wait evidence."
 comments[4]{created_at,author,text}:
   "2026-10-16T12:25:46.181Z",codex-agent,"Triage at main 684a6fa, npm package 2026.10.16: already fixed by 83b7923 (#61). The release workflow attempts the SHA-guarded merge API for nonfatal merge states; only DIRTY and BEHIND fail immediately. BLOCKED and UNKNOWN do not gate the merge call. Sibling release workflows use equivalent handling. Adding an execution regression for this existing behavior and checking its sensitivity to restoring the old state precondition; item remains open."
   "2026-10-16T12:29:53.262Z",codex-agent,"Added test/release-merge-wait.test.ts: executes the actual parsed workflow loop with a local GitHub transport; BLOCKED/UNKNOWN/CLEAN retry a refused SHA-guarded merge, transient reads still merge, DIRTY/BEHIND fail closed, and persistent refusal reaches the deadline. All 7 pass. Behavioral revert proof: restoring the BLOCKED state precondition alone makes the BLOCKED regression exit 1; workflow restored byte-for-byte. No production workflow edit is needed."
@@ -31,5 +31,5 @@ files[1]{path,scope,note}:
   test/release-merge-wait.test.ts,project,Execute the actual workflow merge wait with a local GitHub transport
 tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
   node --test test/release-merge-wait.test.ts,project,240,codex-agent,"2026-10-16T12:30:19.006Z",local_mutation,fix/backlog-gates-and-coverage
-close_reason: "Re-verified unchanged main 7d156cd179b1: delivery cc12869326f7 remains in main ancestry; package.json, test/prepare-merge-driver.test.ts remain present. Audit delivery: Harden the release merge wait against mergeStateStatus deadlock. [PR #150](https://github.com/unbraind/pm-context/pull/150) (cc12869) verifies the existing merge-API attempt loop and adds executable regression coverage; release.yml no longer gates the merge decision on mergeStateStatus."
+close_reason: "Main 7d156cd179b1 recheck: Implementation: PR #61, commit 83b7923157b5, introduced the SHA-guarded merge-API retry loop retained in .github/workflows/release.yml; BLOCKED and UNKNOWN do not suppress merge attempts, while DIRTY and BEHIND fail closed. Verification: PR #150, commit cc12869326f7, added test/release-merge-wait.test.ts for that existing behavior. Both commits are in main ancestry; package.json and prepare-merge-driver tests are not merge-wait evidence."
 body: ""
