@@ -143,7 +143,10 @@ function classify(events, selected, terminal, items) {
         const after = document.metadata;
         documents.set(event.id, after);
         bodies.set(event.id, document.body);
-        const nextBlocked = blockers(documents, terminal, registry);
+        // Ancestor replacements can change every graph field, including imported baselines.
+        const touchesGraph = event.op === "create" || event.op === "delete"
+            || event.patch.some((patch) => /^(?:|\/metadata(?:\/(?:status|dependencies|blocked_by|blocked_reason)(?:\/.*)?)?)$/.test(patch.path));
+        const nextBlocked = touchesGraph ? blockers(documents, terminal, registry) : blocked;
         if (selected.has(event.key)) {
             const kinds = [];
             if (event.op === "create")
@@ -186,8 +189,9 @@ function classify(events, selected, terminal, items) {
                 }
             }
             const unblocked = new Set();
+            const waitingNow = new Set(nextBlocked.values());
             for (const [key, id] of blocked) {
-                if (nextBlocked.has(key) || unblocked.has(id) || [...nextBlocked.values()].includes(id))
+                if (nextBlocked.has(key) || unblocked.has(id) || waitingNow.has(id))
                     continue;
                 const status = documents.get(id)?.status;
                 if (typeof status !== "string" || terminal.has(status))
@@ -201,12 +205,13 @@ function classify(events, selected, terminal, items) {
         }
         blocked = nextBlocked;
     }
+    const waitingAtEnd = new Set(blocked.values());
     for (const row of rows) {
         if (row.kinds[0] === "blocked")
             row.superseded = !blocked.has(row.text);
         if (row.kinds[0] === "unblocked") {
             const status = documents.get(row.id)?.status;
-            row.superseded = [...blocked.values()].includes(row.id) || typeof status !== "string" || terminal.has(status);
+            row.superseded = waitingAtEnd.has(row.id) || typeof status !== "string" || terminal.has(status);
         }
     }
     return { rows, snapshots: [...documents].map(([id, metadata]) => ({ ...metadata, id })), blockers: blocked };
