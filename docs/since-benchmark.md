@@ -1,5 +1,11 @@
 # Public tracker resume measurement
 
+The call/token totals below describe the earlier wire format. Production fixes
+add serving/restart coordinates and timestamp/compaction receipts, so these are
+historical measurements, not current token-savings claims. The optional Python
+`tiktoken` counter was unavailable during this review; no refreshed token total
+is claimed. Current packing timing and byte measurements appear below.
+
 Measured on 2026-10-21 with core CLI **2026.10.21**, package-pinned SDK
 **2026.10.15**, and the committed public `unbraind/pm-cli` tracker at
 `8ce50f94e5dcbeec5b5874dbf990c73a9e9d4b18`: **1,261 existing items**.
@@ -89,3 +95,36 @@ extension into the copy, verifies completeness, retains measured stdout under
 ignored `coverage/since-benchmark`, and removes its scratch tracker. It does not
 publish tracker contents. The checked-in runner produced these results and printed the CLI version; its
 scratch tracker was removed after measurement.
+
+## Packing scalability regression
+
+The production follow-up measures the packing phase separately from tracker reads
+and cursor publication. The fixture is a real non-Git SDK tracker; payloads repeat
+a real row with Unicode prose, varying receipt counters and own-claim rows.
+
+```sh
+node --test --test-name-pattern="incremental budget packing" test/since-production.test.ts
+```
+
+One local run produced:
+
+| Rows | Complete response bytes | Packing time | Whole-response serializations |
+| ---: | ---: | ---: | ---: |
+| 125 | 555,525 | 29.06 ms | 2 |
+| 250 | 1,110,590 | 50.00 ms | 2 |
+| 500 | 2,220,716 | 127.70 ms | 2 |
+
+The regression requires every sample to finish below one second and at most two
+whole-response serializations, in addition to exact output-byte accounting.
+Instrumented coverage runs measured 500 rows at 272.49–663.49 ms. These are packing
+measurements, not end-to-end latency guarantees; filesystem reads, SDK policy
+preflight and checkpoint publication remain outside that timed phase.
+The four full npm/Bun CI gates on Node 22/26 at commit
+`ce20761ff568d4a3a0d9052143a6469bc5e39a32` measured 500 rows at 11.76–17.57 ms;
+all four passed the same one-second and exact-byte assertions.
+
+The same test file verifies that 192 graph events perform at most one complete
+replay-document traversal, including shared/inverse edge correctness. Separate
+storage tests retain an idle cursor through 199 other agents' publications on a
+1,261-stream corpus and store a 40,000-stream inventory within the existing 4 MiB
+cap. These operation and capacity checks complement timing under variable load.

@@ -1152,7 +1152,7 @@ test("createSdkPacker uses fallback ranks for items not in the ranked list", asy
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
     const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
-    const opts = await rankOptionsFrom(initialized.path);
+    await rankOptionsFrom(initialized.path);
     // Build the packer with empty rank maps so all lookups fall back
     const packer = createSdkPacker([], []);
     const focus: PmItem[] = [{ id: "pm-1", title: "F", type: "Task", status: "in_progress", priority: 1, body: "body text" }];
@@ -1172,7 +1172,7 @@ test("createSdkPacker accounts for body text in projection costs", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-pack-"));
   try {
     const initialized = await init("ctx", { defaults: true, author: "test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents", "pm") });
-    const opts = await rankOptionsFrom(initialized.path);
+    await rankOptionsFrom(initialized.path);
     const focus: PmItem[] = [{ id: "pm-1", title: "F", type: "Task", status: "in_progress", priority: 1, body: "A substantial body of text that adds token cost." }];
     const neighbors: PmItem[] = [];
     const packer = createSdkPacker(focus, neighbors);

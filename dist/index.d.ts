@@ -1,3 +1,5 @@
+export { createFreshnessReader, encodeFreshness, FRESHNESS_LIMITS, FreshnessError, parseFreshnessPacket, readFreshnessFile, readFreshnessJson, recordFreshness, resumeFreshness } from "./freshness.ts";
+export type { FreshnessManifest, FreshnessPacket, FreshnessReader, FreshnessResult, FreshnessSection, FreshnessSource } from "./freshness.ts";
 import type { FileFocus } from "./file-focus.ts";
 import type { ExtensionApi, RuntimeStatusRegistry, RelationshipKindRegistry } from "@unbrained/pm-cli/sdk";
 import { list as pmList } from "@unbrained/pm-cli/sdk/core";

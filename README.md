@@ -386,8 +386,23 @@ a new opaque cursor and an omission receipt. The whole JSON response fits the
 conservative UTF-8 byte-token ceiling; budget-deferred rows remain resumable.
 See [cursor semantics and recovery](docs/since.md).
 
+## Resume only invalidated assumptions
+
+Record a digest manifest for a packet whose sections declare item, settings and
+local evidence dependencies. On resume, receive only invalidated sections;
+changes propagate through dependent sections while unchanged assumptions reuse
+safely. Deleted or unreadable sources refuse reuse with a bounded receipt.
+
+```sh
+pm context-freshness record --packet packet.json > manifest.json
+pm context-freshness resume --packet packet.json --manifest manifest.json --json
+```
+
+No new snapshot store or event delta stream is created. See the
+[packet example, typed SDK and refusal contracts](docs/freshness.md).
+
 ## Without git
 
-Item-selected packs, handoffs, usage reports and `context-pack since` work in a
+Item-selected packs, handoffs, usage reports, `context-pack since` and freshness record/resume work in a
 plain initialized tracker without invoking Git. Changed-file focus (`--changed`)
 requires a Git working repository and explains that requirement when unavailable.

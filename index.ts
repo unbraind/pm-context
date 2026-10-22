@@ -1,3 +1,7 @@
+import { createFreshnessReader, encodeFreshness, FreshnessError, parseFreshnessPacket, readFreshnessJson, recordFreshness, resumeFreshness } from "./freshness.ts";
+import type { FreshnessManifest } from "./freshness.ts";
+export { createFreshnessReader, encodeFreshness, FRESHNESS_LIMITS, FreshnessError, parseFreshnessPacket, readFreshnessFile, readFreshnessJson, recordFreshness, resumeFreshness } from "./freshness.ts";
+export type { FreshnessManifest, FreshnessPacket, FreshnessReader, FreshnessResult, FreshnessSection, FreshnessSource } from "./freshness.ts";
 import { buildSincePack, encodeSincePack } from "./since.ts";
 import type { ExtensionModule } from "@unbrained/pm-cli/sdk/authoring";
 import { writeFileSync } from "node:fs";
@@ -1587,6 +1591,37 @@ function setupCommands(api: ExtensionApi): void {
     },
   });
 
+  for (const action of ["record", "resume"] as const) {
+    api.registerCommand({
+      name: `context-freshness ${action}`,
+      description: action === "record" ? "Record source digests behind declared packet assumptions." : "Return only assumptions invalidated by later source changes.",
+      flags: [
+        { long: "--packet", value_name: "file", description: "JSON packet with section content and source dependencies", type: "string" },
+        { long: "--manifest", value_name: "file", description: "Original JSON digest manifest (resume only)", type: "string" },
+        { long: "--evidence-root", value_name: "directory", description: "Root for relative evidence files (default: source workspace)", type: "string" },
+        { long: "--format", value_name: "format", description: "Record: json; resume: toon (default) or json", type: "string" },
+        { long: "--byte-budget", value_name: "n", description: "Output UTF-8 byte ceiling (default: record 262144; resume 4000)", type: "string" },
+      ],
+      async run(ctx: CommandHandlerContext) {
+        const path = stringOption(ctx.options, "packet");
+        const manifestPath = stringOption(ctx.options, "manifest");
+        const format = stringOption(ctx.options, "format") ?? (ctx.global.json || action === "record" ? "json" : "toon");
+        if (!path || (action === "resume" ? !manifestPath : Boolean(manifestPath)) || (format !== "json" && format !== "toon") || (action === "record" && format !== "json")) {
+          throw new FreshnessError("INVALID_ARGUMENT", "Supply --packet JSON; resume also requires --manifest JSON. Record uses json; resume accepts --format json or toon.");
+        }
+        const budget = Number(stringOption(ctx.options, "byte-budget", "byteBudget") ?? (action === "record" ? "262144" : "4000"));
+        if (!Number.isSafeInteger(budget) || budget < 512) throw new FreshnessError("INVALID_ARGUMENT", "Use an integer --byte-budget of at least 512.");
+        const packet = parseFreshnessPacket(readFreshnessJson(path));
+        const read = createFreshnessReader(ctx.pm_root, stringOption(ctx.options, "evidence-root", "evidenceRoot") ?? ctx.source_workspace_root ?? ctx.repo_root ?? process.cwd());
+        if (action === "record") return renderedCommandResult(encodeFreshness(await recordFreshness(packet, read), "json", Math.min(budget, 262144)));
+        const report = await resumeFreshness(packet, readFreshnessJson(manifestPath!) as FreshnessManifest, read);
+        const output = encodeFreshness(report, format, budget);
+        if (report.code === "SOURCE_UNAVAILABLE") process.exitCode = EXIT_CODE.USAGE;
+        return renderedCommandResult(output);
+      },
+    });
+  }
+
   api.registerCommand({
     name: "context-pack since",
     description: "Resume with ranked changes, substantive excerpts, claims and an opaque cursor.",
@@ -1816,7 +1851,7 @@ export default {
     setupCommands(api);
     if (typeof api.registerRenderer === "function") {
       const rendererOwnership = {
-        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage"],
+        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume"],
         resultDiscriminator: isRenderedCommandResult,
       };
       api.registerRenderer("toon", renderCommandResult, rendererOwnership);
