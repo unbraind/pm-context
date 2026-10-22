@@ -83,8 +83,8 @@ jobs:
           fi
           echo "Committed dist/ matches a fresh build."
 
-      - name: Test with coverage gate
-        run: npm run coverage
+      - name: Full release gate with npm
+        run: npm run release:check
 
       - name: Production dependency audit
         run: npm run audit:prod
@@ -103,3 +103,6 @@ jobs:
 
       - name: Verify Bun can install the package graph
         run: bun install --no-save
+
+      - name: Full release gate with Bun
+        run: bun run release:check

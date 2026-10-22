@@ -1,3 +1,4 @@
+import { buildSincePack, encodeSincePack } from "./since.ts";
 import type { ExtensionModule } from "@unbrained/pm-cli/sdk/authoring";
 import { writeFileSync } from "node:fs";
 import { resolveFileFocus, matchFileFocus, rankFileFocus, renderFileFocus, readFileFocusItems } from "./file-focus.ts";
@@ -1587,6 +1588,26 @@ function setupCommands(api: ExtensionApi): void {
   });
 
   api.registerCommand({
+    name: "context-pack since",
+    description: "Resume with ranked changes, substantive excerpts, claims and an opaque cursor.",
+    flags: [
+      { long: "--cursor", value_name: "token", description: "Resume a retained delta checkpoint", type: "string" },
+      { long: "--from", value_name: "timestamp", description: "Start from an inclusive ISO timestamp", type: "string" },
+      { long: "--token-budget", value_name: "n", description: "Complete JSON byte-token upper bound (default: 4000)", type: "string" },
+    ],
+    async run(ctx: CommandHandlerContext) {
+      const settings = await readSettings(ctx.pm_root);
+      const registry = resolveRuntimeStatusRegistry(settings.schema);
+      const pack = await buildSincePack(ctx.pm_root, await readPmItems(ctx.pm_root), new Set(registry.terminal_statuses), {
+        cursor: stringOption(ctx.options, "cursor"),
+        from: stringOption(ctx.options, "from"),
+        author: ctx.global.author ?? process.env.PM_AUTHOR ?? settings.author_default,
+        tokenBudget: Number(stringOption(ctx.options, "token-budget", "tokenBudget") ?? "4000"),
+      });
+      return renderedCommandResult(encodeSincePack(pack));
+    },
+  });
+  api.registerCommand({
     name: "context-handoff",
     description: "Generate an agent-ready handoff with concise defaults.",
     intent: "produce compact, actionable handoff context for another agent",
@@ -1795,7 +1816,7 @@ export default {
     setupCommands(api);
     if (typeof api.registerRenderer === "function") {
       const rendererOwnership = {
-        commands: ["context-pack", "context-handoff", "context-usage"],
+        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage"],
         resultDiscriminator: isRenderedCommandResult,
       };
       api.registerRenderer("toon", renderCommandResult, rendererOwnership);

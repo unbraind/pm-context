@@ -1,0 +1,11 @@
+id: pm-context-595f
+title: Restore strict tracker health for the pinned host and extension contract
+description: "Fresh feature worktree strict health reports extension_host_pm_cli_version_skew:2026.10.15:2026.10.21:pm-github and merge_fence_drift:2. Exact warning searches found no existing covering item; the older 2026.10.4 certification item covers a different candidate. Resolve through the package maintenance workflow without rewriting existing history. Since-delta implementation preserves the dependency pin and merge configuration as required by its queue scope."
+type: Issue
+status: open
+priority: 2
+tags: []
+created_at: "2026-10-21T16:52:21.581Z"
+updated_at: "2026-10-21T16:52:21.581Z"
+author: codex-agent
+body: ""

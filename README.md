@@ -373,3 +373,21 @@ pm-ops template; its internal callback is part of the outstanding documentation
 scope. The alert and workflow-verifier migration also requires coordinating the
 existing `pm-context-qu0a` ownership before migrating its linked paths. No helper
 has been marked removed while that dependency remains unresolved.
+
+## Resume since your last session
+
+```sh
+pm context-pack since --from 2026-10-20T18:00:00Z --token-budget 4000
+pm context-pack since --cursor "$cursor" --token-budget 4000
+```
+
+Returns ranked changes, bounded substantive comments and handoff messages, claims,
+a new opaque cursor and an omission receipt. The whole JSON response fits the
+conservative UTF-8 byte-token ceiling; budget-deferred rows remain resumable.
+See [cursor semantics and recovery](docs/since.md).
+
+## Without git
+
+Item-selected packs, handoffs, usage reports and `context-pack since` work in a
+plain initialized tracker without invoking Git. Changed-file focus (`--changed`)
+requires a Git working repository and explains that requirement when unavailable.
