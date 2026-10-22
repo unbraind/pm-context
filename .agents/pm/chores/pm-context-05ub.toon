@@ -2,11 +2,19 @@ id: pm-context-05ub
 title: "Adopt pm-github 2026.10.16: default-branch-safe gated sync and daily gated closeout PRs"
 description: "Repin the gated sync caller to pm-github 2026.10.16 (tag 67a5e3e: npm-project-dir input, caller default branch resolved through the API for schedule payloads) and add the reusable gated closeout caller, which opens one reviewed PR per day closing items delivered by merged pull requests."
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags[3]: changed,ci,pm-github
 created_at: "2026-10-16T10:37:06.046Z"
-updated_at: "2026-10-16T10:37:06.046Z"
+updated_at: "2026-10-22T10:08:02.781Z"
+closed_at: "2026-10-21T18:38:51.634Z"
+completed_at: "2026-10-21T18:38:51.634Z"
 author: claude-orchestrator
 acceptance_criteria: pm-github-sync.yml pins 2026.10.16 at 67a5e3e; pm-github-closeout.yml calls the reusable closeout workflow at the same pin
+resolution: Delivered by the audit-linked mainline implementation.
+expected_result: "Adopt pm-github 2026.10.16: default-branch-safe gated sync and daily gated closeout PRs."
+actual_result: "Main 7d156cd179b1 recheck: PR #149, eac19c5bf3ce, is in main ancestry. Both .github/workflows/pm-github-sync.yml and .github/workflows/pm-github-closeout.yml pin reusable workflow commit 67a5e3e1514fddeeae29951da00513f06f7aa0ab and pm-github-version 2026.10.16. This verifies both callers, not a live scheduled sync or closeout."
+comments[1]{created_at,author,text}:
+  "2026-10-21T18:38:22.382Z",codex-agent,"Tracker reconciliation authorized for the audited verdict FIXED-STALE. Re-verified unchanged main 7d156cd179b1: delivery eac19c5bf3ce remains in main ancestry; .github/workflows/pm-github-closeout.yml remain present. Adopt pm-github 2026.10.16: default-branch-safe gated sync and daily gated closeout PRs. [PR #149](https://github.com/unbraind/pm-context/pull/149) (eac19c5) delivers both 2026.10.16 callers. Scope: tracker state only; no new runtime certification or deployment claim."
+close_reason: "Main 7d156cd179b1 recheck: PR #149, eac19c5bf3ce, is in main ancestry. Both .github/workflows/pm-github-sync.yml and .github/workflows/pm-github-closeout.yml pin reusable workflow commit 67a5e3e1514fddeeae29951da00513f06f7aa0ab and pm-github-version 2026.10.16. This verifies both callers, not a live scheduled sync or closeout."
 body: ""
