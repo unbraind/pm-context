@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Focus context packs on changed and explicit files ([pm-context-ax7z](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-ax7z.toon))
+
+### Changed
+
+- Enable the gated GitHub issue sync ([pm-context-53bz](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-53bz.toon))
+- Adopt pm-github 2026.10.16: default-branch-safe gated sync and daily gated closeout PRs ([pm-context-05ub](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-05ub.toon))
+
+### Fixed
+
+- A release that merges but fails to publish is abandoned by the next day's run ([pm-context-7yrb](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-7yrb.toon))
+- Harden the release merge wait against mergeStateStatus deadlock ([pm-context-jjbl](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-jjbl.toon))
+- The changelog gate stamps an untagged version with the current date, so its verdict flips every midnight with no commit ([pm-context-a9iw](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-a9iw.toon))
+- The release job authenticated with a stored npm token that expired, so publishing stopped while every other gate stayed green ([pm-context-594y](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-594y.toon))
+- A release run bumped and committed a new version every night while publishing was impossible, because the only externally-failable step runs last ([pm-context-p965](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-p965.toon))
+
+### Other
+
+- Enable GitHub CodeQL code scanning ([pm-context-f4tl](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-f4tl.toon))
+- Certify pm-context on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates ([pm-context-ht20](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-ht20.toon))
+
 ## 2026.10.21 - 2026-10-21
 
 ### Fixed
