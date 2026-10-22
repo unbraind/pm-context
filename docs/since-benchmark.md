@@ -119,6 +119,9 @@ whole-response serializations, in addition to exact output-byte accounting.
 Instrumented coverage runs measured 500 rows at 272.49–663.49 ms. These are packing
 measurements, not end-to-end latency guarantees; filesystem reads, SDK policy
 preflight and checkpoint publication remain outside that timed phase.
+The four full npm/Bun CI gates on Node 22/26 at commit
+`ce20761ff568d4a3a0d9052143a6469bc5e39a32` measured 500 rows at 11.76–17.57 ms;
+all four passed the same one-second and exact-byte assertions.
 
 The same test file verifies that 192 graph events perform at most one complete
 replay-document traversal, including shared/inverse edge correctness. Separate
