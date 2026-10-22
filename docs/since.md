@@ -9,7 +9,12 @@ normal global `--author` or `PM_AUTHOR` identity. Save the returned opaque `curs
 pm context-pack since --cursor "$cursor" --token-budget 4000
 ```
 
-The starting timestamp is inclusive. Subsequent calls identify immutable history
+The starting timestamp is inclusive and must use
+`YYYY-MM-DDTHH:mm:ss[.fraction]Z` or an explicit `±HH:MM` offset in place of `Z`.
+Calendar dates must exist, hours run from 00 to 23, and minutes and seconds from
+00 to 59. Loose dates, missing timezones and normalized rollovers are rejected
+with `INVALID_FROM`. Years below 0100 retain their actual year.
+Subsequent calls identify immutable history
 entries rather than comparing timestamps, so equal timestamps and backdated
 appends do not disappear. Every event gets an operation, author, timestamp,
 changed-field inventory, type, status and stable key. Derived graph transitions

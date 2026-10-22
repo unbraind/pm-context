@@ -118,6 +118,39 @@ test("bad arguments, wrong author, corrupt or missing cursors fail with explicit
   await assert.rejects(f.pack({ cursor: pack.cursor }), errorCode("INVALID_CURSOR"));
 });
 
+test("since rejects loose timestamps and invalid calendar, clock and offset fields", async (t) => {
+  const f = await fixture(t);
+  for (const from of [
+    "1", "2026-10-20", "2026-10-20T18:00:00", "2026-10-20T18:00:00z",
+    "2026-02-30T00:00:00Z", "2026-02-29T00:00:00Z", "2026-04-31T00:00:00Z",
+    "1900-02-29T00:00:00Z", "0099-02-29T00:00:00Z", "0100-02-29T00:00:00Z",
+    "2026-00-01T00:00:00Z", "2026-13-01T00:00:00Z", "2026-01-00T00:00:00Z", "2026-01-32T00:00:00Z",
+    "2026-10-20T24:00:00Z", "2026-10-20T18:60:00Z", "2026-10-20T18:00:60Z",
+    "2026-10-20T18:00:00+24:00", "2026-10-20T18:00:00+00:60", " 2026-10-20T18:00:00Z",
+  ]) await assert.rejects(f.pack({ from }), errorCode("INVALID_FROM"), from);
+  assert.equal(existsSync(join(f.root, ".git")), false);
+});
+
+test("since preserves early years, leap days and inclusive explicit-offset boundaries", async (t) => {
+  const f = await fixture(t);
+  const empty = emptyImportedDocument();
+  for (const [id, nowIso] of [
+    ["delta-early", "0099-02-28T12:34:56.123Z"],
+    ["delta-boundary", "2020-02-29T12:34:56.123Z"],
+  ] as const) await appendHistoryEntry(join(f.pmRoot, "history", `${id}.jsonl`), createHistoryEntry({
+    nowIso, author: "agent-a", op: "update", before: empty, after: empty,
+  }));
+  for (const from of [
+    "0000-02-29T00:00:00Z", "0099-02-28T12:34:56.123Z", "0099-02-28T14:04:56.123+01:30",
+  ]) assert.ok((await f.pack({ from })).changes.some((row) => row.id === "delta-early"), from);
+  for (const from of [
+    "0100-02-28T00:00:00Z", "0400-02-29T00:00:00Z", "2000-02-29T00:00:00Z",
+    "2020-02-29T12:34:56.123Z", "2020-02-29T14:04:56.123+01:30",
+    "2020-02-29T11:04:56.123-01:30", "2020-02-29T12:34:56.123000Z",
+  ]) assert.deepEqual((await f.pack({ from })).changes.filter((row) => row.id.startsWith("delta-")).map((row) => row.id), ["delta-boundary"], from);
+  assert.deepEqual((await f.pack({ from: "2020-02-29T12:34:56.124Z" })).changes.filter((row) => row.id.startsWith("delta-")), []);
+});
+
 test("history compaction invalidates old cursors and predating --from", async (t) => {
   const f = await fixture(t);
   const id = (await create({ title: "Retained history", author: "agent-a" }, f.client)).item.id;

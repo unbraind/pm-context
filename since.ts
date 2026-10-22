@@ -82,6 +82,16 @@ export interface SinceOptions {
   author: string;
   tokenBudget: number;
 }
+/** Parse explicit-zone ISO timestamps without normalizing invalid calendar dates. */
+function parseFromTimestamp(value: string): number {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.exec(value);
+  if (!match) return NaN;
+  // setUTCFullYear preserves years 0000–0099, unlike Date.UTC's 1900 offset.
+  const monthEnd = new Date(0);
+  monthEnd.setUTCFullYear(Number(match[1]), Number(match[2]), 0);
+  if (Number(match[3]) > monthEnd.getUTCDate()) return NaN;
+  return Date.parse(value);
+}
 /** Hash JSON content rather than timestamps, so equal-time and late events survive. */
 function digest(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -341,8 +351,8 @@ export async function buildSincePack(pmRoot: string, items: PmItem[], terminal: 
     snapshot = previous.streams;
   } else {
     const events = mergeEvents(streams);
-    const from = options.from === undefined ? undefined : Date.parse(options.from);
-    if (from !== undefined && !Number.isFinite(from)) throw new SinceError("INVALID_FROM", "--from must be an ISO timestamp.");
+    const from = options.from === undefined ? undefined : parseFromTimestamp(options.from);
+    if (from !== undefined && !Number.isFinite(from)) throw new SinceError("INVALID_FROM", "--from must be a valid ISO timestamp with seconds and an explicit Z or ±HH:MM offset.");
     if (from !== undefined && events.some((event) => event.op === "history_compact_baseline" && Date.parse(event.ts) >= from)) throw new SinceError("HISTORY_EXPIRED", "Requested time predates retained history. Reorient with pm context --for handoff and restart after the compacted baseline.");
     const prior = new Map(previous?.streams.map((stream) => [stream.id, stream.count]));
     const selected = new Set(events.filter((event) => from === undefined ? event.ordinal >= (prior.get(event.id) ?? 0) : Date.parse(event.ts) >= from).map((event) => event.key));
