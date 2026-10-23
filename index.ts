@@ -1213,23 +1213,24 @@ function estimateProjectionCosts(item: PmItem): ContextProjectionCosts {
  * focus items are required anchors, neighbors compete by relevance rank for the
  * remaining budget. The packer first selects under that token budget with pm's
  * projection-degradation optimizer, then enforces the command's explicit item
- * ceiling while preserving the SDK-selected focus-first order.
+ * ceiling. The incoming focus order is authoritative (including file-overlap
+ * ranking); corpus ranks apply only to neighbors, so equal-cost focus ties keep
+ * the selection order established by buildContextPack.
  */
 export function createSdkPacker(
   rankedFocus: readonly PmItem[],
   rankedNeighbors: readonly PmItem[],
 ): (focus: PmItem[], neighbors: PmItem[], maxItems: number) => { focus: PmItem[]; neighbors: PmItem[] } {
-  const focusRank = new Map<string, number>(rankedFocus.map((item, index) => [item.id, index + 1]));
   const neighborRank = new Map<string, number>(rankedNeighbors.map((item, index) => [item.id, rankedFocus.length + index + 1]));
   return (focus: PmItem[], neighbors: PmItem[], maxItems: number): { focus: PmItem[]; neighbors: PmItem[] } => {
     if (!(maxItems > 0)) return { focus, neighbors };
     const tokenBudget = maxItems * TOKENS_PER_ITEM_SLOT;
     const candidates: ContextPackingCandidate<PmItem>[] = [
-      ...focus.map((item) => ({
+      ...focus.map((item, index) => ({
         id: item.id,
         item,
-        rank: focusRank.get(item.id) ?? 1,
-        score: 1 / (focusRank.get(item.id) ?? 1),
+        rank: index + 1,
+        score: 1 / (index + 1),
         token_costs: estimateProjectionCosts(item),
         required: true,
       })),
@@ -1484,7 +1485,7 @@ function setupCommands(api: ExtensionApi): void {
         throw new CommandError("--format must be markdown, json, agent, or compact", EXIT_CODE.USAGE);
       }
       const selection = resolveSelectionOptions(options);
-      const fileFocus = resolveFileFocus(options, ctx.args, ctx.repo_root ?? ctx.source_workspace_root ?? process.cwd(), ctx.pm_root);
+      const fileFocus = resolveFileFocus(options, ctx.args, ctx.repo_root ?? ctx.source_workspace_root ?? process.cwd(), ctx.pm_root, process.cwd());
       const limit = intOption(options, "limit", contextPackDefaultLimit);
       const includeBody = boolOption(options, "include-body", "includeBody");
       const includeClosed = boolOption(options, "include-closed", "includeClosed");
@@ -1499,8 +1500,8 @@ function setupCommands(api: ExtensionApi): void {
       const items = fileFocus ? await readFileFocusItems(ctx.pm_root) : await readPmItems(ctx.pm_root);
       const rankOptions = await resolveSdkRankOptions(ctx);
       const ranker = createSdkRanker(items, rankOptions);
-      // Pre-rank the full corpus so the token-budgeted packer has relevance ranks
-      // for both focus and neighbor candidates before buildContextPack trims.
+      // Pre-rank the corpus for neighbor relevance. Focus arrives in the final
+      // selection order, including file overlap, after buildContextPack trims.
       let packer: ContextPackOptions["packer"];
       if (maxItems) {
         const rankedAll = rankContextItems(items, rankOptions);

@@ -16,7 +16,7 @@ export declare function normalizeFocusPath(value: string, root: string): string 
 /** Check tracker containment using repository-relative paths on native and Windows roots. */
 export declare function isTrackerPath(path: string, pmRoot: string, repoRoot: string): boolean;
 /** Resolve --changed and repeated --files using real Git; an empty working set remains an active filter. */
-export declare function resolveFileFocus(options: Record<string, unknown>, args: string[], cwd: string, pmRoot: string): FileFocus | undefined;
+export declare function resolveFileFocus(options: Record<string, unknown>, args: string[], cwd: string, pmRoot: string, sourceCwd?: string): FileFocus | undefined;
 /** Match exact files and linked directory ancestors, retaining unique changed paths per item. */
 export declare function matchFileFocus(items: PmItem[], focus: FileFocus, links: (value: unknown) => string[]): Map<string, string[]>;
 /** Rank focus by unique overlap, lifecycle status, priority, then deterministic id. */

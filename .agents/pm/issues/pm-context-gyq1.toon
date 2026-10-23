@@ -1,0 +1,26 @@
+id: pm-context-gyq1
+title: Preserve repository roots ending in whitespace for file focus
+description: "Fix GitHub #154: preserve meaningful whitespace in Git root discovery, verify helper and installed CLI paths with same-repository rename controls, and record behavioral revert proof."
+type: Issue
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-23T06:41:44.215Z"
+updated_at: "2026-10-23T06:52:53.221Z"
+assignee: codex-agent
+claim_principal: codex-agent
+author: codex-agent
+comments[4]{created_at,author,text}:
+  "2026-10-23T06:43:08.310Z",codex-agent,"GitHub #154 source inspection confirms trim() removes meaningful root suffixes. Plan: real-Git helper and installed-CLI regressions, same-repository rename control, and preservation of missing-repository and unknown-base errors. Related original feature: pm-context-ax7z."
+  "2026-10-23T06:46:02.433Z",codex-agent,"Regression-first reproduction: node --test --test-name-pattern='trailing-whitespace' test/file-focus.test.ts fails 2/2 on the original implementation: helper throws UNKNOWN_BASE and installed CLI exits 2 with the Git-repository error. The pinned SDK also trims host context; fixtures initialize via the real SDK then rename the same repository to isolate file focus. Fix removes only Git's terminating newline and recovers an exact cwd root only when it matches the host context."
+  "2026-10-23T06:50:23.713Z",codex-agent,"Behavioral revert proof: reverted only resolveFileFocus root-discovery statements to the original trim() implementation, preserving its compatible signature and all tests; rebuilt dist. node --test --test-name-pattern=trailing-whitespace test/file-focus.test.ts failed 2/2 (0 pass), exit 1: helper UNKNOWN_BASE and installed CLI exit 2. Restored the fix and rebuilt dist. Positive helper coverage includes space, tab and newline suffixes with unchanged-HEAD rename controls. Typecheck, test compilation and docstring lint pass."
+  "2026-10-23T06:52:53.221Z",codex-agent,"Out-of-scope SDK initialization behavior is tracked separately by pm-context-2cx5. Local strict health has the already tracked pm-context-595f host-extension skew and fence drift; no history, dependency pin, or merge configuration remediation is included. CI uses its fresh checkout as the full-gate authority."
+files[3]{path,scope}:
+  file-focus.ts,project
+  index.ts,project
+  test/file-focus.test.ts,project
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  npm run build && node --test --test-name-pattern=trailing-whitespace test/file-focus.test.ts,project,600,codex-agent,"2026-10-23T06:49:12.137Z",local_mutation,fix/file-focus-packing
+docs[1]{path,scope}:
+  README.md,project
+body: ""

@@ -52,7 +52,7 @@ export function isTrackerPath(path, pmRoot, repoRoot) {
     return directory === "." || file === directory || file.startsWith(`${directory}/`);
 }
 /** Resolve --changed and repeated --files using real Git; an empty working set remains an active filter. */
-export function resolveFileFocus(options, args, cwd, pmRoot) {
+export function resolveFileFocus(options, args, cwd, pmRoot, sourceCwd = cwd) {
     const changed = options.changed !== undefined && options.changed !== false;
     const explicit = options.files === undefined ? [] : Array.isArray(options.files) ? options.files.map(String) : [String(options.files)];
     if (!changed && explicit.length === 0) {
@@ -62,7 +62,11 @@ export function resolveFileFocus(options, args, cwd, pmRoot) {
     }
     if (args.length > 1 || (!changed && args.length > 0))
         throw new FileFocusError("INVALID_FILE_FOCUS", "Pass one base with --changed, or repeat --files <path>.");
-    const root = git(cwd, ["rev-parse", "--show-toplevel"])?.trim();
+    // Older hosts trim their root context. Recover it only when the actual working
+    // repository matches that context, preserving portable roots for other repos.
+    const sourceRoot = git(sourceCwd, ["rev-parse", "--show-toplevel"])?.replace(/\n$/, "");
+    const root = sourceRoot?.trimEnd() === cwd ? sourceRoot
+        : git(cwd, ["rev-parse", "--show-toplevel"])?.replace(/\n$/, "");
     if (!root)
         throw new FileFocusError("NOT_GIT_REPOSITORY", "File focus requires a Git working repository. Run from the repository containing the changed files.");
     const files = new Set();

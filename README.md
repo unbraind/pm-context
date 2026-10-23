@@ -73,7 +73,14 @@ contained files with path boundaries, so `src` matches `src/parser.ts` but
 Focus items rank by the number of unique matching paths, then status
 (`in_progress`, `open`, `blocked`, `closed` with `--include-closed`), then
 ascending priority and id. Existing neighborhood depth, focus limit, max-items
-and token packing apply afterward. An empty working set selects no focus items.
+and token packing apply afterward. Under `--max-items` token pressure, equal-cost
+focus candidates retain that order: greatest overlap first, then lifecycle
+status, ascending priority, and ascending id as the final deterministic tie-break.
+An empty working set selects no focus items.
+
+Repository roots retain meaningful trailing whitespace. With older hosts that
+trim the repository context, file focus recovers the exact root from the current
+working repository when it matches that context.
 
 Every focus item exposes `matched_files`. `unlinked_changed_files` lists working
 set paths with no linked item anywhere in the tracker, independently of filters

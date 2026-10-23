@@ -401,7 +401,9 @@ export declare function createSdkRanker(allItems: readonly PmItem[], options: Sd
  * focus items are required anchors, neighbors compete by relevance rank for the
  * remaining budget. The packer first selects under that token budget with pm's
  * projection-degradation optimizer, then enforces the command's explicit item
- * ceiling while preserving the SDK-selected focus-first order.
+ * ceiling. The incoming focus order is authoritative (including file-overlap
+ * ranking); corpus ranks apply only to neighbors, so equal-cost focus ties keep
+ * the selection order established by buildContextPack.
  */
 export declare function createSdkPacker(rankedFocus: readonly PmItem[], rankedNeighbors: readonly PmItem[]): (focus: PmItem[], neighbors: PmItem[], maxItems: number) => {
     focus: PmItem[];
