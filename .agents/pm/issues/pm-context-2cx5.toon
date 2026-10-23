@@ -1,0 +1,11 @@
+id: pm-context-2cx5
+title: Track SDK initialization of whitespace-suffixed repositories
+description: "Out-of-scope SDK follow-up discovered while testing GitHub #154. With the pinned SDK 2026.10.15, initializing directly in a Git repository whose directory ends in a space creates the tracker but omits .gitattributes; the real-Git fixture then fails to stage that file. SDK repository discovery trims roots. File-focused reads are repaired by pm-context-gyq1, including installed CLI compatibility, but SDK initialization belongs to the host. Reproduce with a disposable real Git repository and SDK init before pursuing a host-side correction; do not change the dependency pin in this fix."
+type: Issue
+status: open
+priority: 2
+tags: []
+created_at: "2026-10-23T06:51:45.294Z"
+updated_at: "2026-10-23T06:51:45.294Z"
+author: codex-agent
+body: ""

@@ -8,7 +8,7 @@ import test, { type TestContext } from "node:test";
 import { init, readLocatedItem, serializeItemDocument } from "@unbrained/pm-cli/sdk";
 import { create } from "@unbrained/pm-cli/sdk/core";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
-import extension, { buildContextPack, buildAgentHandoff, type ContextPack } from "../index.ts";
+import extension, { buildContextPack, buildAgentHandoff, createSdkPacker, type ContextPack } from "../index.ts";
 import { FileFocusError, isTrackerPath, normalizeFocusPath, resolveFileFocus, readFileFocusItems } from "../file-focus.ts";
 
 const packageRoot = resolve(import.meta.dirname, "..");
@@ -33,9 +33,11 @@ function snapshot(root: string): Record<string, string> {
 }
 
 /** Real repository, tracker and installed distribution for parser-to-renderer acceptance. */
-async function fixture(t: TestContext, trackerPath = ".agents/pm") {
-  const root = mkdtempSync(join(tmpdir(), "file-focus-"));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+async function fixture(t: TestContext, trackerPath = ".agents/pm", rootSuffix = "") {
+  const parent = mkdtempSync(join(tmpdir(), "file-focus-"));
+  let root = join(parent, "project");
+  mkdirSync(root);
+  t.after(() => rmSync(parent, { recursive: true, force: true }));
   git(root, "init", "-b", "main");
   mkdirSync(join(root, "src"));
   for (const path of ["src/one.ts", "src/two.ts", "old.ts"]) writeFileSync(join(root, path), "initial\n");
@@ -44,6 +46,7 @@ async function fixture(t: TestContext, trackerPath = ".agents/pm") {
   git(root, "commit", "-m", "Base");
   git(root, "switch", "-c", "feature");
   const initialized = await init("focus", { defaults: true, author: "integration-test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, trackerPath) });
+  let pmRoot = initialized.path;
   git(root, "add", ".gitattributes", ".gitignore");
   git(root, "commit", "--amend", "--no-edit");
   git(root, "branch", "-f", "main", "HEAD");
@@ -55,15 +58,127 @@ async function fixture(t: TestContext, trackerPath = ".agents/pm") {
   cpSync(join(packageRoot, "manifest.json"), join(installed, "manifest.json"));
   cpSync(join(packageRoot, "dist"), join(installed, "dist"), { recursive: true });
   symlinkSync(join(packageRoot, "node_modules"), join(installed, "node_modules"), "dir");
+  // Initialize through the real SDK before renaming: its Git setup also trims roots.
+  if (rootSuffix) {
+    renameSync(root, `${root}${rootSuffix}`);
+    root += rootSuffix;
+    pmRoot = join(root, trackerPath);
+    client.cwd = root;
+    client.pmRoot = pmRoot;
+  }
   const run = (...args: string[]) => {
     const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), "context-pack", ...args], {
-      cwd: root, encoding: "utf8", env: { ...process.env, PM_PATH: initialized.path, PM_SOURCE_WORKSPACE_ROOT: root, PM_SOURCE_PM_PATH: initialized.path, PM_AUTHOR: "integration-test" },
+      cwd: root, encoding: "utf8", env: { ...process.env, PM_PATH: pmRoot, PM_SOURCE_WORKSPACE_ROOT: root, PM_SOURCE_PM_PATH: pmRoot, PM_AUTHOR: "integration-test" },
     });
     assert.equal(result.status, 0, result.stderr + result.stdout);
     return result.stdout;
   };
-  return { root, pmRoot: initialized.path, client, one: one.item.id, two: two.item.id, run };
+  return { root, pmRoot, client, one: one.item.id, two: two.item.id, run };
 }
+
+test("trailing-whitespace roots preserve exact helper paths across same-repository renames", async (t) => {
+  for (const suffix of [" ", "\t", "\n"]) {
+    const f = await fixture(t, ".agents/pm", suffix);
+    writeFileSync(join(f.root, "src/one.ts"), "changed\n");
+    const focus = resolveFileFocus({ changed: "main" }, [], f.root, f.pmRoot)!;
+    assert.equal(focus.root, f.root);
+    assert.deepEqual(focus.files, ["src/one.ts"]);
+    const head = git(f.root, "rev-parse", "HEAD");
+    const renamed = `${f.root}ordinary`;
+    renameSync(f.root, renamed);
+    assert.equal(git(renamed, "rev-parse", "HEAD"), head);
+    const control = resolveFileFocus({ changed: "main" }, [], renamed, join(renamed, ".agents/pm"))!;
+    assert.deepEqual(control.files, focus.files);
+    assert.equal(control.root, renamed);
+  }
+});
+
+test("trailing-whitespace roots work through the installed CLI with changed and explicit files", async (t) => {
+  const f = await fixture(t, ".agents/pm", " ");
+  writeFileSync(join(f.root, "src/one.ts"), "changed\n");
+  assert.ok((JSON.parse(f.run("--format", "json")) as ContextPack).items.length > 0);
+  const before = snapshot(f.pmRoot);
+  for (const selector of [["--changed", "main"], ["--files", "src/one.ts"]]) {
+    const pack = JSON.parse(f.run(...selector, "--format", "json")) as ContextPack;
+    assert.deepEqual(pack.items.map((item) => item.id), [f.one]);
+    assert.deepEqual(pack.items[0]!.matched_files, ["src/one.ts"]);
+  }
+  assert.deepEqual(snapshot(f.pmRoot), before);
+});
+
+test("equal-cost capped packing preserves highest overlap despite opposite corpus ranks", () => {
+  const best = { id: "focus-best-000", title: "X".repeat(100), type: "Task", status: "open", priority: 4, files: ["src"] };
+  const next = Array.from({ length: 8 }, (_, index) => ({
+    ...best, id: `focus-next-00${index}`, priority: 0, files: ["src/a.ts"],
+  }));
+  const corpusOrder = [...next, best];
+  const pack = buildContextPack([best, ...next], {
+    fileFocus: { root: "/repo", files: ["src/a.ts", "src/b.ts"], refresh: "" },
+    neighborhood: false, maxItems: 1, packer: createSdkPacker(corpusOrder, corpusOrder),
+  });
+  assert.deepEqual(pack.items.map((item) => item.id), [best.id]);
+});
+
+test("equal-cost capped packing resolves overlap ties by lifecycle, priority, then id", () => {
+  for (const [bestStatus, bestPriority, nextStatus, nextPriority] of [
+    ["in_progress", 4, "open", 0], ["open", 0, "open", 4], ["open", 2, "open", 2],
+  ] as const) {
+    const best = { id: "focus-best-000", title: "X".repeat(100), type: "Task", status: bestStatus, priority: bestPriority, files: ["src"] };
+    const next = Array.from({ length: 8 }, (_, index) => ({
+      ...best, id: `focus-next-00${index}`, status: nextStatus, priority: nextPriority,
+    })).reverse();
+    const corpusOrder = [...next, best];
+    const pack = buildContextPack(corpusOrder, {
+      fileFocus: { root: "/repo", files: ["src/a.ts"], refresh: "" },
+      neighborhood: false, maxItems: 1, packer: createSdkPacker(corpusOrder, corpusOrder),
+    });
+    assert.deepEqual(pack.items.map((item) => item.id), [best.id]);
+  }
+});
+
+test("capped tracker-only packs work without git and file focus reports its requirement", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "context-no-git-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const initialized = await init("focus", { defaults: true, author: "integration-test", agentGuidance: "skip" }, { cwd: root, pmRoot: join(root, ".agents/pm") });
+  const item = await create({ id: "one", title: "Portable work", author: "integration-test" }, { cwd: root, pmRoot: initialized.path });
+  const installed = join(initialized.path, "extensions", "pm-context");
+  mkdirSync(installed, { recursive: true });
+  cpSync(join(packageRoot, "manifest.json"), join(installed, "manifest.json"));
+  cpSync(join(packageRoot, "dist"), join(installed, "dist"), { recursive: true });
+  symlinkSync(join(packageRoot, "node_modules"), join(installed, "node_modules"), "dir");
+  const emptyPath = join(root, "empty-bin");
+  mkdirSync(emptyPath);
+  const run = (...args: string[]) => spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), "context-pack", ...args], {
+    cwd: root, encoding: "utf8", env: { ...process.env, PM_PATH: initialized.path, PM_SOURCE_WORKSPACE_ROOT: root, PM_SOURCE_PM_PATH: initialized.path, PATH: emptyPath, GIT_CEILING_DIRECTORIES: tmpdir() },
+  });
+  const packed = run("--max-items", "1", "--format", "json");
+  assert.equal(packed.status, 0, packed.stdout + packed.stderr);
+  assert.deepEqual((JSON.parse(packed.stdout) as ContextPack).items.map((entry) => entry.id), [item.item.id]);
+  const changed = run("--changed", "main");
+  assert.equal(changed.status, 2);
+  assert.match(changed.stdout + changed.stderr, /File focus requires a Git working repository/);
+});
+
+test("equal-cost capped packing keeps highest overlap through installed CLI and explain", async (t) => {
+  const f = await fixture(t);
+  const best = await create({ id: "best-000", title: "X".repeat(100), status: "open", priority: 4, file: ["path=src"], author: "integration-test" }, f.client);
+  for (let index = 0; index < 8; index += 1) {
+    await create({ id: `next-00${index}`, title: "X".repeat(100), status: "open", priority: 0, file: ["path=src/a.ts"], author: "integration-test" }, f.client);
+  }
+  const args = ["--files", "src/a.ts", "--files", "src/b.ts", "--without-neighborhood", "--format", "json"];
+  const uncapped = JSON.parse(f.run(...args)) as ContextPack;
+  assert.equal(uncapped.items[0]!.id, best.item.id);
+  assert.equal(uncapped.items.length, 9);
+  for (const control of [["--id", best.item.id], ["--limit", "1"]]) {
+    assert.deepEqual((JSON.parse(f.run(...args, "--max-items", "1", ...control)) as ContextPack).items.map((item) => item.id), [best.item.id]);
+  }
+  const pack = JSON.parse(f.run(...args, "--max-items", "1")) as ContextPack;
+  assert.deepEqual(pack.items.map((item) => item.id), [best.item.id]);
+  assert.deepEqual(pack.items[0]!.matched_files, ["src/a.ts", "src/b.ts"]);
+  const explained = JSON.parse(f.run(...args, "--max-items", "1", "--explain")) as { entries: { id: string; matched_files: string[] }[] };
+  assert.deepEqual(explained.entries.map((entry) => entry.id), [best.item.id]);
+  assert.deepEqual(explained.entries[0]!.matched_files, pack.items[0]!.matched_files);
+});
 
 test("changed uses committed branch edits, index, worktree and untracked paths without writing the tracker", async (t) => {
   const f = await fixture(t);

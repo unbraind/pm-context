@@ -1,0 +1,24 @@
+id: pm-context-gb70
+title: Preserve highest-overlap focus during capped packing
+description: "Fix GitHub #153: equal-cost candidates under --max-items must preserve file-overlap ranking through token-budget selection. Add regression and behavioral revert proof, document deterministic ties, and verify the npm and Bun CI gates."
+type: Issue
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-23T06:41:42.601Z"
+updated_at: "2026-10-23T07:01:25.679Z"
+author: codex-agent
+comments[5]{created_at,author,text}:
+  "2026-10-23T06:43:05.006Z",codex-agent,"GitHub #153 reproduced in source inspection: file selection ranks by overlap, but the SDK packer retains corpus relevance ranks under token pressure. Plan: add equal-cost budget-pressure regressions with CLI controls and explain parity before changing selection ranks. Related original feature: pm-context-ax7z."
+  "2026-10-23T06:45:52.501Z",codex-agent,"Regression-first reproduction: node --test --test-name-pattern='equal-cost capped' test/file-focus.test.ts fails both helper and installed-CLI assertions on the original implementation. Eight lower-overlap equal-cost identities displace focus-best-000; explicit-ID and limit-one controls pass. Fix uses the already-ranked incoming focus order for SDK token selection."
+  "2026-10-23T06:52:38.981Z",codex-agent,"Behavioral revert proof: replaced only createSdkPacker with its origin/main implementation, retaining all other fixes and tests, and rebuilt dist. node --test --test-name-pattern='equal-cost capped' test/file-focus.test.ts failed 3/3 (0 pass), exit 1: overlap helper, lifecycle/priority/id tie helper, and installed CLI lost the best focus. Restored createSdkPacker and rebuilt dist. Root discovery revert independently failed 2/2 on pm-context-gyq1."
+  "2026-10-23T06:59:23.700Z",codex-agent,"CI full-gate evidence at commit 1a7116a: https://github.com/unbraind/pm-context/actions/runs/39914505693 passed both Node 22 and 26 jobs. Each npm run release:check and bun run release:check passed 393/393 tests, zero failures/skips; all four full gates succeeded. Native coverage gate reported 11 source files at unchanged thresholds; c8 aggregate statements/branches/functions/lines = 100/99.94/100/100. Audits report zero vulnerabilities. PR: https://github.com/unbraind/pm-context/pull/166."
+  "2026-10-23T07:01:22.223Z",codex-agent,"Local linked-test execution completed: pm test pm-context-gb70 --run --progress ran npm run build && node --test test/file-focus.test.ts successfully, 23/23 tests, zero failures/skips, exit 0. Includes installed CLI budget pressure, JSON/explain parity, deterministic lifecycle/priority/id ties, whitespace rename controls and no-Git acceptance. Result tracking is disabled, so this comment preserves the receipt without changing configuration. Local npm run typecheck, npm run build:test, npm run docstring and git diff --check pass; no separate lint script is configured."
+files[2]{path,scope}:
+  index.ts,project
+  test/file-focus.test.ts,project
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  npm run build && node --test test/file-focus.test.ts,project,600,codex-agent,"2026-10-23T06:48:47.706Z",local_mutation,fix/file-focus-packing
+docs[1]{path,scope}:
+  README.md,project
+body: ""
