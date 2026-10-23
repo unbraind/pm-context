@@ -2,6 +2,7 @@
  * Receipt protocol for the final output of pm-context's serving commands.
  * The package owns only runtime/context-receipts, never the SDK usage ledger.
  */
+import { acquireLock } from "@unbrained/pm-cli/sdk";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
@@ -106,14 +107,14 @@ export function normalizeReceiptFile(value: string): string {
  * manifest, and persist its receipt. Fact hashes exclude clocks and receipt ids.
  * Write failures propagate so callers disclose that measurement is unavailable.
  */
-export function serveContextReceipt(
+export async function serveContextReceipt(
   pmRoot: string,
   output: string,
   format: "json" | "text",
   associations: ReceiptAssociations,
   identity: ReceiptIdentity,
   outputPath?: string,
-): { output: string; receipt: ContextReceipt } {
+): Promise<{ output: string; receipt: ContextReceipt }> {
   const receipt: StoredReceipt = {
     protocol: "pm-context-usage/v1", receipt_id: randomUUID(), session: "", author: identity.author,
     served_at: new Date().toISOString(), command: identity.command, sections: [], facts: [], protocol_tokens: 0, used: {},
@@ -178,7 +179,7 @@ export function serveContextReceipt(
     rendered = `${lines.join("\n")}\n\nContext receipt: ${receipt.receipt_id}; session: ${receipt.session}; protocol: ${receipt.protocol}\n`;
     receipt.protocol_tokens = Math.ceil((rendered.length - output.length) / 4);
   }
-  withReceiptStore(pmRoot, (directory) => {
+  await withReceiptStore(pmRoot, (directory) => {
     const path = join(directory, `${receipt.receipt_id}.json`);
     try {
       persistReceipt(path, receipt);
@@ -205,13 +206,21 @@ function persistReceipt(path: string, receipt: StoredReceipt): void {
   finally { rmSync(temporary, { force: true }); }
 }
 
-/** Cooperating writers serialize rotation and evidence updates; contention asks for retry. */
-function withReceiptStore<T>(pmRoot: string, operation: (directory: string) => T): T {
+/** Native namespace, lease lifetime and hard total contention budget for receipt writers. */
+export const RECEIPT_LOCK = { id: "pm-context-receipts", owner: "pm-context:receipts", ttlSeconds: 60, waitMs: 500 } as const;
+
+/** Serialize receipt commits under a token-owned native lock, retaining unverifiable legacy locks. */
+async function withReceiptStore<T>(pmRoot: string, operation: (directory: string) => T): Promise<T> {
   const directory = join(pmRoot, RECEIPTS_RELATIVE_PATH);
   mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const lock = join(directory, ".lock");
-  mkdirSync(lock);
-  try { return operation(directory); } finally { rmSync(lock, { recursive: true, force: true }); }
+  const release = await acquireLock(pmRoot, RECEIPT_LOCK.id, RECEIPT_LOCK.ttlSeconds,
+    RECEIPT_LOCK.owner, false, true, RECEIPT_LOCK.waitMs, { maxWaitMs: RECEIPT_LOCK.waitMs });
+  try {
+    if (existsSync(join(directory, ".lock"))) {
+      throw new Error("Legacy context receipt .lock has no verifiable owner. Stop receipt writers and explicitly recover it before retrying.");
+    }
+    return operation(directory);
+  } finally { await release(); }
 }
 
 /** Validate every field consumed by reports, skipping oversized or corrupt snapshots. */
@@ -253,9 +262,9 @@ function readReceipt(path: string): StoredReceipt | null {
  * Record explicit, receipt-scoped usage. Unknown ids reject the entire update;
  * repeat reports are idempotent. Item/file proxies match only facts in this receipt.
  */
-export function recordReceiptUsage(pmRoot: string, usage: ReceiptUsage): void {
+export async function recordReceiptUsage(pmRoot: string, usage: ReceiptUsage): Promise<void> {
   if (!/^[\da-f-]{36}$/.test(usage.receipt_id)) throw new Error("Invalid context receipt id");
-  withReceiptStore(pmRoot, (directory) => {
+  await withReceiptStore(pmRoot, (directory) => {
     const path = join(directory, `${usage.receipt_id}.json`);
     const receipt = readReceipt(path);
     if (!receipt) throw new Error("Context receipt is missing, expired or malformed");

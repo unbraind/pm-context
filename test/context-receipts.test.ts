@@ -193,7 +193,7 @@ test("session environment is honored; no identity yields an isolated receipt ses
 
 test("receipt storage rotates at the hard count bound and rejects oversized snapshots", async (t) => {
   const f = await fixture(t);
-  const base = serveContextReceipt(f.pmRoot, "# Pack\n\n## Focus\n- first\n## Focus\n- first\n", "text", { item_ids: [], files: [] }, { author: "a", command: "context-pack" });
+  const base = await serveContextReceipt(f.pmRoot, "# Pack\n\n## Focus\n- first\n## Focus\n- first\n", "text", { item_ids: [], files: [] }, { author: "a", command: "context-pack" });
   assert.equal(base.receipt.facts.length, 1, "duplicate content is one fact with summed token cost");
   assert.equal(base.receipt.facts[0].estimated_tokens, 4);
   const directory = join(f.pmRoot, RECEIPTS_RELATIVE_PATH);
@@ -204,7 +204,7 @@ test("receipt storage rotates at the hard count bound and rejects oversized snap
     writeFileSync(path, JSON.stringify({ ...stored, receipt_id: id }));
     utimesSync(path, Math.floor(index / 2), Math.floor(index / 2));
   }
-  serveContextReceipt(f.pmRoot, "# Empty\n", "text", { item_ids: [], files: [] }, { author: "a", command: "context-pack" });
+  await serveContextReceipt(f.pmRoot, "# Empty\n", "text", { item_ids: [], files: [] }, { author: "a", command: "context-pack" });
   assert.equal(readdirSync(directory).filter((name) => name.endsWith(".json")).length, RECEIPT_LIMITS.count);
   assert.ok(!readdirSync(directory).includes("00000000-0000-0000-0000-000000000000.json"));
   // A clock moving backwards or coarse timestamps must not evict the receipt
@@ -213,10 +213,10 @@ test("receipt storage rotates at the hard count bound and rejects oversized snap
     const future = new Date("2100-01-01T00:00:00.000Z");
     utimesSync(join(directory, name), future, future);
   }
-  const current = serveContextReceipt(f.pmRoot, "# Current\n", "text", { item_ids: [], files: [] }, { author: "a", command: "context-pack" });
+  const current = await serveContextReceipt(f.pmRoot, "# Current\n", "text", { item_ids: [], files: [] }, { author: "a", command: "context-pack" });
   assert.equal(reportContextReceipts(f.pmRoot, { receipt_id: current.receipt.receipt_id, limit: 20 }).retained_receipts, 1);
   assert.equal(readdirSync(directory).filter((name) => name.endsWith(".json")).length, RECEIPT_LIMITS.count);
-  assert.throws(() => serveContextReceipt(f.pmRoot, "# Pack\n- x\n", "text", { item_ids: [], files: [] }, {
+  await assert.rejects(() => serveContextReceipt(f.pmRoot, "# Pack\n- x\n", "text", { item_ids: [], files: [] }, {
     author: "a".repeat(RECEIPT_LIMITS.bytes), command: "context-pack",
   }), /byte limit/);
   assert.ok(!readdirSync(directory).includes(".lock"));
@@ -227,27 +227,27 @@ test("token accounting, JSON minification, text inheritance, stable ids and norm
   const f = await fixture(t);
   const association = { item_ids: ["item-1", "item-10"], files: [{ itemId: "item-1", value: "./src/used.ts" }, { itemId: "item-1", value: "https://example.invalid" }] };
   const output = 'preamble\n# Pack\nGenerated: now\n\n## Focus\n- item-1\n  - body: extra\n## Links\n- item-1 file: ./src/used.ts\n- item-10\n';
-  const receipt = serveContextReceipt(f.pmRoot, output, "text", association, { author: "a", command: "context-pack" }).receipt;
+  const receipt = (await serveContextReceipt(f.pmRoot, output, "text", association, { author: "a", command: "context-pack" })).receipt;
   assert.deepEqual(receipt.facts[1].item_ids, ["item-1"]);
   assert.deepEqual(receipt.facts[2].item_ids, ["item-1"]);
   assert.deepEqual(receipt.facts.at(-1)?.item_ids, ["item-10"]);
-  recordReceiptUsage(f.pmRoot, { receipt_id: receipt.receipt_id, citations: [], touched_items: [], edited_files: ["src\\used.ts"] });
+  await recordReceiptUsage(f.pmRoot, { receipt_id: receipt.receipt_id, citations: [], touched_items: [], edited_files: ["src\\used.ts"] });
   const report = reportContextReceipts(f.pmRoot, { receipt_id: receipt.receipt_id, limit: 20 });
   const used = receipt.facts.find((fact) => fact.files.length > 0);
   assert.ok(used);
   assert.equal(report.totals.unused_context_tokens, receipt.facts.reduce((sum, fact) => sum + fact.estimated_tokens, 0) - used.estimated_tokens);
   assert.equal(report.totals.precision, 1 / receipt.facts.length);
-  const pretty = serveContextReceipt(f.pmRoot, '{\n "generatedAt": "now",\n "items": [{"id":"item-1"}]\n}\n', "json", association, { session: "json", author: "a", command: "context-pack" });
-  const compact = serveContextReceipt(f.pmRoot, '{"generatedAt":"later","items":[{"id":"item-1"}]}\n', "json", association, { author: "a", command: "context-pack" });
+  const pretty = await serveContextReceipt(f.pmRoot, '{\n "generatedAt": "now",\n "items": [{"id":"item-1"}]\n}\n', "json", association, { session: "json", author: "a", command: "context-pack" });
+  const compact = await serveContextReceipt(f.pmRoot, '{"generatedAt":"later","items":[{"id":"item-1"}]}\n', "json", association, { author: "a", command: "context-pack" });
   assert.deepEqual(compact.receipt.facts, pretty.receipt.facts);
   assert.equal(compact.output.trim().split("\n").length, 1);
   for (const invalid of ["", "/absolute", "../escape", "a/../../escape", ".", "C:\\escape", "https://example.invalid/file"]) assert.throws(() => normalizeReceiptFile(invalid));
   assert.equal(normalizeReceiptFile("./src/../src/used.ts"), "src/used.ts");
   const quotedFile = 'src/quoted"file.ts';
   const quotedAssociation = { item_ids: ["item-1"], files: [{ itemId: "item-1", value: quotedFile }] };
-  const quoted = serveContextReceipt(f.pmRoot, JSON.stringify({ links: [{ itemId: "item-1", kind: "file", value: quotedFile }] }), "json", quotedAssociation, { author: "a", command: "context-pack" });
+  const quoted = await serveContextReceipt(f.pmRoot, JSON.stringify({ links: [{ itemId: "item-1", kind: "file", value: quotedFile }] }), "json", quotedAssociation, { author: "a", command: "context-pack" });
   assert.deepEqual(quoted.receipt.facts[0].files, [quotedFile], "JSON escaping must preserve editable-file associations");
-  const hiddenLink = serveContextReceipt(f.pmRoot, '# Pack\n- item-1: src/used.tsx\n', "text", { item_ids: ["item-1"], files: [{ itemId: "item-1", value: "src/used.ts" }] }, { author: "a", command: "context-pack" });
+  const hiddenLink = await serveContextReceipt(f.pmRoot, '# Pack\n- item-1: src/used.tsx\n', "text", { item_ids: ["item-1"], files: [{ itemId: "item-1", value: "src/used.ts" }] }, { author: "a", command: "context-pack" });
   assert.deepEqual(hiddenLink.receipt.facts[0].files, [], "partial filename text cannot credit an excluded link");
 });
 
@@ -270,7 +270,7 @@ test("literal item matchers compile once per receipt and preserve exact fact ass
     },
   });
   try {
-    const first = serveContextReceipt(f.pmRoot, output, "text", association, { author: "a", command: "context-pack" });
+    const first = await serveContextReceipt(f.pmRoot, output, "text", association, { author: "a", command: "context-pack" });
     assert.equal(compiled.length, association.item_ids.length, "one actual matcher constructor per item per receipt, independent of fragment count");
     const expectedItems = [[literalId, "item-1"].sort(), [literalId, "item-1"].sort(), [], ["item-10"], [literalId], ["item-1"]];
     const expected = fragments.map((text, index) => {
@@ -284,11 +284,11 @@ test("literal item matchers compile once per receipt and preserve exact fact ass
     });
     assert.deepEqual(first.receipt.facts, expected, "literal escaping, boundaries, inheritance, order, deduplication and stable hashes");
     assert.deepEqual(receiptFrom(first.output, f.pmRoot).facts, expected, "real persisted receipt retains exact associations");
-    const second = serveContextReceipt(f.pmRoot, output, "text", association, { author: "b", command: "context-handoff" });
+    const second = await serveContextReceipt(f.pmRoot, output, "text", association, { author: "b", command: "context-handoff" });
     assert.equal(compiled.length, 2 * association.item_ids.length);
     assert.deepEqual(second.receipt.facts, expected);
     assert.notEqual(first.receipt.receipt_id, second.receipt.receipt_id);
-    const json = serveContextReceipt(f.pmRoot, JSON.stringify({ items: [{ id: literalId }, { id: `${literalId}-near` }, { id: "item-10" }], links: association.files }), "json", association, { author: "a", command: "context-pack" });
+    const json = await serveContextReceipt(f.pmRoot, JSON.stringify({ items: [{ id: literalId }, { id: `${literalId}-near` }, { id: "item-10" }], links: association.files }), "json", association, { author: "a", command: "context-pack" });
     assert.equal(compiled.length, 3 * association.item_ids.length);
     assert.deepEqual(json.receipt.facts.map((fact) => fact.item_ids), [[literalId], [], ["item-10"], [literalId], ["item-1"]]);
     assert.deepEqual(json.receipt.facts.map((fact) => fact.files), [[], [], [], ["src/literal.ts"], ["src/used.ts"]]);
@@ -303,8 +303,8 @@ test("receipt aggregates honor filters and row limits without changing denominat
   assert.equal(empty.totals.precision, null);
   assert.match(renderReceiptReport(empty), /n\/a/);
   const association = { item_ids: ["item-1"], files: [] };
-  const first = serveContextReceipt(f.pmRoot, "## Focus\n- item-1\n", "text", association, { author: "a", command: "context-pack", session: "a|b\nc" }).receipt;
-  const second = serveContextReceipt(f.pmRoot, "## Focus\n- item-1\n", "text", association, { author: "b", command: "context-handoff", session: "second" }).receipt;
+  const first = (await serveContextReceipt(f.pmRoot, "## Focus\n- item-1\n", "text", association, { author: "a", command: "context-pack", session: "a|b\nc" })).receipt;
+  const second = (await serveContextReceipt(f.pmRoot, "## Focus\n- item-1\n", "text", association, { author: "b", command: "context-handoff", session: "second" })).receipt;
   const secondPath = join(f.pmRoot, RECEIPTS_RELATIVE_PATH, `${second.receipt_id}.json`);
   const secondSnapshot = JSON.parse(readFileSync(secondPath, "utf8")) as Record<string, unknown>;
   writeFileSync(secondPath, JSON.stringify({ ...secondSnapshot, served_at: first.served_at }));
@@ -350,7 +350,7 @@ test("corrupt receipt snapshots are counted, excluded and cannot accept usage", 
   assert.equal(reportContextReceipts(f.pmRoot, { limit: 20 }).malformed_receipts, 1);
   writeFileSync(path, " ".repeat(RECEIPT_LIMITS.bytes + 1));
   assert.equal(reportContextReceipts(f.pmRoot, { limit: 20 }).malformed_receipts, 1);
-  assert.throws(() => recordReceiptUsage(f.pmRoot, { receipt_id: receipt.receipt_id, citations: [fact.id], touched_items: [], edited_files: [] }), /malformed/);
+  await assert.rejects(() => recordReceiptUsage(f.pmRoot, { receipt_id: receipt.receipt_id, citations: [fact.id], touched_items: [], edited_files: [] }), /malformed/);
   rmSync(path);
   mkdirSync(path);
   assert.equal(reportContextReceipts(f.pmRoot, { limit: 20 }).malformed_receipts, 1);

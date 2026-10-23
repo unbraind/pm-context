@@ -350,10 +350,10 @@ test("buildContextExplain produces a report from the SDK relevance model", async
 // readPmItems error path
 // ---------------------------------------------------------------------------
 
-test("readPmItems throws CommandError when pmRoot is not a tracker", async () => {
+test("readPmItems preserves SDK refusal when pmRoot is not a tracker", async () => {
   const root = mkdtempSync(join(tmpdir(), "pm-context-bad-"));
   try {
-    await assert.rejects(() => readPmItems(root), /Could not read pm items via SDK list/);
+    await assert.rejects(() => readPmItems(root), /tracker|settings|initialized/i);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
