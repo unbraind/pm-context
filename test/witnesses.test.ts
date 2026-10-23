@@ -173,4 +173,10 @@ test("installed CLI and SDK work without Git and leave a real tracker byte-ident
   assert.equal(result.errorMessage, undefined);
   const global = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath, byteBudget: "4000" }, global: { json: true } });
   assert.equal(global.errorMessage, undefined);
+  const explicitFormat = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath, format: "toon", "byte-budget": "4000" }, global: { json: false } });
+  assert.equal(explicitFormat.errorMessage, undefined);
+  for (const options of [{}, { packet: packetPath, format: "invalid" }]) {
+    await assert.rejects(harness.runCommand({ command: "context-witnesses", pmRoot, options, global: {} }), code("INVALID_ARGUMENT"));
+  }
+  await assert.rejects(harness.runCommand({ command: "context-witnesses", pmRoot, args: ["extra"], options: { packet: packetPath }, global: {} }), code("INVALID_ARGUMENT"));
 });
