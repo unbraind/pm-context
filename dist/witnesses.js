@@ -38,7 +38,7 @@ export function parseWitnessPacket(value) {
             || typeof claim.value !== "string" || claim.value.length === 0 || claim.value.length > 256 || /[\x00-\x1f\x7f]/.test(claim.value)
             || (claim.kind === "policy" && !["required", "forbidden"].includes(claim.value))
             || !object(claim.citation) || !keys(claim.citation, ["item", "field"]) || !identifier(claim.citation.item)
-            || typeof claim.citation.field !== "string" || !/^(?:\/(?:[^~\x00-\x1f\x7f]|~[01])*)+$/.test(claim.citation.field) || claim.citation.field.length > 256
+            || typeof claim.citation.field !== "string" || claim.citation.field.length > 256 || !/^\/(?:[^~\x00-\x1f\x7f]|~[01])*$/.test(claim.citation.field)
             || (claim.supersedes !== undefined && (!Array.isArray(claim.supersedes) || claim.supersedes.length > 512 || !claim.supersedes.every(identifier) || new Set(claim.supersedes).size !== claim.supersedes.length)))
             throw fail();
         ids.add(claim.id);

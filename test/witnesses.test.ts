@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { init } from "@unbrained/pm-cli/sdk";
 import { create } from "@unbrained/pm-cli/sdk/core";
@@ -119,6 +120,38 @@ test("512 claim boundary is deterministic and does not hide conflicts behind com
   assert.deepEqual(report.witness?.claims.map((row) => row.id), ["c000", "c511"]);
 });
 
+test("pointer validation rejects adversarial slash runs without backtracking", { timeout: 120000 }, async (t) => {
+  const source = pathToFileURL(resolve(import.meta.dirname, "../witnesses.ts")).href;
+  const packet = { claims: [claim("a", { citation: { item: "x", field: "/".repeat(250) + "~" } })] };
+  // Start the deadline only after imports complete: a saturated host can load
+  // the SDK slowly, but validating a bounded pointer must still finish promptly.
+  const script = `import { parseWitnessPacket } from ${JSON.stringify(source)};
+process.stdout.write("ready\\n");
+try { parseWitnessPacket(${JSON.stringify(packet)}); process.exitCode = 1; }
+catch (error) { if (error.code !== "INVALID_PACKET") process.exitCode = 1; }
+process.stdout.write("done\\n");`;
+  const child = spawn(process.execPath, ["--input-type=module", "--eval", script], { stdio: ["ignore", "pipe", "pipe"] });
+  t.after(() => child.kill());
+  let output = ""; let errors = "";
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  await new Promise<void>((resolveDone, reject) => {
+    child.stdout.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+      if (!deadline && output.includes("ready\n")) deadline = setTimeout(() => {
+        child.kill("SIGKILL"); reject(new Error("Bounded JSON Pointer validation exceeded five seconds after imports"));
+      }, 5000);
+    });
+    child.stderr.on("data", (chunk: Buffer) => { errors += chunk.toString(); });
+    child.once("error", reject);
+    child.once("close", (status) => {
+      clearTimeout(deadline);
+      if (status !== 0) reject(new Error(`Pointer validation failed: ${errors}`));
+      else resolveDone();
+    });
+  });
+  assert.match(output, /done\n/);
+});
+
 test("installed CLI and SDK work without Git and leave a real tracker byte-identical", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "witness-test-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -173,6 +206,9 @@ test("installed CLI and SDK work without Git and leave a real tracker byte-ident
   assert.equal(result.errorMessage, undefined);
   const global = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath, byteBudget: "4000" }, global: { json: true } });
   assert.equal(global.errorMessage, undefined);
+  const handler = harness.activation.commands.handlers.find((entry) => entry.command === "context-witnesses")!;
+  const directJson = await handler.run({ command: "context-witnesses", args: [], pm_root: pmRoot, options: { packet: packetPath }, global: { json: true } }) as { output: string };
+  assert.equal((JSON.parse(directJson.output) as { code: string }).code, "CONTRADICTION");
   const explicitFormat = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath, format: "toon", "byte-budget": "4000" }, global: { json: false } });
   assert.equal(explicitFormat.errorMessage, undefined);
   for (const options of [{}, { packet: packetPath, format: "invalid" }]) {

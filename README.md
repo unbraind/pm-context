@@ -427,5 +427,5 @@ The SDK exports `checkContextWitnesses`, packet parsing and encoding, and typed
 ## Without git
 
 Item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a
-plain initialized tracker without invoking Git. Changed-file focus (`--changed`)
+plain initialized tracker without invoking Git. File focus (`--changed` or `--files`)
 requires a Git working repository and explains that requirement when unavailable.
