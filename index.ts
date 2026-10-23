@@ -1,4 +1,7 @@
 import { createFreshnessReader, encodeFreshness, FreshnessError, parseFreshnessPacket, readFreshnessJson, recordFreshness, resumeFreshness } from "./freshness.ts";
+import { checkContextWitnesses, encodeWitnessReport, readWitnessPacket, WitnessError } from "./witnesses.ts";
+export { checkContextWitnesses, encodeWitnessReport, parseWitnessPacket, readWitnessPacket, WitnessError } from "./witnesses.ts";
+export type { ClaimCitation, ContextClaim, ContextWitness, WitnessPacket, WitnessReport } from "./witnesses.ts";
 import type { FreshnessManifest } from "./freshness.ts";
 export { createFreshnessReader, encodeFreshness, FRESHNESS_LIMITS, FreshnessError, parseFreshnessPacket, readFreshnessFile, readFreshnessJson, recordFreshness, resumeFreshness } from "./freshness.ts";
 export type { FreshnessManifest, FreshnessPacket, FreshnessReader, FreshnessResult, FreshnessSection, FreshnessSource } from "./freshness.ts";
@@ -1592,6 +1595,24 @@ function setupCommands(api: ExtensionApi): void {
     },
   });
 
+  api.registerCommand({
+    name: "context-witnesses",
+    description: "Find the smallest cited contradiction among declared packet assertions without editing sources.",
+    flags: [
+      { long: "--packet", value_name: "file", description: "JSON packet of cited co-current claims", type: "string" },
+      { long: "--format", value_name: "format", description: "toon (default) or json", type: "string" },
+      { long: "--byte-budget", value_name: "n", description: "Complete-output UTF-8 byte ceiling (default 4000)", type: "string" },
+    ],
+    async run(ctx: CommandHandlerContext) {
+      const path = stringOption(ctx.options, "packet");
+      const format = stringOption(ctx.options, "format") ?? (ctx.global.json ? "json" : "toon");
+      if (!path || (format !== "json" && format !== "toon") || ctx.args.length) throw new WitnessError("INVALID_ARGUMENT", "Supply --packet JSON with --format json or toon; no positional arguments are accepted.");
+      const budget = Number(stringOption(ctx.options, "byte-budget", "byteBudget") ?? "4000");
+      const report = checkContextWitnesses(readWitnessPacket(path));
+      return renderedCommandResult(encodeWitnessReport(report, format, budget));
+    },
+  });
+
   for (const action of ["record", "resume"] as const) {
     api.registerCommand({
       name: `context-freshness ${action}`,
@@ -1852,7 +1873,7 @@ export default {
     setupCommands(api);
     if (typeof api.registerRenderer === "function") {
       const rendererOwnership = {
-        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume"],
+        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses"],
         resultDiscriminator: isRenderedCommandResult,
       };
       api.registerRenderer("toon", renderCommandResult, rendererOwnership);

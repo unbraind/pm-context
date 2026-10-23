@@ -1,0 +1,37 @@
+id: pm-context-kzoe
+title: Return smallest cited witnesses for contradictory context claims
+description: ""
+type: Feature
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-23T14:30:51.600Z"
+updated_at: "2026-10-23T14:53:07.778Z"
+assignee: codex-agent
+claim_principal: codex-agent
+author: codex-agent
+acceptance_criteria: "Conflicting state, supersession and mutually exclusive policy fixtures produce stable witnesses; no automatic edits or unsupported semantic certainty. Typed SDK and CLI, bounded JSON and TOON, actionable refusals, non-git read-only public tracker validation, CRLF file-focus regression, npm and Bun CI release gates."
+comments[7]{created_at,author,text}:
+  "2026-10-23T14:31:23.193Z",codex-agent,"Overlap checked against the installed CLI SDK context packing and relationship history contracts plus sibling README surfaces: core owns tracker reads, citations and selection; pm-memory owns durable consolidation and lexical or semantic proposals; pm-jev owns typed model decisions. No smallest packet contradiction witness API found. Implement explicit producer-declared state, policy and supersession claims with citation coordinates; deterministic smallest witnesses only, no inference, source edits or model calls. Reuse SDK expected errors, existing bounded JSON input reader and complete item reader for validation. Include CRLF focus fix and behavioral revert proofs. Local targeted tests/typecheck/docstring; CI npm and Bun full gates at existing thresholds."
+  "2026-10-23T14:36:36.653Z",codex-agent,"Live overlap refresh used CLI 2026.10.23 context packing declarations as well as the package-pinned 2026.10.20 SDK. Core graph governance checks storage/ordering contradictions and bounded graph witnesses, not co-current assertion values. Packing lineage suppresses superseded duplicates but does not return packet inconsistency witnesses. This feature retains selection ownership in the existing context packer and checks only supplied declarations; citation locations are producer-owned, not independent source verification."
+  "2026-10-23T14:43:27.592Z",codex-agent,"Public-data measurement used the committed public pm-context tracker at base fed1f6d, exported without Git metadata. The owned copy was made read-only and read with no Git executable on PATH: 87 items selected, 925 history entries inspected, 181 source files byte-identical afterward. Current-only: 87 claims, 0 conflicts, 270 JSON bytes/261 TOON bytes, 123.65 ms. Reusing 82 real historical status assertions as co-current (deliberate stale handoff assembly): 169 claims, 82 conflicting pairs, smallest witness size 2, 691 JSON bytes/773 TOON bytes, 125.73 ms. Reversed inputs give identical reports. Item read/selection took 4594.17 ms under host load. Historical overlay is a validation scenario, not a claim of 82 corrupt source items."
+  "2026-10-23T14:46:57.397Z",codex-agent,"Linked pm test run: node --test --test-name-pattern=stable test/witnesses.test.ts passed 3/3 via pm test --run --progress --only-last --workspace-context source --pm-context schema --override-linked-workspace-context --override-linked-pm-context. The tracker has test-result recording disabled; no setting was changed. Source typecheck and docstring lint passed; test typecheck found an unused type import, which was removed, and the rerun passed. No dedicated eslint script exists; docstring is the repository lint gate."
+  "2026-10-23T14:48:45.552Z",codex-agent,"Behavioral revert proof: bypassing only conflict detection in checkContextWitnesses makes the stable state/policy/supersession fixtures fail 3/3 (0 pass, exit 1); restoring detection returns the linked run to 3/3 pass. Removing only the trailing newline normalization from normalizeFocusPath makes the new edited-file-list regression fail 1/1 (exit 1). Mutations were restored in finally blocks; no history or external source was altered. Tests import the changed source helpers directly; installed CLI checks use the rebuilt distribution."
+  "2026-10-23T14:50:38.141Z",codex-agent,"Targeted new-module coverage reached 100% lines/branches/functions. The broad focused run passed 39/40; its failing assertion incorrectly required the entire host error envelope to omit invocation paths. Inspection confirmed the package detail/next_steps are path-free, while the host appends normalized arguments and refusal metadata. Updated the assertion to enforce the package-owned boundary and documented the host behavior. Observed CLI UX gap: an invalid format is assigned refusal.surface=--packet and rejected_value=packet argument instead of the actual invalid format; retained for final reporting, no upstream issue filed."
+  "2026-10-23T14:53:07.778Z",codex-agent,"Final focused witness suite passed 9/9 with 100% new-module lines/branches/functions. All 24 file-focus and 7 renderer tests passed in the focused file run; the updated registration/CRLF/renderer selection passed 5/5. CRLF-first revert proof specifically observed src/one.ts with a retained CRLF: 0/1 pass, exit 1, then restored. Build, source/test typechecks and docstring lint passed. Final no-Git public runner recheck: 87 items, 925 events, 181 unchanged files; current-only 87 claims/0 conflicts/270 JSON bytes/261 TOON bytes/18.89 ms; stale-history overlay 169 claims/82 pairs/witness size 2/691 JSON bytes/773 TOON bytes/61.29 ms; read/selection 2912.54 ms. CI npm and Bun release gates will supply the full-suite evidence at unchanged thresholds."
+files[8]{path,scope}:
+  file-focus.ts,project
+  index.ts,project
+  test/context-pack.test.ts,project
+  test/file-focus.test.ts,project
+  test/measure-witnesses.ts,project
+  test/renderer-ownership.test.ts,project
+  test/witnesses.test.ts,project
+  witnesses.ts,project
+tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/witnesses.test.ts test/file-focus.test.ts test/renderer-ownership.test.ts,project,codex-agent,"2026-10-23T14:40:02.082Z",local_mutation,feat/contradiction-witnesses
+  node --test --test-name-pattern=stable test/witnesses.test.ts,project,codex-agent,"2026-10-23T14:42:21.522Z",local_mutation,feat/contradiction-witnesses
+docs[2]{path,scope}:
+  docs/witnesses.md,project
+  README.md,project
+body: ""

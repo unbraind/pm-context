@@ -31,6 +31,7 @@ function git(cwd: string, args: string[]): string | undefined {
 
 /** Convert native or slash-separated links to safe paths relative to the repository root. */
 export function normalizeFocusPath(value: string, root: string): string | undefined {
+  value = value.replace(/\r?\n$/, "");
   if (!value || /^[a-z][a-z\d+.-]*:\/\//i.test(value)) return undefined;
   let path = value.replace(/\\/g, "/");
   const normalizedRoot = root.replace(/\\/g, "/");
