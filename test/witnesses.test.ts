@@ -6,10 +6,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
-import { init } from "@unbrained/pm-cli/sdk";
+import { init, isPmCliExpectedError } from "@unbrained/pm-cli/sdk";
 import { create } from "@unbrained/pm-cli/sdk/core";
 import { createExtensionTestHarness, decodeToon } from "@unbrained/pm-cli/sdk/testing";
-import extension, { checkContextWitnesses, encodeWitnessReport, parseWitnessPacket, readWitnessPacket, WitnessError } from "../index.ts";
+import extension, { checkContextWitnesses, encodeWitnessReport, parseWitnessPacket, readWitnessPacket } from "../index.ts";
+import builtExtension from "../dist/index.js";
 import type { ContextClaim, WitnessPacket } from "../index.ts";
 
 /** Explicitly scoped assertions, with no lexical inference from their citation. */
@@ -17,7 +18,7 @@ function claim(id: string, patch: Partial<ContextClaim> = {}): ContextClaim {
   return { id, kind: "state", subject: "service", field: "status", scope: "production-now", value: "open", citation: { item: "fixture-item", field: "/metadata/status" }, ...patch };
 }
 /** Expected refusal shape shared with the host's structured error renderer. */
-function code(expected: string) { return (error: unknown) => error instanceof WitnessError && error.code === expected && error.exitCode === 2 && !!error.remedy; }
+function code(expected: string) { return (error: unknown) => isPmCliExpectedError(error) && error.code === expected && error.exitCode === 2 && "remedy" in error && typeof error.remedy === "string" && error.remedy.length > 0; }
 /** Hash all tracker files, including runtime metadata, to detect read-side effects. */
 function fingerprint(root: string): string {
   const hash = createHash("sha256");
@@ -200,19 +201,23 @@ test("installed CLI and SDK work without Git and leave a real tracker byte-ident
     assert.ok(!JSON.stringify({ detail: error.detail, next_steps: error.next_steps }).includes(root));
   }
   assert.equal(fingerprint(pmRoot), before);
-  const harness = await createExtensionTestHarness(extension, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] });
-  t.after(() => harness.deactivate());
-  const result = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath }, global: {} });
-  assert.equal(result.errorMessage, undefined);
-  const global = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath, byteBudget: "4000" }, global: { json: true } });
-  assert.equal(global.errorMessage, undefined);
-  const handler = harness.activation.commands.handlers.find((entry) => entry.command === "context-witnesses")!;
-  const directJson = await handler.run({ command: "context-witnesses", args: [], pm_root: pmRoot, options: { packet: packetPath }, global: { json: true } }) as { output: string };
-  assert.equal((JSON.parse(directJson.output) as { code: string }).code, "CONTRADICTION");
-  const explicitFormat = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath, format: "toon", "byte-budget": "4000" }, global: { json: false } });
-  assert.equal(explicitFormat.errorMessage, undefined);
-  for (const options of [{}, { packet: packetPath, format: "invalid" }]) {
-    await assert.rejects(harness.runCommand({ command: "context-witnesses", pmRoot, options, global: {} }), code("INVALID_ARGUMENT"));
+  for (const module of [extension, builtExtension]) {
+    const harness = await createExtensionTestHarness(module, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] });
+    t.after(() => harness.deactivate());
+    const result = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath }, global: {} });
+    assert.equal(result.errorMessage, undefined);
+    const global = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath, byteBudget: "4000" }, global: { json: true } });
+    assert.equal(global.errorMessage, undefined);
+    const handler = harness.activation.commands.handlers.find((entry) => entry.command === "context-witnesses")!;
+    const directJson = await handler.run({ command: "context-witnesses", args: [], pm_root: pmRoot, options: { packet: packetPath }, global: { json: true } }) as { output: string };
+    assert.equal((JSON.parse(directJson.output) as { code: string }).code, "CONTRADICTION");
+    const directToon = await handler.run({ command: "context-witnesses", args: [], pm_root: pmRoot, options: { packet: packetPath }, global: { json: false } }) as { output: string };
+    assert.deepEqual(decodeToon(directToon.output), checkContextWitnesses(packet));
+    const explicitFormat = await harness.runCommand({ command: "context-witnesses", pmRoot, options: { packet: packetPath, format: "toon", "byte-budget": "4000" }, global: { json: false } });
+    assert.equal(explicitFormat.errorMessage, undefined);
+    for (const options of [{}, { packet: packetPath, format: "invalid" }]) {
+      await assert.rejects(harness.runCommand({ command: "context-witnesses", pmRoot, options, global: {} }), code("INVALID_ARGUMENT"));
+    }
+    await assert.rejects(harness.runCommand({ command: "context-witnesses", pmRoot, args: ["extra"], options: { packet: packetPath }, global: {} }), code("INVALID_ARGUMENT"));
   }
-  await assert.rejects(harness.runCommand({ command: "context-witnesses", pmRoot, args: ["extra"], options: { packet: packetPath }, global: {} }), code("INVALID_ARGUMENT"));
 });
