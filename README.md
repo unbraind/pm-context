@@ -66,6 +66,7 @@ tracker root (including custom roots) are excluded from `--changed`.
 Use repeated `--files <path>` for an explicit working set, including paths that
 do not exist yet. Paths are relative to the repository root (native absolute
 paths inside that root are also accepted), and backslashes are normalized.
+One trailing LF or CRLF from an edited file list is removed; other whitespace is preserved.
 `--files` and `--changed` combine their unique paths. Linked directories match
 contained files with path boundaries, so `src` matches `src/parser.ts` but
 `sr` does not. File selection intersects any id/status/type/tag filters.
@@ -408,8 +409,23 @@ pm context-freshness resume --packet packet.json --manifest manifest.json --json
 No new snapshot store or event delta stream is created. See the
 [packet example, typed SDK and refusal contracts](docs/freshness.md).
 
+## Smallest contradictory claim witnesses
+
+`pm context-witnesses --packet claims.json` checks an explicitly selected packet
+of cited, co-current assertions and returns its smallest conflicting pair.
+Use `--format json` (or global `--json`) for JSON; default TOON and JSON both
+retain complete citations within `--byte-budget 4000`. Oversized results refuse
+with a typed code and remedy rather than dropping witness evidence.
+
+Rules compare exact subject/field/scope coordinates: unequal single-valued state,
+required/forbidden policy, and explicit supersession of another selected claim.
+`NO_DECLARED_CONFLICT` says only that these rules found no conflict; prose and
+model proposals remain unchecked. The command performs no edits or model calls.
+The SDK exports `checkContextWitnesses`, packet parsing and encoding, and typed
+`WitnessError` refusals. See the [packet example and SDK contract](docs/witnesses.md).
+
 ## Without git
 
-Item-selected packs, handoffs, usage reports, `context-pack since` and freshness record/resume work in a
-plain initialized tracker without invoking Git. Changed-file focus (`--changed`)
+Item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a
+plain initialized tracker without invoking Git. File focus (`--changed` or `--files`)
 requires a Git working repository and explains that requirement when unavailable.

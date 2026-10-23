@@ -487,3 +487,16 @@ test("malformed item errors retain the failing item path and original parser cau
     return true;
   });
 });
+
+
+test("CRLF and LF terminated explicit file lists select their linked item", async (t) => {
+  const f = await fixture(t);
+  for (const ending of ["\r\n", "\n"]) {
+    assert.equal(normalizeFocusPath(`src/one.ts${ending}`, f.root), "src/one.ts");
+    const pack = JSON.parse(f.run("--files", `src/one.ts${ending}`, "--format", "json")) as ContextPack;
+    assert.deepEqual(pack.items.map((item) => item.id), [f.one]);
+    assert.deepEqual(pack.unlinked_changed_files, []);
+  }
+  assert.equal(normalizeFocusPath("src/file with spaces.ts ", f.root), "src/file with spaces.ts ");
+  assert.equal(normalizeFocusPath("\r\n", f.root), undefined);
+});

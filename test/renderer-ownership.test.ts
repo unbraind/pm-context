@@ -16,7 +16,7 @@ const CAPABILITIES = ["commands", "renderers", "schema"] as const;
  * `context-pack`, `context-handoff`, and `context-usage` commands), each of
  * which can return a `pmContextRendered`-marked result.
  */
-const OWNED_COMMANDS = ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume"];
+const OWNED_COMMANDS = ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses"];
 
 async function harness() {
   return createExtensionTestHarness(extension, { name: "pm-context", capabilities: CAPABILITIES });

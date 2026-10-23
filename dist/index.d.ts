@@ -1,3 +1,5 @@
+export { checkContextWitnesses, encodeWitnessReport, parseWitnessPacket, readWitnessPacket, WitnessError } from "./witnesses.ts";
+export type { ClaimCitation, ContextClaim, ContextWitness, WitnessPacket, WitnessReport } from "./witnesses.ts";
 export { createFreshnessReader, encodeFreshness, FRESHNESS_LIMITS, FreshnessError, parseFreshnessPacket, readFreshnessFile, readFreshnessJson, recordFreshness, resumeFreshness } from "./freshness.ts";
 export type { FreshnessManifest, FreshnessPacket, FreshnessReader, FreshnessResult, FreshnessSection, FreshnessSource } from "./freshness.ts";
 import type { FileFocus } from "./file-focus.ts";
