@@ -267,6 +267,13 @@ carry no session or fact ids and are never automatically credited to a receipt.
 Receipts live exclusively in the tracker's ignored
 `runtime/context-receipts/` directory. Each atomic JSON snapshot stores ids,
 associations, token estimates and deduplicated evidence, **no context text**.
+Receipt writers use a native SDK lock with an explicit owner, a 60-second lifetime,
+a 500 ms total contention ceiling and token-owned release. A verifiably dead writer
+is recovered by the SDK before the lifetime expires; a live owner causes bounded
+refusal. Existing ownerless `runtime/context-receipts/.lock` directories are
+preserved and require explicit recovery after stopping all receipt writers.
+Serving still discloses unavailable measurement when persistence fails.
+
 Rotation keeps the current receipt and the most recently written siblings, at
 most 200 snapshots of 256 KiB each (50 MiB maximum retained receipt data).
 Older receipts are deleted; their
@@ -427,5 +434,8 @@ The SDK exports `checkContextWitnesses`, packet parsing and encoding, and typed
 ## Without git
 
 Item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a
-plain initialized tracker without invoking Git. File focus (`--changed` or `--files`)
+plain initialized tracker without invoking Git. Corpus reads use `listAllComplete`
+with extension hooks disabled and re-certify its full-corpus receipt before packing,
+including custom item types and terminal statuses. Receipt writes and usage updates
+also work without Git. File focus (`--changed` or `--files`)
 requires a Git working repository and explains that requirement when unavailable.

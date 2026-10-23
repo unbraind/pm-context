@@ -99,15 +99,22 @@ export declare function normalizeReceiptFile(value: string): string;
  * manifest, and persist its receipt. Fact hashes exclude clocks and receipt ids.
  * Write failures propagate so callers disclose that measurement is unavailable.
  */
-export declare function serveContextReceipt(pmRoot: string, output: string, format: "json" | "text", associations: ReceiptAssociations, identity: ReceiptIdentity, outputPath?: string): {
+export declare function serveContextReceipt(pmRoot: string, output: string, format: "json" | "text", associations: ReceiptAssociations, identity: ReceiptIdentity, outputPath?: string): Promise<{
     output: string;
     receipt: ContextReceipt;
+}>;
+/** Native namespace, lease lifetime and hard total contention budget for receipt writers. */
+export declare const RECEIPT_LOCK: {
+    readonly id: "pm-context-receipts";
+    readonly owner: "pm-context:receipts";
+    readonly ttlSeconds: 60;
+    readonly waitMs: 500;
 };
 /**
  * Record explicit, receipt-scoped usage. Unknown ids reject the entire update;
  * repeat reports are idempotent. Item/file proxies match only facts in this receipt.
  */
-export declare function recordReceiptUsage(pmRoot: string, usage: ReceiptUsage): void;
+export declare function recordReceiptUsage(pmRoot: string, usage: ReceiptUsage): Promise<void>;
 /** Read retained receipts, report skipped corruption, and aggregate before limiting detail. */
 export declare function reportContextReceipts(pmRoot: string, options: ReceiptReportOptions): ReceiptReport;
 /** Render the receipt denominator, usage proxies and unused estimated cost as a brief. */

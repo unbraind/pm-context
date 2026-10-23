@@ -1,0 +1,59 @@
+id: pm-context-pbcw
+title: Certify complete context corpora and recover abandoned receipt locks
+description: Adopt native SDK corpus certification and owned receipt coordination for SDK audit findings F01 and F07.
+type: Task
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-23T20:24:32.930Z"
+updated_at: "2026-10-23T20:48:17.529Z"
+author: codex-agent
+acceptance_criteria: "F01: Read all custom and terminal items through listAllComplete and certifyCompleteListResult and refuse missing complete-list proof with a revert-failing non-git regression.; F07: Use owned bounded native receipt locks with dead-owner recovery, live-owner contention, preserved retention and permissions, and a revert-failing two-process non-git regression."
+comments[7]{created_at,author,text}:
+  "2026-10-23T20:24:59.444Z",codex-agent,"Verified F01 and F07 against origin/main at 479bf899ab9ad9eb6117c8e74ddcf815505a968f. F01 uses ordinary list plus four local checks without canonical complete-list certification. F07 uses mkdir runtime/context-receipts/.lock with no verifiable owner. Plan: native complete reads and certification, async owned receipt locks, and real non-git regressions. SDK 2026.10.20 lacks acquireLockLease; the task authorizes the minimal dependency upgrade needed for native recovery."
+  "2026-10-23T20:30:59.190Z",codex-agent,"F01 audit correction: certifyCompleteListResult constructs complete_list rather than requiring a pre-existing certificate. The underlying weaker consumer contract is valid: the old guard also accepts missing universal read_output and unverified projection/filter evidence. The new guard delegates all corpus invariants to the SDK and compares the producer certificate to the canonical certification. F07 is migrated only after upgrading the pinned SDK and matching peer/manifest minimum to 2026.10.23 for owned fenced leases and proven-dead-owner recovery. Legacy ownerless directories remain untouched and require explicit recovery."
+  "2026-10-23T20:32:46.624Z",codex-agent,"Focused source and built-package regressions pass 18/18. F01 revert proof: restoring only the origin/main reader/guard and rebuilding makes the F01 non-git regression fail with Missing expected exception at the missing-certificate consumer check (0 passed, 1 failed). The original custom and terminal corpus still reads successfully. Restored and rebuilt afterward. Receipt coordination uses acquireLock with explicit owner, 60-second lifetime and 500ms hard wait, released in finally. The package does not clear legacy ownerless directories."
+  "2026-10-23T20:33:22.693Z",codex-agent,"F07 revert proof: restoring only withReceiptStore from origin/main and rebuilding makes the two-process crash regression fail on the first recovery write with EEXIST at the abandoned runtime/context-receipts/.lock directory (0 passed, 1 failed). Async callers and tests remain changed. Restored the native helper and rebuilt. Both revert checks were behavioural failures after genuine corpus reads or genuine child receipt persistence, not compilation failures."
+  "2026-10-23T20:41:19.783Z",codex-agent,"Full npm release:check passed under an isolated HOME with global Git configuration disabled: 400 tests passed, zero failures/skips, native coverage 100% lines/branches/functions across all 12 required source files. c8 covered 5012/5012 lines and statements, 178/178 functions, 2090/2091 branches (99.95%), meeting the unchanged 99.9% c8 branch threshold. Docstrings: 52/52 declarations across 13 files. Production audit: zero vulnerabilities. Packing and workflow/publish-attestation/changelog-date checks passed. pm test executed the linked focused suite 18/18; result tracking is disabled so this comment records the receipt. Clean npm ci succeeded and regenerated one tracker-attributes line required by SDK health. No driver implementation was changed."
+  "2026-10-23T20:42:50.850Z",codex-agent,"SDK recovery boundary observed during design verification: killing a writer inside acquireLockLease.fence leaves the native cleanup gate subject to its stale-owner grace, so a 500ms retry can refuse despite proven process death. Selected the named acquireLock helper for the synchronous receipt critical section; the real killed-writer recovery regression passes before TTL without package-owned cleanup. Strict tracker health now passes with one pre-existing provenance advisory. No history repair or upstream issue was performed."
+  "2026-10-23T20:48:13.820Z",codex-agent,"Full Bun release:check also passed under isolated HOME and disabled global Git config: 400/400 tests, zero failures/skips, native coverage 100% lines/branches/functions over all 12 required sources; c8 5012/5012 lines and statements, 178/178 functions, 2090/2091 branches (99.95%). All thresholds are unchanged. Bun install, production audit (zero vulnerabilities), package packing and all release policy checks passed. Both release gates and the 18-test focused command are linked. Changelog regeneration/check passed with no content change for this open task. Both findings are implemented with the F01 audit correction documented. Ready for PR CI and orchestrator verification; leave this task in progress and release the claim."
+files[11]{path,scope}:
+  .gitattributes,project
+  context-receipts.ts,project
+  index.ts,project
+  manifest.json,project
+  package-lock.json,project
+  package.json,project
+  test/context-receipts.test.ts,project
+  test/coverage-gaps.test.ts,project
+  test/fixtures/receipt-lock-writer.ts,project
+  test/list-all-completeness.test.ts,project
+  test/receipt-lock-recovery.test.ts,project
+tests[3]:
+  - command: node --test test/list-all-completeness.test.ts test/context-receipts.test.ts test/receipt-lock-recovery.test.ts
+    scope: project
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-23T20:32:49.478Z"
+      source_kind: local_mutation
+      source_ref: refactor/sdk-completeness-and-locks
+  - command: "npm run release:check"
+    scope: project
+    timeout_seconds: 1200
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-23T20:41:25.594Z"
+      source_kind: local_mutation
+      source_ref: refactor/sdk-completeness-and-locks
+  - command: "bun run release:check"
+    scope: project
+    timeout_seconds: 1200
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-23T20:41:31.059Z"
+      source_kind: local_mutation
+      source_ref: refactor/sdk-completeness-and-locks
+docs[2]{path,scope}:
+  CHANGELOG.md,project
+  README.md,project
+body: ""

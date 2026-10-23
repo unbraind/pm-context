@@ -8,6 +8,7 @@ export type { FreshnessManifest, FreshnessPacket, FreshnessReader, FreshnessResu
 import { buildSincePack, encodeSincePack } from "./since.ts";
 import type { ExtensionModule } from "@unbrained/pm-cli/sdk/authoring";
 import { writeFileSync } from "node:fs";
+import { isDeepStrictEqual } from "node:util";
 import { resolveFileFocus, matchFileFocus, rankFileFocus, renderFileFocus, readFileFocusItems } from "./file-focus.ts";
 import type { FileFocus } from "./file-focus.ts";
 import type {
@@ -23,10 +24,12 @@ import {
   resolveRuntimeStatusRegistry,
   resolveWorkspaceRelationshipKindRegistry,
 } from "@unbrained/pm-cli/sdk";
-import { list as pmList } from "@unbrained/pm-cli/sdk/core";
-import type { ListResult, ListResultItem } from "@unbrained/pm-cli/sdk/query";
+import { listAllComplete } from "@unbrained/pm-cli/sdk/core";
+import type { PmCompleteListResult } from "@unbrained/pm-cli/sdk";
 import {
   buildItemContextRelevanceCandidates,
+  certifyCompleteListResult,
+  PmCompleteListValidationError,
   defaultScoreContextCandidates,
   packContextCandidates,
   recordContextUsageServing,
@@ -950,133 +953,27 @@ export function renderAgentHandoff(
 }
 
 /**
- * Runtime shape of the SDK list result's omission receipt.
- *
- * The engine populates `omission_receipt` on every list result (it is the same
- * envelope the CLI serializes for `list-all --json`), but the declared
- * `ListResult` type does not carry it — this local view reads it without
- * weakening the SDK type.
+ * Re-certify the full SDK envelope and require its producer's certificate.
+ * The SDK owns corpus and output invariants; this consumer also refuses a
+ * missing or inconsistent producer certificate before constructing a pack.
  */
-interface ListOmissionReceipt {
-  /** True when field groups were dropped from the projection. */
-  has_omissions?: boolean;
-  /** Count of dropped groups. */
-  omitted_field_group_count?: number;
-  /** Names of the dropped groups. */
-  omitted_field_groups?: string[];
-}
-
-/** A list result widened only by the runtime-present omission receipt. */
-type ListResultWithReceipt = ListResult & { omission_receipt?: ListOmissionReceipt };
-
-/**
- * Refuse an incomplete SDK `list-all` result instead of consuming it.
- *
- * Reading `.items` without consulting the result's completeness receipt is how
- * this package once built a context pack from 10 of 682 workspace items and
- * reported success: pm 2026.8.14 defaulted the list to a truncated answer and
- * nothing here checked. Any one of four independent signals means the rows in
- * `items` are NOT the whole workspace, so this throws (never returns a partial
- * list, never logs and continues) naming the signal that tripped plus the
- * `count`/`total` figures:
- *
- * - `truncated === true` — the row list was cut short (output budget, limit);
- * - `has_more === true` — rows exist past the returned cursor boundary;
- * - `completeness.status !== "complete"` — items/directories were unreadable
- *   ("partial") or the corpus was never scanned ("unchecked"); either way the
- *   answer is not attested complete;
- * - `omission_receipt.has_omissions === true` — field groups were dropped from
- *   the projection, so rows are present but degraded.
- *
- * Thrown errors are {@link CommandError} so the command runtime turns them into
- * a clean nonzero exit. Paging is deliberately NOT attempted: a context pack
- * silently built from a partial page is the failure mode this guard exists to
- * prevent, so refusing loudly is simpler and safer.
- *
- * @param result - SDK list result (a result missing its receipt trips the
- *                 completeness signal: an unverifiable answer is not complete).
- * @throws {@link CommandError} naming the first tripped signal and the counts.
- */
-export function assertListResultComplete(result: ListResultWithReceipt): void {
-  const count = typeof result.count === "number" ? result.count : result.items.length;
-  const total = typeof result.total === "number" ? result.total : count;
-  const counts = `count ${count} of total ${total}`;
-  if (result.truncated === true) {
-    throw new CommandError(
-      `Refusing incomplete pm list-all result: truncated=true (${counts}). `
-      + "The item list was cut short (output budget or limit); a context pack "
-      + "built from it would silently miss items. Narrow the operation or "
-      + "raise the output budget, then retry.",
-    );
-  }
-  if (result.has_more === true) {
-    throw new CommandError(
-      `Refusing incomplete pm list-all result: has_more=true (${counts}). `
-      + "Rows exist beyond the returned page; packing the page as the whole "
-      + "workspace would silently drop them.",
-    );
-  }
-  if (result.completeness?.status !== "complete") {
-    const status = result.completeness?.status === undefined
-      ? "(missing)"
-      : JSON.stringify(result.completeness.status);
-    const unreadable = `unreadable_item_count=${result.completeness?.unreadable_item_count ?? 0}`
-      + `, unreadable_directory_count=${result.completeness?.unreadable_directory_count ?? 0}`;
-    throw new CommandError(
-      `Refusing incomplete pm list-all result: completeness.status=${status} `
-      + `(${unreadable}; ${counts}). The workspace corpus behind this list was `
-      + "not attested completely read, so the rows are not the whole workspace.",
-    );
-  }
-  const omission = result.omission_receipt;
-  if (omission?.has_omissions === true) {
-    const groups = omission.omitted_field_groups ?? [];
-    throw new CommandError(
-      `Refusing incomplete pm list-all result: omission_receipt.has_omissions=true `
-      + `(omitted_field_groups: ${groups.length ? groups.join(", ") : "(none listed)"}; ${counts}). `
-      + "Field groups were dropped from the projection, so the rows are present "
-      + "but degraded; re-read without the field-omitting options.",
-    );
+export function assertListResultComplete(result: unknown): asserts result is PmCompleteListResult {
+  const certified = certifyCompleteListResult(result);
+  if (!isDeepStrictEqual((result as PmCompleteListResult).complete_list, certified.complete_list)) {
+    throw new PmCompleteListValidationError([{
+      code: "invalid_envelope", message: "Context input requires a matching complete_list certificate from listAllComplete.",
+    }]);
   }
 }
 
-/** Injectable seam over the SDK list action {@link readPmItems} uses. */
-export type PmListAction = typeof pmList;
+/** Injectable complete-read boundary; receipt tests derive inputs from real trackers. */
+export type PmListAction = typeof listAllComplete;
 
-/**
- * Read every pm item (full metadata + body) in-process through the SDK.
- *
- * Replaces the previous `spawnSync("pm", ["list-all", "--json", "--include-body"])`
- * shell-out with the typed {@link list} action from `@unbrained/pm-cli/sdk/core`.
- * `list-all` is the SDK alias for `list` with `excludeTerminal: false`; passing
- * `full: true` + `includeBody: true` reproduces the full-metadata-with-body
- * projection the shell-out parsed. `noTruncate: true` deliberately overrides any
- * truncating limit and `strictRead: true` makes unreadable corpus entries a hard
- * SDK error, and the returned receipt is STILL verified by
- * {@link assertListResultComplete} — the 2026.8.14 truncated-default regression
- * is exactly the silently-partial read this package refuses to reintroduce, so
- * the guard does not trust the request options alone. Being an in-process SDK
- * action (no child process), there is no spawn stdout buffer to size here; the
- * completeness receipt is the over-run guard.
- *
- * @param pmRoot - Tracker storage root to read.
- * @param list - Injectable SDK list action (tests substitute a canned real
- *               result); defaults to the real {@link pmList}.
- */
-export async function readPmItems(pmRoot: string, list: PmListAction = pmList): Promise<PmItem[]> {
-  let result: ListResultWithReceipt;
-  try {
-    result = await list(
-      { full: true, includeBody: true, excludeTerminal: false, noTruncate: true, strictRead: true },
-      { pmRoot },
-    );
-  } catch (err) {
-    throw new CommandError(`Could not read pm items via SDK list: ${err instanceof Error ? err.message : String(err)}`);
-  }
+/** Read all types and lifecycle states without extension side effects, preserving SDK refusals. */
+export async function readPmItems(pmRoot: string, list: PmListAction = listAllComplete): Promise<PmItem[]> {
+  const result = await list({ includeBody: true }, { pmRoot, noExtensions: true });
   assertListResultComplete(result);
-  return result.items.filter(
-    (item): item is ListResultItem & { id: string } => typeof item.id === "string",
-  );
+  return result.items;
 }
 
 /** Per-item token estimate for one character of text (rough 4 chars/token). */
@@ -1410,7 +1307,7 @@ async function recordPackServing(ctx: CommandHandlerContext, focus: readonly PmI
  */
 async function measureContextOutput(ctx: CommandHandlerContext, pack: ContextPack, output: string, format: string, command: string, compress: boolean, outputPath?: string): Promise<string> {
   try {
-    const measured = serveContextReceipt(ctx.pm_root, output, format === "json" ? "json" : "text", {
+    const measured = await serveContextReceipt(ctx.pm_root, output, format === "json" ? "json" : "text", {
       item_ids: [...pack.items, ...pack.neighbors].map((item) => item.id),
       files: pack.links.filter((link) => link.kind === "file"),
     }, {
@@ -1825,7 +1722,7 @@ function setupCommands(api: ExtensionApi): void {
       if (citations.length + touchedItems.length + editedFiles.length > 0) {
         if (!receiptId) throw new CommandError("Usage evidence requires --receipt", EXIT_CODE.USAGE);
         try {
-          recordReceiptUsage(ctx.pm_root, { receipt_id: receiptId, session, citations, touched_items: touchedItems, edited_files: editedFiles });
+          await recordReceiptUsage(ctx.pm_root, { receipt_id: receiptId, session, citations, touched_items: touchedItems, edited_files: editedFiles });
         } catch (error) {
           throw new CommandError(error instanceof Error ? error.message : String(error), EXIT_CODE.USAGE);
         }
