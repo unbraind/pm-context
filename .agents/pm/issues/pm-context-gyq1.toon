@@ -2,12 +2,17 @@ id: pm-context-gyq1
 title: Preserve repository roots ending in whitespace for file focus
 description: "Fix GitHub #154: preserve meaningful whitespace in Git root discovery, verify helper and installed CLI paths with same-repository rename controls, and record behavioral revert proof."
 type: Issue
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-23T06:41:44.215Z"
-updated_at: "2026-10-23T07:02:04.469Z"
+updated_at: "2026-10-24T23:10:19.274Z"
+closed_at: "2026-10-24T21:44:09.403Z"
+completed_at: "2026-10-23T07:09:06.000Z"
 author: codex-agent
+resolution: "Preserves exact repository roots with space, tab and newline suffixes in file-focus selection and installed CLI controls."
+expected_result: "Fix GitHub #154: preserve meaningful whitespace in Git root discovery, verify helper and installed CLI paths with same-repository rename controls, and record behavioral revert proof."
+actual_result: "https://github.com/unbraind/pm-context/pull/166, merged 2026-10-23T07:09:06Z, merge 8d9576778a3609f156e9444ed659ca7c2e2aa9e7: Preserves exact repository roots with space, tab and newline suffixes in file-focus selection and installed CLI controls."
 comments[6]{created_at,author,text}:
   "2026-10-23T06:43:08.310Z",codex-agent,"GitHub #154 source inspection confirms trim() removes meaningful root suffixes. Plan: real-Git helper and installed-CLI regressions, same-repository rename control, and preservation of missing-repository and unknown-base errors. Related original feature: pm-context-ax7z."
   "2026-10-23T06:46:02.433Z",codex-agent,"Regression-first reproduction: node --test --test-name-pattern='trailing-whitespace' test/file-focus.test.ts fails 2/2 on the original implementation: helper throws UNKNOWN_BASE and installed CLI exits 2 with the Git-repository error. The pinned SDK also trims host context; fixtures initialize via the real SDK then rename the same repository to isolate file focus. Fix removes only Git's terminating newline and recovers an exact cwd root only when it matches the host context."
@@ -23,4 +28,5 @@ tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,
   npm run build && node --test --test-name-pattern=trailing-whitespace test/file-focus.test.ts,project,600,codex-agent,"2026-10-23T06:49:12.137Z",local_mutation,fix/file-focus-packing
 docs[1]{path,scope}:
   README.md,project
+close_reason: "https://github.com/unbraind/pm-context/pull/166, merged 2026-10-23T07:09:06Z, merge 8d9576778a3609f156e9444ed659ca7c2e2aa9e7: Preserves exact repository roots with space, tab and newline suffixes in file-focus selection and installed CLI controls."
 body: ""

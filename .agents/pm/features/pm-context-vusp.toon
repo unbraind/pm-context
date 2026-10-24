@@ -2,12 +2,17 @@ id: pm-context-vusp
 title: Validate only context assumptions invalidated on resume
 description: "Record section-to-source digests for context packets and return only invalidated assumptions on resume. Acceptance: changed dependencies invalidate dependent packet sections; unchanged packets reuse safely; deleted or unreadable sources fail with a bounded receipt. Provide typed SDK and CLI, compact TOON/JSON, typed refusals with remedies, documentation and non-git public-tracker validation."
 type: Feature
-status: in_progress
+status: closed
 priority: 1
 tags: []
 created_at: "2026-10-21T22:14:51.863Z"
-updated_at: "2026-10-22T22:14:39.172Z"
+updated_at: "2026-10-24T23:10:15.384Z"
+closed_at: "2026-10-24T21:44:09.038Z"
+completed_at: "2026-10-22T22:20:01.000Z"
 author: codex-agent
+resolution: "Resume freshness validates only declared assumptions and fails closed on unavailable settings/item sources, with non-git regressions and npm/Bun CI."
+expected_result: "Record section-to-source digests for context packets and return only invalidated assumptions on resume. Acceptance: changed dependencies invalidate dependent packet sections; unchanged packets reuse safely; deleted or unreadable sources fail with a bounded receipt. Provide typed SDK and CLI, compact TOON/JSON, typed refusals with remedies, documentation and non-git public-tracker validation."
+actual_result: "https://github.com/unbraind/pm-context/pull/165, merged 2026-10-22T22:20:01Z, merge f55cdbbcf2447dae29df789e133fdbe5521a47b6: Resume freshness validates only declared assumptions and fails closed on unavailable settings/item sources, with non-git regressions and npm/Bun CI."
 comments[19]{created_at,author,text}:
   "2026-10-21T22:15:14.936Z",codex-agent,"Overlap recheck: SDK workspace snapshots retain complete files and revisions; core context usage/improvement ledgers record observations and delivery. pm-brief since and pm-context context-pack since report events; pm-memory verify checks memory claims. None validates a declared packet section against item/settings/evidence digests and propagates invalidation through section dependencies. Implement a portable digest-only manifest, typed SDK and context-freshness record/resume commands, with bounded fail-closed receipts. Builds on PR #164; no snapshot store or second delta stream."
   "2026-10-21T22:23:42.686Z",codex-agent,"Implementation uses portable digest-only packet manifests with declared item/settings field projections, exact evidence byte digests, acyclic section dependencies and transitive invalidation. Stateless authoritative SDK readers avoid stale adapter caches and usage-ledger writes. Targeted regressions cover SDK and installed no-git CLI with no Git executable, compact TOON round trips, JSON byte ceilings, typed refusals, missing sources and concurrent file changes. Full release gates are delegated to the existing CI npm/Bun matrix because the host is saturated."
@@ -69,4 +74,5 @@ docs[3]{path,scope}:
   docs/freshness-benchmark.md,project
   docs/freshness.md,project
   README.md,project
+close_reason: "https://github.com/unbraind/pm-context/pull/165, merged 2026-10-22T22:20:01Z, merge f55cdbbcf2447dae29df789e133fdbe5521a47b6: Resume freshness validates only declared assumptions and fails closed on unavailable settings/item sources, with non-git regressions and npm/Bun CI."
 body: ""

@@ -2,12 +2,17 @@ id: pm-context-gb70
 title: Preserve highest-overlap focus during capped packing
 description: "Fix GitHub #153: equal-cost candidates under --max-items must preserve file-overlap ranking through token-budget selection. Add regression and behavioral revert proof, document deterministic ties, and verify the npm and Bun CI gates."
 type: Issue
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-23T06:41:42.601Z"
-updated_at: "2026-10-23T07:01:25.679Z"
+updated_at: "2026-10-24T23:10:20.126Z"
+closed_at: "2026-10-24T21:44:09.464Z"
+completed_at: "2026-10-23T07:09:06.000Z"
 author: codex-agent
+resolution: Capped packing retains highest-overlap focus with deterministic ties and installed CLI budget-pressure regressions.
+expected_result: "Fix GitHub #153: equal-cost candidates under --max-items must preserve file-overlap ranking through token-budget selection. Add regression and behavioral revert proof, document deterministic ties, and verify the npm and Bun CI gates."
+actual_result: "https://github.com/unbraind/pm-context/pull/166, merged 2026-10-23T07:09:06Z, merge 8d9576778a3609f156e9444ed659ca7c2e2aa9e7: Capped packing retains highest-overlap focus with deterministic ties and installed CLI budget-pressure regressions."
 comments[5]{created_at,author,text}:
   "2026-10-23T06:43:05.006Z",codex-agent,"GitHub #153 reproduced in source inspection: file selection ranks by overlap, but the SDK packer retains corpus relevance ranks under token pressure. Plan: add equal-cost budget-pressure regressions with CLI controls and explain parity before changing selection ranks. Related original feature: pm-context-ax7z."
   "2026-10-23T06:45:52.501Z",codex-agent,"Regression-first reproduction: node --test --test-name-pattern='equal-cost capped' test/file-focus.test.ts fails both helper and installed-CLI assertions on the original implementation. Eight lower-overlap equal-cost identities displace focus-best-000; explicit-ID and limit-one controls pass. Fix uses the already-ranked incoming focus order for SDK token selection."
@@ -21,4 +26,5 @@ tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,
   npm run build && node --test test/file-focus.test.ts,project,600,codex-agent,"2026-10-23T06:48:47.706Z",local_mutation,fix/file-focus-packing
 docs[1]{path,scope}:
   README.md,project
+close_reason: "https://github.com/unbraind/pm-context/pull/166, merged 2026-10-23T07:09:06Z, merge 8d9576778a3609f156e9444ed659ca7c2e2aa9e7: Capped packing retains highest-overlap focus with deterministic ties and installed CLI budget-pressure regressions."
 body: ""
