@@ -6,9 +6,9 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-10-23T06:41:42.601Z"
-updated_at: "2026-10-24T21:44:09.468Z"
+updated_at: "2026-10-24T23:10:20.126Z"
 closed_at: "2026-10-24T21:44:09.464Z"
-completed_at: "2026-10-24T21:44:09.464Z"
+completed_at: "2026-10-23T07:09:06.000Z"
 author: codex-agent
 resolution: Capped packing retains highest-overlap focus with deterministic ties and installed CLI budget-pressure regressions.
 expected_result: "Fix GitHub #153: equal-cost candidates under --max-items must preserve file-overlap ranking through token-budget selection. Add regression and behavioral revert proof, document deterministic ties, and verify the npm and Bun CI gates."

@@ -4,8 +4,8 @@
 
 ### Added
 
-- Return smallest cited witnesses for contradictory context claims ([pm-context-kzoe](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-kzoe.toon))
 - Pack criterion evidence with exact budget coverage receipts ([pm-context-coverage-pack](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-coverage-pack.toon))
+- Return smallest cited witnesses for contradictory context claims ([pm-context-kzoe](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-kzoe.toon))
 - Resumable since delta packs with substantive messages and claims ([pm-context-8bbh](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-8bbh.toon))
 - Validate only context assumptions invalidated on resume ([pm-context-vusp](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-vusp.toon))
 
@@ -16,8 +16,8 @@
 
 ### Other
 
-- Correct tracker reconciliation review evidence for PR 163 ([pm-context-r163](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-r163.toon))
 - Certify complete context corpora and recover abandoned receipt locks ([pm-context-pbcw](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-pbcw.toon))
+- Correct tracker reconciliation review evidence for PR 163 ([pm-context-r163](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-r163.toon))
 
 ## 2026.10.23 - 2026-10-23
 

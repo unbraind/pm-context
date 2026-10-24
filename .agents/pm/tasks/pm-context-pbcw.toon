@@ -6,9 +6,9 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-10-23T20:24:32.930Z"
-updated_at: "2026-10-24T21:44:09.291Z"
+updated_at: "2026-10-24T23:10:17.745Z"
 closed_at: "2026-10-24T21:44:09.276Z"
-completed_at: "2026-10-24T21:44:09.276Z"
+completed_at: "2026-10-23T20:58:45.000Z"
 author: codex-agent
 acceptance_criteria: "F01: Read all custom and terminal items through listAllComplete and certifyCompleteListResult and refuse missing complete-list proof with a revert-failing non-git regression.; F07: Use owned bounded native receipt locks with dead-owner recovery, live-owner contention, preserved retention and permissions, and a revert-failing two-process non-git regression."
 resolution: "Certifies complete custom/terminal corpora and uses native owned receipt locks with killed-writer recovery and live contention, proven in real non-git regressions."

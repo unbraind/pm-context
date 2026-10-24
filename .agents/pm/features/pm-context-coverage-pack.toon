@@ -6,9 +6,9 @@ status: closed
 priority: 2
 tags: []
 created_at: "2026-10-24T06:50:03.535Z"
-updated_at: "2026-10-24T21:44:09.221Z"
+updated_at: "2026-10-24T23:10:16.969Z"
 closed_at: "2026-10-24T21:44:09.204Z"
-completed_at: "2026-10-24T21:44:09.204Z"
+completed_at: "2026-10-24T07:12:09.000Z"
 author: codex-agent
 acceptance_criteria: "A budget cut identifies the exact uncovered criterion; Deterministic ranking never implies omitted evidence was inspected; Citations and the coverage receipt count against the complete output budget; Typed SDK and CLI support compact TOON and JSON, actionable refusals, and non-git trackers; Read-only public tracker validation and npm plus Bun CI release gates pass"
 resolution: "Budgeted criterion evidence reports exact uncovered criteria and counts citations/receipts against the full UTF-8 budget, with compact no-git SDK/CLI and npm/Bun CI."
