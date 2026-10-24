@@ -158,7 +158,7 @@ test("installed command and compiled SDK return bounded lossless JSON/TOON with 
     t.after(() => harness.deactivate());
     const handler = harness.activation.commands.handlers.find((entry) => entry.command === "context-evidence")!;
     for (const global of [{}, { json: true }]) {
-      const result = await handler.run({ command: "context-evidence", args: [], pm_root: pmRoot, options: { packet: packetPath, byteBudget: "4000" }, global }) as { output: string };
+      const result = await handler.run({ command: "context-evidence", args: [], pm_root: pmRoot, options: { packet: packetPath }, global }) as { output: string };
       assert.ok(Buffer.byteLength(result.output) <= 4000);
     }
     const explicit = await harness.runCommand({ command: "context-evidence", pmRoot, options: { packet: packetPath, format: "toon", "byte-budget": "4000" }, global: {} });
