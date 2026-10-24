@@ -1,3 +1,5 @@
+export { packCriterionEvidence, encodeEvidencePack, parseEvidencePacket, readEvidencePacket, EvidencePackingError } from "./evidence-packing.ts";
+export type { EvidenceBinding, EvidenceCriterion, EvidencePacket, EvidencePack, EvidencePackOptions, CriterionCoverage, PackedEvidence } from "./evidence-packing.ts";
 export { checkContextWitnesses, encodeWitnessReport, parseWitnessPacket, readWitnessPacket, WitnessError } from "./witnesses.ts";
 export type { ClaimCitation, ContextClaim, ContextWitness, WitnessPacket, WitnessReport } from "./witnesses.ts";
 export { createFreshnessReader, encodeFreshness, FRESHNESS_LIMITS, FreshnessError, parseFreshnessPacket, readFreshnessFile, readFreshnessJson, recordFreshness, resumeFreshness } from "./freshness.ts";

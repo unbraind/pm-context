@@ -433,9 +433,25 @@ The SDK exports `checkContextWitnesses`, packet parsing and encoding, and typed
 
 ## Without git
 
-Item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a
+Criterion evidence packs, item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a
 plain initialized tracker without invoking Git. Corpus reads use `listAllComplete`
 with extension hooks disabled and re-certify its full-corpus receipt before packing,
 including custom item types and terminal statuses. Receipt writes and usage updates
 also work without Git. File focus (`--changed` or `--files`)
 requires a Git working repository and explains that requirement when unavailable.
+
+## Coverage-aware evidence packing
+
+Pack explicit acceptance criteria and their tracker field citations with
+`pm context-evidence --packet criteria.json --byte-budget 4000` (TOON by default;
+`--format json` or `--json` for compact JSON). Each criterion reports `linked`,
+`budget_omitted`, or `unlinked`. A budget cut retains the exact uncovered
+criterion ID and text. Citations, coverage receipts and output syntax all count
+against the byte ceiling. Whole evidence groups fit or are omitted together.
+
+Coverage means all producer-declared bindings are present, not that acceptance
+was semantically verified. Source fields are read for sizing; omitted evidence
+is never described as reviewed. Linked artifacts are not opened and tests are
+not run. The command and typed `packCriterionEvidence` SDK work without Git and
+leave the tracker unchanged. [Packet, CLI and SDK examples, refusal remedies,
+and limitations](docs/criterion-evidence.md).

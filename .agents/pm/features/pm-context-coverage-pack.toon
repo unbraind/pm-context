@@ -1,0 +1,31 @@
+id: pm-context-coverage-pack
+title: Pack criterion evidence with exact budget coverage receipts
+description: "Explicit acceptance criteria bind tracker field citations; bounded packs disclose sufficient declared linked evidence and precise coverage lost under budget cuts. Core context intents own projections, existing pm-context neighborhoods and file focus own selection, pm-graph owns graph search, pm-brief owns reporting, pm-review owns review attention. This adds criterion-level evidence packing, not a search provider."
+type: Feature
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-24T06:50:03.535Z"
+updated_at: "2026-10-24T07:05:58.172Z"
+author: codex-agent
+acceptance_criteria: "A budget cut identifies the exact uncovered criterion; Deterministic ranking never implies omitted evidence was inspected; Citations and the coverage receipt count against the complete output budget; Typed SDK and CLI support compact TOON and JSON, actionable refusals, and non-git trackers; Read-only public tracker validation and npm plus Bun CI release gates pass"
+comments[5]{created_at,author,text}:
+  "2026-10-24T06:50:36.270Z",codex-agent,"Overlap check against current package, pinned core SDK, and pm-brief/pm-graph/pm-memory/pm-review: core context intents select field groups; core context-packing provides deterministic bounded candidate selection; pm-context owns neighborhoods, file focus and compression; pm-review criterion coverage measures substantive review attention. No existing criterion-to-evidence budget packing command found. Implement explicit criterion bindings, whole evidence groups, exact serialized-byte accounting including citations and coverage receipts, and declared-link sufficiency without claiming semantic review or executing linked tests. Reuse SDK packing, authoritative item readers, expected errors, and host rendering contracts. Keep the pinned SDK unchanged."
+  "2026-10-24T06:57:57.276Z",codex-agent,"Implementation and focused verification complete: 10/10 linked tests passed via pm test (execution tracking is disabled, receipt recorded here), registration regression 1/1; source/test typecheck, docstring gate and whitespace lint pass. Native and c8 focused module measurements are 100% lines/branches/functions, with c8 statements also 100%. Behavioral revert: bypassing only the SDK selection budget makes the real-tracker regression fail because AC2 becomes linked instead of budget_omitted; restored implementation passes. Public main snapshot c484938: 89 items, 29 with actual criteria and linked tests, 8 selected items, 9 criteria, 16 source fields. Full JSON 6485 bytes and TOON 5539; cuts to ceilings 4540/3877 emit 4341/3555 bytes, identify AC4 and AC7 budget omissions, preserve AC9 unlinked and all criterion rows. Reordered declarations yield identical packs and frozen non-git copy fingerprints remain unchanged. Complete data and method are in docs/criterion-evidence-validation.md. Full npm and Bun gates delegated to unchanged CI matrix. Clean-home strict health passed; normal home has an unrelated installed-extension version skew. No pins, global extensions or history were modified."
+  "2026-10-24T07:01:24.482Z",codex-agent,"PR 170 opened ready for review. Initial CI run 40072345528 passed all 403 tests on both Node 22 and 26 but failed the unchanged native 100% branch gate at 99.95%: direct source-handler coverage lacked the default byte-budget fallback. Added a direct SDK-host invocation without a byte-budget option; installed CLI behavior already passed. No product logic or thresholds changed. Focused checks and CI will verify the added path. External reviewer availability is separate from acceptance evidence."
+  "2026-10-24T07:01:58.978Z",codex-agent,"Focused regression rerun after adding direct default-budget coverage: 10/10 tests pass, build:test passes, changelog generation/check and whitespace lint pass. PR 170 review services report quota/trial/automatic-review limits; these are missing review evidence rather than approvals. Full release gates remain required."
+  "2026-10-24T07:05:57.276Z",codex-agent,"Verified code head 808301d in CI run https://github.com/unbraind/pm-context/actions/runs/40072556257: npm run release:check and bun run release:check each pass 403/403 tests on Node 22 and 26 (four successful gates, 1612 main-suite test executions). Native package coverage: 100% lines/branches/functions. c8 package coverage: 100% statements/lines/functions and 99.95% branches, above the unchanged 99.9% c8 threshold; new evidence module is 100% on all four dimensions. Both jobs also pass strict tracker health, committed-dist reproducibility, changelog checks, production audit and package checks. PR https://github.com/unbraind/pm-context/pull/170 remains ready for review, unmerged and unreleased. This final receipt and documentation will be committed, and its resulting head will be verified again in CI. Remaining limits: declared evidence coverage is not semantic acceptance; individual source reads are not an atomic cross-tracker snapshot; external review services are unavailable/limited. Linked-test execution tracking is disabled, so its successful 10/10 receipt is preserved in comments."
+files[6]{path,scope}:
+  evidence-packing.ts,project
+  index.ts,project
+  test/context-pack.test.ts,project
+  test/evidence-packing.test.ts,project
+  test/renderer-ownership.test.ts,project
+  test/validate-evidence-data.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/evidence-packing.test.ts test/renderer-ownership.test.ts,project,codex-agent,"2026-10-24T06:55:38.293Z",local_mutation,feat/coverage-aware-evidence-packing
+docs[3]{path,scope}:
+  docs/criterion-evidence-validation.md,project
+  docs/criterion-evidence.md,project
+  README.md,project
+body: ""
