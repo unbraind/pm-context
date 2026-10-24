@@ -52,3 +52,13 @@ on Node 22 and 26, at unchanged thresholds. Local full gates were deferred becau
 of host CPU saturation. A clean-home strict tracker health check passed. The
 normal local home exposed an unrelated installed-extension host version skew;
 no dependency pin, global extension or history record was changed to hide it.
+
+Code head `808301d` passed [CI run 40072556257](https://github.com/unbraind/pm-context/actions/runs/40072556257):
+`npm run release:check` and `bun run release:check` each passed 403/403 tests on
+Node 22 and 26 (four successful full gates, 1612 main-suite test executions).
+Package native coverage measured 100% lines/branches/functions. Package c8
+coverage measured 100% statements/lines/functions and 99.95% branches, exceeding
+the unchanged 99.9% c8 branch threshold. The new evidence module measured 100%
+on all four c8 dimensions. The CI also passed strict tracker health, committed
+build reproducibility, changelog validation, production audit and package checks.
+The documentation/PM receipt commit is verified separately on its final PR head.
