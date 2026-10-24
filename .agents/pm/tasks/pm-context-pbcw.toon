@@ -2,13 +2,18 @@ id: pm-context-pbcw
 title: Certify complete context corpora and recover abandoned receipt locks
 description: Adopt native SDK corpus certification and owned receipt coordination for SDK audit findings F01 and F07.
 type: Task
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-23T20:24:32.930Z"
-updated_at: "2026-10-23T20:48:17.529Z"
+updated_at: "2026-10-24T21:44:09.291Z"
+closed_at: "2026-10-24T21:44:09.276Z"
+completed_at: "2026-10-24T21:44:09.276Z"
 author: codex-agent
 acceptance_criteria: "F01: Read all custom and terminal items through listAllComplete and certifyCompleteListResult and refuse missing complete-list proof with a revert-failing non-git regression.; F07: Use owned bounded native receipt locks with dead-owner recovery, live-owner contention, preserved retention and permissions, and a revert-failing two-process non-git regression."
+resolution: "Certifies complete custom/terminal corpora and uses native owned receipt locks with killed-writer recovery and live contention, proven in real non-git regressions."
+expected_result: "F01: Read all custom and terminal items through listAllComplete and certifyCompleteListResult and refuse missing complete-list proof with a revert-failing non-git regression.; F07: Use owned bounded native receipt locks with dead-owner recovery, live-owner contention, preserved retention and permissions, and a revert-failing two-process non-git regression."
+actual_result: "https://github.com/unbraind/pm-context/pull/169, merged 2026-10-23T20:58:45Z, merge c484938837a10e2b0963300d604c748e5c22f5f9: Certifies complete custom/terminal corpora and uses native owned receipt locks with killed-writer recovery and live contention, proven in real non-git regressions."
 comments[7]{created_at,author,text}:
   "2026-10-23T20:24:59.444Z",codex-agent,"Verified F01 and F07 against origin/main at 479bf899ab9ad9eb6117c8e74ddcf815505a968f. F01 uses ordinary list plus four local checks without canonical complete-list certification. F07 uses mkdir runtime/context-receipts/.lock with no verifiable owner. Plan: native complete reads and certification, async owned receipt locks, and real non-git regressions. SDK 2026.10.20 lacks acquireLockLease; the task authorizes the minimal dependency upgrade needed for native recovery."
   "2026-10-23T20:30:59.190Z",codex-agent,"F01 audit correction: certifyCompleteListResult constructs complete_list rather than requiring a pre-existing certificate. The underlying weaker consumer contract is valid: the old guard also accepts missing universal read_output and unverified projection/filter evidence. The new guard delegates all corpus invariants to the SDK and compares the producer certificate to the canonical certification. F07 is migrated only after upgrading the pinned SDK and matching peer/manifest minimum to 2026.10.23 for owned fenced leases and proven-dead-owner recovery. Legacy ownerless directories remain untouched and require explicit recovery."
@@ -56,4 +61,5 @@ tests[3]:
 docs[2]{path,scope}:
   CHANGELOG.md,project
   README.md,project
+close_reason: "https://github.com/unbraind/pm-context/pull/169, merged 2026-10-23T20:58:45Z, merge c484938837a10e2b0963300d604c748e5c22f5f9: Certifies complete custom/terminal corpora and uses native owned receipt locks with killed-writer recovery and live contention, proven in real non-git regressions."
 body: ""

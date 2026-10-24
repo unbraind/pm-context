@@ -2,12 +2,17 @@ id: pm-context-8bbh
 title: Resumable since delta packs with substantive messages and claims
 description: "Add context-pack since with opaque retained-history cursors, bounded substantive comment and handoff excerpts, ranked changes and claims, strict output budget and omission receipts; measure against the core activity retry and comment-read route on a public tracker copy."
 type: Feature
-status: in_progress
+status: closed
 priority: 1
 tags: []
 created_at: "2026-10-21T16:31:40.635Z"
-updated_at: "2026-10-22T21:48:15.598Z"
+updated_at: "2026-10-24T21:44:09.114Z"
+closed_at: "2026-10-24T21:44:09.103Z"
+completed_at: "2026-10-24T21:44:09.103Z"
 author: codex-agent
+resolution: "Latest implementing PR hardens the delta feature from PR 164 with substantive event semantics, resumable checkpoints, stable ordering and bounded incremental packing."
+expected_result: "Add context-pack since with opaque retained-history cursors, bounded substantive comment and handoff excerpts, ranked changes and claims, strict output budget and omission receipts; measure against the core activity retry and comment-read route on a public tracker copy."
+actual_result: "https://github.com/unbraind/pm-context/pull/165, merged 2026-10-22T22:20:01Z, merge f55cdbbcf2447dae29df789e133fdbe5521a47b6: Latest implementing PR hardens the delta feature from PR 164 with substantive event semantics, resumable checkpoints, stable ordering and bounded incremental packing."
 comments[37]{created_at,author,text}:
   "2026-10-21T16:32:19.146Z",codex-agent,"Overlap checked: core context --for handoff is a current-state snapshot, activity digest/compact omits patch comment text, and pm-brief brief since already classifies lifecycle, priority and dependency changes but has no durable cursor, substantive comment excerpts or claim continuation. Implement only the missing resumable delta serving surface over SDK activity plus the existing certified complete item reader. Keep tracker/history semantics in the SDK. Plan non-git/no-git-PATH regressions, behavioural revert proof and public-copy three-call completeness/token comparison."
   "2026-10-21T16:39:34.156Z",codex-agent,"Implemented the since surface with SDK history replay, registered relationship ordering, content-addressed retained cursors, snapshot paging and exact whole-response byte-token ceilings. Six real-SDK regressions pass, including a built extension in a non-git tracker with an empty executable PATH, indirect unblock detection, cross-agent claims, substantive prose, deterministic retries, paginated completeness and typed retention remedies. Public-copy benchmark and unchanged full gates are running."
@@ -87,4 +92,5 @@ tests[4]:
 docs[2]{path,scope}:
   docs/since-benchmark.md,project
   docs/since.md,project
+close_reason: "https://github.com/unbraind/pm-context/pull/165, merged 2026-10-22T22:20:01Z, merge f55cdbbcf2447dae29df789e133fdbe5521a47b6: Latest implementing PR hardens the delta feature from PR 164 with substantive event semantics, resumable checkpoints, stable ordering and bounded incremental packing."
 body: ""

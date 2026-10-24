@@ -2,12 +2,17 @@ id: pm-context-r163
 title: Correct tracker reconciliation review evidence for PR 163
 description: "Verify the five unresolved review threads against main, correct evidence fields with append-only events, and recheck every reconciled record for the same citation class. Tracker-only scope; retain delivery status and prior history."
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-22T10:05:30.187Z"
-updated_at: "2026-10-22T10:13:45.273Z"
+updated_at: "2026-10-24T21:44:09.500Z"
+closed_at: "2026-10-24T21:44:09.496Z"
+completed_at: "2026-10-24T21:44:09.496Z"
 author: codex-agent
+resolution: "Corrects per-item reconciliation evidence, distinguishes implementation from verification and records paired CodeQL receipts while preserving original history bytes."
+expected_result: "Verify the five unresolved review threads against main, correct evidence fields with append-only events, and recheck every reconciled record for the same citation class. Tracker-only scope; retain delivery status and prior history."
+actual_result: "https://github.com/unbraind/pm-context/pull/163, merged 2026-10-22T20:07:49Z, merge 61d6a5fe7ad8c50e2e69576d6812d6696be7abbe: Corrects per-item reconciliation evidence, distinguishes implementation from verification and records paired CodeQL receipts while preserving original history bytes."
 comments[2]{created_at,author,text}:
   "2026-10-22T10:06:12.838Z",codex-agent,"Verified five unresolved threads: PRRT_kwDOSzDuFs6vBuTz and PRRT_kwDOSzDuFs6vBuT- require publishing-guard citations; PRRT_kwDOSzDuFs6vBuT8 and PRRT_kwDOSzDuFs6vBuT_ require implementation versus verification attribution; PRRT_kwDOSzDuFs6vBuT5 requires both successful CodeQL workflow and analysis receipts. All valid. Main remains 7d156cd179b1; every delivery commit is in main ancestry. CodeQL main run 39410986052 succeeds and analysis 1987756727 has empty error at the same ancestor bbc33ecb6d6d. Self-review covers all ten closeouts; correct the same citation mismatch in p965, a9iw, 05ub and ht20 too. Preserve every prior history byte. No outside-diff findings in the latest CodeRabbit review."
   "2026-10-22T10:13:30.593Z",codex-agent,"Tracker-only evidence verification complete. All five threads are valid and addressed by seven snapshot corrections: publishing guard (594y and self-review p965), merge-wait implementation versus later test (jjbl), paired CodeQL success and analysis (f4tl), deterministic date artifacts (a9iw), both reusable callers (05ub), and historical certification package/launcher artifacts (ht20). Three other closeouts already cite relevant artifacts. All eleven distinct delivery/verification/analysis commits are in unchanged main 7d156cd179b1 ancestry. Each of seven existing PR history streams preserves every prior byte and appends exactly one event; all ten original changed streams preserve main prefixes. Both evidence fields match intended corrections and existing terminal status remains unchanged. This mainline evidence is the tracker-only substitute for behavioral revert proofs. Linked pm test passes 3/3 ancestry commands; npm ci, changelog generation/check, inventory, snapshot, privacy and whitespace checks pass. pm health --check-only --json exits 0 but reports ok=false for existing host-extension version skew and legacy provenance-domain advisory; no strict-health certification or history repair. No runtime or dist edits, no new closure operations, and no review replies, resolutions, mentions, merge or release."
@@ -25,4 +30,5 @@ tests[3]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,
   git merge-base --is-ancestor bbc33ecb6d6d61475b72b756395b87d47f68126a origin/main,project,900,codex-agent,"2026-10-22T10:09:03.287Z",local_mutation,chore/reconcile-tracker-1021
 docs[1]{path,scope}:
   "https://github.com/unbraind/pm-context/pull/163",project
+close_reason: "https://github.com/unbraind/pm-context/pull/163, merged 2026-10-22T20:07:49Z, merge 61d6a5fe7ad8c50e2e69576d6812d6696be7abbe: Corrects per-item reconciliation evidence, distinguishes implementation from verification and records paired CodeQL receipts while preserving original history bytes."
 body: ""

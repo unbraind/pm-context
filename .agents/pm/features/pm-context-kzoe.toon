@@ -2,13 +2,18 @@ id: pm-context-kzoe
 title: Return smallest cited witnesses for contradictory context claims
 description: ""
 type: Feature
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-23T14:30:51.600Z"
-updated_at: "2026-10-23T15:32:53.720Z"
+updated_at: "2026-10-24T21:44:09.352Z"
+closed_at: "2026-10-24T21:44:09.342Z"
+completed_at: "2026-10-24T21:44:09.342Z"
 author: codex-agent
 acceptance_criteria: "Conflicting state, supersession and mutually exclusive policy fixtures produce stable witnesses; no automatic edits or unsupported semantic certainty. Typed SDK and CLI, bounded JSON and TOON, actionable refusals, non-git read-only public tracker validation, CRLF file-focus regression, npm and Bun CI release gates."
+resolution: "Returns stable cited witnesses for declared state, supersession and policy conflicts without edits or semantic certainty, with CRLF/no-git/public-copy and full CI evidence."
+expected_result: "Conflicting state, supersession and mutually exclusive policy fixtures produce stable witnesses; no automatic edits or unsupported semantic certainty. Typed SDK and CLI, bounded JSON and TOON, actionable refusals, non-git read-only public tracker validation, CRLF file-focus regression, npm and Bun CI release gates."
+actual_result: "https://github.com/unbraind/pm-context/pull/168, merged 2026-10-23T15:46:35Z, merge 479bf899ab9ad9eb6117c8e74ddcf815505a968f: Returns stable cited witnesses for declared state, supersession and policy conflicts without edits or semantic certainty, with CRLF/no-git/public-copy and full CI evidence."
 comments[13]{created_at,author,text}:
   "2026-10-23T14:31:23.193Z",codex-agent,"Overlap checked against the installed CLI SDK context packing and relationship history contracts plus sibling README surfaces: core owns tracker reads, citations and selection; pm-memory owns durable consolidation and lexical or semantic proposals; pm-jev owns typed model decisions. No smallest packet contradiction witness API found. Implement explicit producer-declared state, policy and supersession claims with citation coordinates; deterministic smallest witnesses only, no inference, source edits or model calls. Reuse SDK expected errors, existing bounded JSON input reader and complete item reader for validation. Include CRLF focus fix and behavioral revert proofs. Local targeted tests/typecheck/docstring; CI npm and Bun full gates at existing thresholds."
   "2026-10-23T14:36:36.653Z",codex-agent,"Live overlap refresh used CLI 2026.10.23 context packing declarations as well as the package-pinned 2026.10.20 SDK. Core graph governance checks storage/ordering contradictions and bounded graph witnesses, not co-current assertion values. Packing lineage suppresses superseded duplicates but does not return packet inconsistency witnesses. This feature retains selection ownership in the existing context packer and checks only supplied declarations; citation locations are producer-owned, not independent source verification."
@@ -38,4 +43,5 @@ tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
 docs[2]{path,scope}:
   docs/witnesses.md,project
   README.md,project
+close_reason: "https://github.com/unbraind/pm-context/pull/168, merged 2026-10-23T15:46:35Z, merge 479bf899ab9ad9eb6117c8e74ddcf815505a968f: Returns stable cited witnesses for declared state, supersession and policy conflicts without edits or semantic certainty, with CRLF/no-git/public-copy and full CI evidence."
 body: ""
