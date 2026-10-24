@@ -1,3 +1,5 @@
+import { packCriterionEvidence, encodeEvidencePack, readEvidencePacket, EvidencePackingError } from "./evidence-packing.js";
+export { packCriterionEvidence, encodeEvidencePack, parseEvidencePacket, readEvidencePacket, EvidencePackingError } from "./evidence-packing.js";
 import { createFreshnessReader, encodeFreshness, FreshnessError, parseFreshnessPacket, readFreshnessJson, recordFreshness, resumeFreshness } from "./freshness.js";
 import { checkContextWitnesses, encodeWitnessReport, readWitnessPacket, WitnessError } from "./witnesses.js";
 export { checkContextWitnesses, encodeWitnessReport, parseWitnessPacket, readWitnessPacket, WitnessError } from "./witnesses.js";
@@ -1233,6 +1235,25 @@ function setupCommands(api) {
         },
     });
     api.registerCommand({
+        name: "context-evidence",
+        description: "Pack explicit criterion evidence with exact coverage lost at a byte budget.",
+        flags: [
+            { long: "--packet", value_name: "file", description: "JSON acceptance criteria and tracker field bindings", type: "string" },
+            { long: "--format", value_name: "format", description: "toon (default) or json", type: "string" },
+            { long: "--byte-budget", value_name: "n", description: "Complete-output UTF-8 byte ceiling (default 4000)", type: "string" },
+        ],
+        async run(ctx) {
+            const path = stringOption(ctx.options, "packet");
+            const format = stringOption(ctx.options, "format") ?? (ctx.global.json ? "json" : "toon");
+            if (!path || (format !== "json" && format !== "toon") || ctx.args.length)
+                throw new EvidencePackingError("INVALID_ARGUMENT", "Supply --packet JSON with --format json or toon; no positional arguments are accepted.");
+            const pack = await packCriterionEvidence(readEvidencePacket(path), createFreshnessReader(ctx.pm_root, "."), {
+                format, byteBudget: Number(stringOption(ctx.options, "byte-budget", "byteBudget") ?? "4000"),
+            });
+            return renderedCommandResult(encodeEvidencePack(pack, format));
+        },
+    });
+    api.registerCommand({
         name: "context-witnesses",
         description: "Find the smallest cited contradiction among declared packet assertions without editing sources.",
         flags: [
@@ -1511,7 +1532,7 @@ export default {
         setupCommands(api);
         if (typeof api.registerRenderer === "function") {
             const rendererOwnership = {
-                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses"],
+                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence"],
                 resultDiscriminator: isRenderedCommandResult,
             };
             api.registerRenderer("toon", renderCommandResult, rendererOwnership);
