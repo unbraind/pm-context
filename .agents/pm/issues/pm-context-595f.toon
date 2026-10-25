@@ -6,9 +6,10 @@ status: open
 priority: 2
 tags: []
 created_at: "2026-10-21T16:52:21.581Z"
-updated_at: "2026-10-23T14:59:25.133Z"
+updated_at: "2026-10-25T01:53:39.723Z"
 author: codex-agent
-comments[2]{created_at,author,text}:
+comments[3]{created_at,author,text}:
   "2026-10-23T14:50:42.232Z",codex-agent,"Witness feature validation reconfirmed the existing local pinned-host health limitation: extension_host_pm_cli_version_skew:2026.10.20:2026.10.23:pm-github and merge_fence_drift:2, plus advisory historical provenance normalization. No history repair, dependency bump, extension change or merge-configuration work was attempted; fresh CI installation and its isolated host are the full gate evidence for the feature."
   "2026-10-23T14:59:25.133Z",codex-agent,"Fresh CI at eaa08c1 passed strict tracker health with required merge drivers on both Node 22 and Node 26. The previously observed extension skew and fence warning are local environment evidence, not a fresh-clone CI blocker for this feature. Historical advisory provenance was left untouched."
+  "2026-10-25T01:53:39.723Z",codex-agent,"Next-evidence work reconfirmed the existing local pinned-host/global-extension skew: pinned host 2026.10.23 versus pm-github host 2026.10.24. Local strict health reports this gate-failing extension warning plus advisory historical provenance. No history repair, dependency bump, extension mutation or merge-configuration work was attempted. Fresh-clone CI will provide the isolated health evidence."
 body: ""

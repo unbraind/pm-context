@@ -1,3 +1,6 @@
+import { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
+export { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
+export type { EvidenceRead, NextEvidencePacket, NextEvidenceStep, NextEvidencePlan } from "./next-evidence.ts";
 import { packCriterionEvidence, encodeEvidencePack, readEvidencePacket, EvidencePackingError } from "./evidence-packing.ts";
 export { packCriterionEvidence, encodeEvidencePack, parseEvidencePacket, readEvidencePacket, EvidencePackingError } from "./evidence-packing.ts";
 export type { EvidenceBinding, EvidenceCriterion, EvidencePacket, EvidencePack, EvidencePackOptions, CriterionCoverage, PackedEvidence } from "./evidence-packing.ts";
@@ -1496,6 +1499,25 @@ function setupCommands(api: ExtensionApi): void {
   });
 
   api.registerCommand({
+    name: "context-next-evidence",
+    description: "Plan the cheapest declared reads covering explicitly missing evidence; execute nothing.",
+    flags: [
+      { long: "--packet", value_name: "file", description: "JSON missing criteria, revision contracts and available read estimates", type: "string" },
+      { long: "--check", value_name: "file", description: "Validate a saved JSON plan against the current packet", type: "string" },
+      { long: "--format", value_name: "format", description: "toon (default) or json", type: "string" },
+    ],
+    async run(ctx: CommandHandlerContext) {
+      const path = stringOption(ctx.options, "packet");
+      const format = stringOption(ctx.options, "format") ?? (ctx.global.json ? "json" : "toon");
+      if (!path || (format !== "json" && format !== "toon") || ctx.args.length) throw new NextEvidenceError("INVALID_ARGUMENT", "Supply --packet JSON and --format json or toon, without positional arguments.");
+      const packet = parseNextEvidencePacket(readNextEvidenceJson(path));
+      const check = stringOption(ctx.options, "check");
+      const plan = check ? validateNextEvidencePlan(readNextEvidenceJson(check), packet) : planNextEvidence(packet);
+      return renderedCommandResult(encodeNextEvidencePlan(plan, format));
+    },
+  });
+
+  api.registerCommand({
     name: "context-evidence",
     description: "Pack explicit criterion evidence with exact coverage lost at a byte budget.",
     flags: [
@@ -1792,7 +1814,7 @@ export default {
     setupCommands(api);
     if (typeof api.registerRenderer === "function") {
       const rendererOwnership = {
-        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence"],
+        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-next-evidence"],
         resultDiscriminator: isRenderedCommandResult,
       };
       api.registerRenderer("toon", renderCommandResult, rendererOwnership);

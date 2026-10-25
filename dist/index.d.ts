@@ -1,3 +1,5 @@
+export { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
+export type { EvidenceRead, NextEvidencePacket, NextEvidenceStep, NextEvidencePlan } from "./next-evidence.ts";
 export { packCriterionEvidence, encodeEvidencePack, parseEvidencePacket, readEvidencePacket, EvidencePackingError } from "./evidence-packing.ts";
 export type { EvidenceBinding, EvidenceCriterion, EvidencePacket, EvidencePack, EvidencePackOptions, CriterionCoverage, PackedEvidence } from "./evidence-packing.ts";
 export { checkContextWitnesses, encodeWitnessReport, parseWitnessPacket, readWitnessPacket, WitnessError } from "./witnesses.ts";
