@@ -433,7 +433,7 @@ The SDK exports `checkContextWitnesses`, packet parsing and encoding, and typed
 
 ## Without git
 
-Criterion evidence packs, item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a
+Next-evidence acquisition plans, criterion evidence packs, item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a
 plain initialized tracker without invoking Git. Corpus reads use `listAllComplete`
 with extension hooks disabled and re-certify its full-corpus receipt before packing,
 including custom item types and terminal statuses. Receipt writes and usage updates
@@ -455,3 +455,18 @@ is never described as reviewed. Linked artifacts are not opened and tests are
 not run. The command and typed `packCriterionEvidence` SDK work without Git and
 leave the tracker unchanged. [Packet, CLI and SDK examples, refusal remedies,
 and limitations](docs/criterion-evidence.md).
+
+## Plan the next evidence reads
+
+`pm context-next-evidence --packet acquisition.json` chooses the exact cheapest
+cover of explicitly missing criteria from a caller-declared read catalog. It
+executes **zero reads**. Cost combines estimated tokens and a caller-declared
+per-tool-call token overhead; selected reads are ordered by marginal coverage
+per cost. Uncoverable criteria remain explicit. JSON and TOON output contain
+read IDs, costs and revision contracts, without source content.
+
+Use `--format json > plan.json` to save a plan, then
+`pm context-next-evidence --packet acquisition.json --check plan.json` to
+revalidate it. Revised criterion/source contracts, coverage or estimates require
+replanning. This command also works without Git and leaves tracker state intact.
+See the [packet example, typed SDK, limits and remedies](docs/next-evidence.md).

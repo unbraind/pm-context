@@ -1,0 +1,27 @@
+id: pm-context-next-evidence
+title: Plan the cheapest next reads for missing criterion evidence
+description: "Choose which explicitly missing evidence to acquire from a caller-declared catalog, without executing reads."
+type: Feature
+status: in_progress
+priority: 2
+tags[3]: context,evidence,planning
+created_at: "2026-10-25T01:45:14.508Z"
+updated_at: "2026-10-25T01:53:41.258Z"
+author: codex-agent
+acceptance_criteria: "Three overlapping reads select the cheapest complete cover or disclose uncovered criteria; planning executes no read; revised source contracts invalidate the plan.; Typed SDK and CLI, compact JSON/TOON, typed remedies, docs, no-git real-data validation, targeted checks and npm/Bun CI release gates."
+comments[3]{created_at,author,text}:
+  "2026-10-25T01:45:16.946Z",codex-agent,"Overlap checked against current CLI SDK/query, context evidence packing, pm-ops diagnostic plans and pm-rlm adaptive/evidence modules: existing packing selects present facts; operational plans execute approved fixed diagnostics; recursive workflows own model decomposition. This feature only optimizes acquisition of caller-declared missing criteria. Design: stateless exact bounded set cover with marginal coverage/cost ordering, revision-bound contract digest and explicit uncovered criteria. No imports, exports of native items, sync, claims, checkpoints, leases or outboxes are added; tracker state remains SDK-owned and untouched. Existing SDK stable JSON reader, expected errors and extension testing harness will be reused."
+  "2026-10-25T01:52:13.269Z",codex-agent,"Implemented typed stateless SDK and context-next-evidence CLI using SDK expected errors, stable packet reads and lossless table-cell encoding. Exact optimizer bounded to 12 criteria/64 reads; source revision contracts cover the full catalog and estimates; JSON saved-plan check rejects changes. Targeted planner tests passed 6/6, including 500 seeded sequences (2000 operations), full SDK-native state read-back with relationships, installed CLI with no Git, and five peer-transition boundaries. Registration/renderer integration passed 59/59. Public main snapshot validation: 91 items, 31 with criteria/tests, six selected items, seven missing criteria, three reads, one selected read, six covered/one uncovered; 523 estimated tokens + one call at 40 overhead = 563 vs 915 for the pair; JSON 869 bytes, TOON 912 bytes. Zero acquired reads and unchanged tracker fingerprint. Behavioral reverts rebuilt: greedy cover fails the three-read optimum fixture; bypassed revision refusal fails stale-plan tests. Restored before verification. Full release gates delegated to CI per the shared-host instruction."
+  "2026-10-25T01:53:40.527Z",codex-agent,"Linked targeted run passed 65/65, with new planner native line/branch/function coverage 100/100/100. PM test-result tracking is disabled; the explicit run receipt was observed and is recorded here without changing tracking policy. Extended the seeded model to restore every plan through both JSON and SDK-decoded TOON, in addition to packet CRLF variants and SDK-native state comparisons. Existing local strict-health extension skew is tracked by pm-context-595f; isolated fresh CI health remains the gate."
+files[4]{path,scope}:
+  index.ts,project
+  next-evidence.ts,project
+  test/next-evidence.test.ts,project
+  test/validate-next-evidence-data.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --experimental-test-coverage --test-coverage-include=next-evidence.ts test/next-evidence.test.ts test/context-pack.test.ts test/renderer-ownership.test.ts,project,codex-agent,"2026-10-25T01:52:19.077Z",local_mutation,feat/next-evidence-plans
+docs[3]{path,scope}:
+  docs/next-evidence-validation.md,project
+  docs/next-evidence.md,project
+  README.md,project
+body: ""
