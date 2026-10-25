@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
-import { PmCliError, acquireLock, applyHistoryPatch, readHistoryEntries, resolveWorkspaceRelationshipKindRegistry } from "@unbrained/pm-cli/sdk";
+import { PmCliError, acquireLock, applyHistoryPatch, listMutationEvents, readHistoryEntries, resolveWorkspaceRelationshipKindRegistry } from "@unbrained/pm-cli/sdk";
 import type { RelationshipKindRegistry } from "@unbrained/pm-cli/sdk";
 import { runActivity } from "@unbrained/pm-cli/sdk/query";
 import type { ActivityEntry } from "@unbrained/pm-cli/sdk/query";
@@ -121,13 +121,23 @@ function excerpt(value: string, max: number): { text: string; omitted: number } 
 function compare(a: string, b: string): number {
   return Number(a > b) - Number(a < b);
 }
-/** Apply SDK history policy/read hooks, then retain physical stream order for equal/backdated timestamps. */
+/**
+ * Discover streams through SDK event pages, then retain their physical entries.
+ * Raw SDK history reads preserve prefix fingerprints and timestamp spellings;
+ * indexed event entries normalize timestamps and cannot replace that proof.
+ */
 async function readStreams(pmRoot: string): Promise<Event[][]> {
   const streams: Event[][] = [];
   await runActivity({ raw: true, compact: true, limit: "1" }, { path: pmRoot });
-  for (const file of readdirSync(join(pmRoot, "history")).filter((name) => name.endsWith(".jsonl")).sort()) {
-    const id = file.slice(0, -6);
-    const entries = await readHistoryEntries(join(pmRoot, "history", file), id);
+  const ids = new Set<string>();
+  let cursor: string | undefined;
+  do {
+    const page = await listMutationEvents({ pmRoot, since: cursor, limit: 1000 });
+    for (const event of page.events) ids.add(event.item_id);
+    cursor = page.has_more ? page.next_cursor : undefined;
+  } while (cursor);
+  for (const id of [...ids].sort()) {
+    const entries = await readHistoryEntries(join(pmRoot, "history", `${id}.jsonl`), id);
     streams.push(entries.map((entry, ordinal) => ({ ...entry, id, ordinal, key: digest([id, ordinal, entry]), time: parseFromTimestamp(entry.ts) })));
   }
   return streams;
