@@ -158,8 +158,10 @@ test("installed CLI and SDK work without Git, write nothing, and revalidate save
       const result = await harness.runCommand({ command: "context-next-evidence", pmRoot, options, global: {} }); assert.equal(result.errorMessage, undefined);
     }
     const handler = harness.activation.commands.handlers.find((entry) => entry.command === "context-next-evidence")!;
-    const result = await handler.run({ command: "context-next-evidence", args: [], pm_root: pmRoot, options: { packet: path }, global: { json: true } }) as { output: string };
-    assert.equal(JSON.parse(result.output).cost, 55);
+    for (const global of [{}, { json: true }]) {
+      const result = await handler.run({ command: "context-next-evidence", args: [], pm_root: pmRoot, options: { packet: path }, global }) as { output: string };
+      assert.equal(result.output, encodeNextEvidencePlan(planNextEvidence(input), global.json ? "json" : "toon"));
+    }
     for (const options of [{}, { packet: path, format: "bad" }]) await assert.rejects(harness.runCommand({ command: "context-next-evidence", pmRoot, options, global: {} }), code("INVALID_ARGUMENT"));
     await assert.rejects(harness.runCommand({ command: "context-next-evidence", pmRoot, args: ["extra"], options: { packet: path }, global: {} }), code("INVALID_ARGUMENT"));
   }
