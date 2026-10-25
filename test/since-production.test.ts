@@ -40,14 +40,14 @@ async function stream(pmRoot: string, id: string, snapshots: Array<{ ts: string;
   writeFileSync(join(pmRoot, "history", `${id}.jsonl`), entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
 }
 
-test("history timestamps require zones, disclose invalid rows and order offsets by instant across TZs", async (t) => {
+test("raw history spellings retain invalid-row diagnostics and offset ordering across TZs", async (t) => {
   const f = await fixture(t);
   await stream(f.pmRoot, "delta-time-a", [{ ts: "2020-01-01T10:00:00+02:00", op: "create", metadata: { id: "delta-time-a", title: "Waiting", status: "open", dependencies: [{ id: "delta-time-b", kind: "blocked_by" }] } }]);
   await stream(f.pmRoot, "delta-time-b", [{ ts: "2020-01-01T08:30:00Z", op: "create", metadata: { id: "delta-time-b", title: "Prerequisite", status: "closed" } }]);
   await stream(f.pmRoot, "delta-bad", [
-    { ts: "2020-01-01T07:30:00", metadata: {} }, { ts: "unparseable", metadata: {} },
+    { ts: " 2020-01-01T07:30:00Z", metadata: {} }, { ts: "2020-01-01T07:30:00Z ", metadata: {} },
   ]);
-  await stream(f.pmRoot, "delta-baseline", [{ ts: "2020-01-01T07:30:00", op: "history_compact_baseline", metadata: {} }]);
+  await stream(f.pmRoot, "delta-baseline", [{ ts: " 2020-01-01T07:30:00Z", op: "history_compact_baseline", metadata: {} }]);
   const originalTZ = process.env.TZ;
   const packs: SincePack[] = [];
   try {
@@ -199,7 +199,7 @@ test("graph events update reverse adjacency without full document scans and pres
 
 test("shared inventory corruption expires safely and invalid timestamp diagnostics stay bounded", async (t) => {
   const f = await fixture(t);
-  await stream(f.pmRoot, "delta-invalid", Array.from({ length: 12 }, () => ({ ts: "x".repeat(1000), metadata: {} })));
+  await stream(f.pmRoot, "delta-invalid", Array.from({ length: 12 }, () => ({ ts: " ".repeat(1000) + epoch, metadata: {} })));
   const pack = await f.pack();
   assert.equal(pack.omission_receipt.invalid_timestamp_rows, 12);
   assert.equal(pack.omission_receipt.invalid_timestamp_examples.length, 8);

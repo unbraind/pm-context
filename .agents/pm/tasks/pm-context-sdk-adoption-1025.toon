@@ -1,0 +1,31 @@
+id: pm-context-sdk-adoption-1025
+title: Use SDK reads for file focus and resumable deltas
+description: Replace the two remaining audit findings with certified complete item reads and paged mutation events where the pinned SDK preserves existing contracts. Follow-up to pm-context-lk82.
+type: Task
+status: in_progress
+priority: 2
+tags[2]: audit-1025,sdk-adoption
+created_at: "2026-10-25T15:04:57.630Z"
+updated_at: "2026-10-25T15:20:05.989Z"
+author: codex-agent
+dependencies[1]{id,kind,created_at,author,source_kind,author_source}:
+  pm-context-lk82,related,"2026-10-25T15:04:57.630Z",codex-agent,"cli:create:dep",detected
+comments[6]{created_at,author,text}:
+  "2026-10-25T15:07:01.004Z",codex-agent,"Plan and SDK capability evidence: pinned host is 2026.10.23; registry latest verified as 2026.10.25. Keep the pin unchanged. Finding file-focus.ts:137-161 cannot migrate safely: listAllComplete({includeBody:true}) creates runtime metadata-cache, body, collection and manifest files on a fresh real tracker. PmCompleteListOptions exposes only includeBody; PmClientOptions exposes pmRoot/cwd/author/noExtensions. Missing SDK API: an explicit cache-free/read-only complete-list policy, retaining active type registrations and duplicate-identity rejection. Preserve the current no-cache reader until that API exists; orchestrator owns upstream filing. Finding since.ts:128-133: replace directory enumeration with listMutationEvents page/cursor traversal; retain runActivity policy preflight and raw readHistoryEntries for physical-prefix fingerprints and original timestamp spellings, because indexed events normalize timestamps. SDK history_timestamp_invalid refusal for malformed or sub-millisecond event timestamps is the intentional stricter difference. Differential proof will compare origin/main builds on immutable public tracker copies outside Git; normal output must remain identical."
+  "2026-10-25T15:11:07.394Z",codex-agent,"Differential result against origin/main 9068fb1: two public tracker snapshots (pm-context 9068fb1, pm-csv c7cb72b8e377743b7d6ae8787bf73c989c559754) passed all six comparisons each: full file-focus items, context pack, agent handoff, SDK explanation, initial delta and resumed delta. Counts: 92 items / 1044 delta rows, and 126 items / 1000 delta rows. Copies used immutable source files outside Git, no git executable on PATH; every settings/item/history byte remained unchanged. Only wall-clock served_at fields are excluded from equality; cursors, event identities, budgets, omission receipts and all other fields compare exactly. Separately, the new malformed/sub-millisecond history test documents the intentional SDK refusal."
+  "2026-10-25T15:11:10.421Z",codex-agent,"Revert proof for since.ts stream discovery: reverting only readStreams to origin/main makes node --test --test-name-pattern=\"SDK event admission\" test/sdk-adoption.test.ts fail with Missing expected rejection (1 failed); restoring SDK discovery makes both adoption tests pass (2/2). Existing 26 delta tests pass, including equal-time/backdated events, prefix rewrite/truncation/removal, compaction, more than 1000 streams and no-Git CLI execution. File-focus replacement is blocked, so no replacement revert proof applies there; the real SDK capability test proves complete-list cache writes while the retained reader writes none."
+  "2026-10-25T15:13:23.623Z",codex-agent,"Validation: npm run typecheck, npm run build:test and npm run docstring pass; git diff --check passes. No lint script is configured. Pinned pm test pm-context-sdk-adoption-1025 --run --progress --only-last executed the linked adoption command successfully: 2 passed, 0 failed, no skips. Test-result tracking is disabled, so this comment records the receipt without changing tracking configuration. Host-global extension skew reproduces the already tracked pm-context-595f maintenance concern; the CI-style empty-HOME strict health check passes with no gate-failing findings."
+  "2026-10-25T15:14:37.744Z",codex-agent,"Local isolated-identity coverage passed: env HOME=<fresh-directory> GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 npm run coverage. 411 tests passed; 0 failed/cancelled/skipped. Native source gate: 14 sources, 100% lines/branches/functions. c8: 5361/5361 lines and statements, 206/206 functions, 2326/2327 branches (99.95%), above unchanged 99.9 branch threshold; the single uncovered branch is in unchanged index.ts:1771 and remains within the existing pm-context-3s5f coverage follow-up. since.ts itself is 100% in all c8 dimensions. No threshold changes. Production diff removes 5 source lines, including the 3-line local history-directory discovery; bounded SDK pagination adds 15 source lines."
+  "2026-10-25T15:20:05.090Z",codex-agent,"PR ready for review: https://github.com/unbraind/pm-context/pull/179 . Code commit 12582c2732197b0906b423b4ba3ffc4371767dc9 passed CI https://github.com/unbraind/pm-context/actions/runs/40206100714 : Node 22 and 26 both passed npm run release:check and bun run release:check, 411/411 tests per gate, 1644 total test executions, no failures/cancellations/skips. Both jobs passed strict tracker health, build-output freshness, changelog checks, audit and pack checks. CodeQL also passed. Review services are skipped, quota-limited, billing-limited or neutral, so they supply no approval evidence. The final receipt-only commit will rerun CI; its exact-head result will be linked in the PR. Outstanding SDK gap is the cache-free complete-list policy; physical-prefix reads remain intentionally required. No upstream issue filed, no merge or release performed. Item remains in progress for orchestrator verification; releasing claim."
+files[5]{path,scope}:
+  file-focus.ts,project
+  since.ts,project
+  test/sdk-adoption-differential.ts,project
+  test/sdk-adoption.test.ts,project
+  test/since-production.test.ts,project
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/sdk-adoption.test.ts,project,120,codex-agent,"2026-10-25T15:12:30.810Z",local_mutation,refactor/sdk-adoption-1025
+docs[2]{path,scope}:
+  docs/sdk-adoption.md,project
+  docs/since.md,project
+body: ""

@@ -23,11 +23,17 @@ not manufacture newly actionable work. Lifecycle, priority and assignee
 transitions are stated explicitly. Blocking edges follow the SDK relationship
 registry; closing a prerequisite also identifies affected dependents.
 
-History timestamps also require valid explicit-zone timestamps. Each is parsed
+History timestamps also require valid explicit-zone timestamps. Stream discovery
+uses SDK mutation-event pages. The SDK refuses malformed or sub-millisecond
+history timestamps with `history_timestamp_invalid` before publishing a cursor;
+restore or repair the referenced history through the host before retrying.
+This is stricter than the former local enumeration, which omitted malformed
+rows and accepted sub-millisecond spellings. Each retained timestamp is parsed
 once; cross-stream replay and ranked time ordering compare instants, so different
 offset spellings do not change causal order. Physical append order within each
-stream still wins for backdated entries. Invalid timestamps cannot be assigned
-to a time window: the omission receipt reports `invalid_timestamp_rows` and up
+stream still wins for backdated entries. Raw spellings accepted after SDK
+trimming can still be invalid for the package's explicit timestamp parser.
+These cannot be assigned to a time window: the omission receipt reports `invalid_timestamp_rows` and up
 to eight `invalid_timestamp_examples` (item, zero-based ordinal and at most 128
 timestamp characters). Their patches still contribute to current-state replay,
 but those event rows are omitted. A positive count prevents a completeness claim;
@@ -101,8 +107,11 @@ any expired stream or invalid timestamp requires history inspection or
 `CURSOR_CAPACITY` provide specific remedies through the exported `SinceError`
 contract (`code`, `remedy`, `exitCode=2`) and the CLI diagnostic.
 
-The package uses the existing certified full-item SDK reader and validated SDK
-history reader/patch replay. It never modifies items or append-only histories.
+The package uses the existing certified full-item SDK reader, paged mutation-event
+stream discovery and validated SDK history reader/patch replay. It never modifies
+items or append-only histories. SDK event-index files and package cursor snapshots
+are disposable runtime state. See [the SDK adoption evidence](sdk-adoption.md)
+for the retained cache-free file-focus boundary and differential proof.
 Readers consume the tracker view supplied by the host; this local runtime cursor
 store does not claim a remote Postgres or MCP transport implementation.
 
@@ -127,7 +136,8 @@ See [the public-copy measurement](since-benchmark.md) for calls, tokenizer count
 completeness checks, reproducible commands and the limits of the experiment.
 
 An internal SDK activity preflight applies core history policy and read hooks.
-Physical stream reads then preserve append order for equal or backdated timestamps.
+SDK event pages discover streams, and physical SDK history reads preserve original
+prefix hashes and append order for equal or backdated timestamps.
 The call/token measurement concerns agent invocations and output, rather than
 internal filesystem-read counts or latency.
 
