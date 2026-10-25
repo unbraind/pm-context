@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Plan the cheapest next reads for missing criterion evidence ([pm-context-next-evidence](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-next-evidence.toon))
+
 ## 2026.10.25 - 2026-10-25
 
 ### Added
