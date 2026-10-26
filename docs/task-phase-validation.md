@@ -317,3 +317,16 @@ sequentially with two workers and fresh Git identities. Native coverage covers
 statements/functions/lines and 99.96% branches at unchanged thresholds. Typecheck,
 build, test typecheck, docstring and changelog checks pass; no separate lint
 script exists. Final exact-head CI evidence is reported in the PR.
+
+## Registered-collision CI receipt
+
+Product head `9374a6e0d0b090b833e41c3749913943bb75d135` passes
+[CI run 40409245270](https://github.com/unbraind/pm-context/actions/runs/40409245270).
+Node 22 and 26 each pass npm and Bun full release gates: **428/428 per gate**,
+zero failures/skips, **1,712 aggregate passes**. Raw logs confirm native coverage
+for 16 sources at 100% lines/branches/functions, with c8 at 100%
+statements/functions/lines and 99.96% branches. Fresh health, committed dist,
+audit, package contents, changelog and attestation checks pass.
+[CodeQL](https://github.com/unbraind/pm-context/actions/runs/40409244255) passes.
+This subsequent receipt changes only documentation and tracker evidence; the
+PR records its independent final-head CI run. Existing tests remain unchanged.
