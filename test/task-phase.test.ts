@@ -219,6 +219,11 @@ test("installed CLI and compiled SDK work with Git absent and expose typed priva
     assert.match(error.code, /INVALID_REQUEST|INPUT_UNAVAILABLE|BUDGET_TOO_SMALL/);
     assert.ok(error.next_steps.length > 0); assert.ok(!JSON.stringify({ detail: error.detail, remedies: error.next_steps }).includes(root));
   }
+  for (const flag of ["--phase", "--previous-phase", "--include-fields", "--byte-budget", "--format"]) {
+    const result = run(["--packet", path, flag, " ", "--json"]);
+    assert.equal(result.status, 2, `${flag}: ${result.stderr}`);
+    assert.equal(JSON.parse(result.stderr).code, "INVALID_REQUEST");
+  }
   for (const invalid of [null, [], 2]) { writeFileSync(bad, JSON.stringify(invalid)); assert.equal(run(["--packet", bad, "--json"]).status, 2); }
   for (const module of [extension, builtExtension]) {
     const harness = await createExtensionTestHarness(module, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] }); t.after(() => harness.deactivate());
@@ -233,6 +238,9 @@ test("installed CLI and compiled SDK work with Git absent and expose typed priva
       assert.equal(out.errorMessage, undefined);
     }
     await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: {}, global: {} }), code("INVALID_REQUEST"));
+    for (const options of [{ phase: " " }, { "previous-phase": " " }, { format: " " }, { "include-fields": " " }, { "byte-budget": " " }, { includeFields: 0 }, { byteBudget: 0 }, { phase: null }]) {
+      await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: { packet: path, ...options }, global: {} }), code("INVALID_REQUEST"));
+    }
     for (const invalid of [null, [], 2]) {
       writeFileSync(bad, JSON.stringify(invalid));
       await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: { packet: bad }, global: {} }), code("INVALID_REQUEST"));

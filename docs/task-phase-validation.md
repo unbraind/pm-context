@@ -111,6 +111,13 @@ Result: **1/1 failed** because the unchanged title was delivered in full instead
 of retaining its SDK reference. Exact source bytes were restored after each
 probe. The complete tests run with both behaviors restored.
 
+The CLI also preserves raw overrides for the same strict schema. Replacing only
+that adapter's raw phase/format read with the older trim-and-ignore helper makes
+the installed/host regression fail **1/1**, with `Missing expected rejection`
+for a blank phase. The source is restored exactly afterward. Blank phase,
+previous-phase, field, budget and format flags refuse through the installed
+parser; source and compiled host cases cover wrong types and malformed roots too.
+
 ## Local targeted gates
 
 `test/task-phase.test.ts`: **8/8 passed**, including the 500-sequence model.

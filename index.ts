@@ -1361,13 +1361,13 @@ function setupCommands(api: ExtensionApi): void {
       if (input === null || typeof input !== "object" || Array.isArray(input)) throw new PhaseContextError("INVALID_REQUEST", "Supply a JSON object with phase, contracts and items.");
       const overrides: Record<string, unknown> = {};
       for (const [option, camel, key] of [["phase", "phase", "phase"], ["previous-phase", "previousPhase", "previous_phase"], ["format", "format", "format"]]) {
-        const value = stringOption(ctx.options, option, camel);
+        const value = Object.hasOwn(ctx.options, option) ? ctx.options[option] : ctx.options[camel];
         if (value !== undefined) overrides[key] = value;
       }
-      const fields = stringOption(ctx.options, "include-fields", "includeFields");
-      if (fields !== undefined) overrides.include_fields = fields.split(",");
-      const budget = stringOption(ctx.options, "byte-budget", "byteBudget");
-      if (budget !== undefined) overrides.byte_budget = Number(budget);
+      const fields = Object.hasOwn(ctx.options, "include-fields") ? ctx.options["include-fields"] : ctx.options.includeFields;
+      if (fields !== undefined) overrides.include_fields = typeof fields === "string" ? fields.split(",") : fields;
+      const budget = Object.hasOwn(ctx.options, "byte-budget") ? ctx.options["byte-budget"] : ctx.options.byteBudget;
+      if (budget !== undefined) overrides.byte_budget = typeof budget === "string" && budget.trim() ? Number(budget) : budget;
       if (ctx.global.json && overrides.format === undefined) overrides.format = "json";
       return renderedCommandResult(encodePhaseContext(await buildPhaseContext({ ...input, ...overrides } as unknown as PhaseContextRequest, ctx.pm_root)));
     },
