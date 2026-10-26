@@ -160,7 +160,7 @@ export async function serveContextReceipt(
     payload.context_receipt = publicReceipt;
     // Preserve compact JSON when the original output was minified.
     rendered = `${JSON.stringify(payload, null, output.trim().includes("\n") ? 2 : 0)}\n`;
-    receipt.protocol_tokens = Math.ceil((rendered.length - output.length) / 4);
+    receipt.protocol_tokens = Math.max(0, Math.ceil((rendered.length - output.length) / 4));
     publicReceipt.protocol_tokens = receipt.protocol_tokens;
     rendered = `${JSON.stringify(payload, null, output.trim().includes("\n") ? 2 : 0)}\n`;
   } else {
@@ -177,7 +177,7 @@ export async function serveContextReceipt(
       return `${line} [${fact.id}]`;
     });
     rendered = `${lines.join("\n")}\n\nContext receipt: ${receipt.receipt_id}; session: ${receipt.session}; protocol: ${receipt.protocol}\n`;
-    receipt.protocol_tokens = Math.ceil((rendered.length - output.length) / 4);
+    receipt.protocol_tokens = Math.max(0, Math.ceil((rendered.length - output.length) / 4));
   }
   await withReceiptStore(pmRoot, (directory) => {
     const path = join(directory, `${receipt.receipt_id}.json`);

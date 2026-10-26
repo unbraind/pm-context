@@ -1,0 +1,33 @@
+id: pm-context-json-estimates
+title: Saved acquisition plans retain numeric estimates through JSON round trips
+description: "Review finding from PR #176: accepted signed-zero estimates survive in memory but serialize as positive zero, causing saved-plan validation to disagree. Audit package plan and estimate producers and canonicalize numeric output boundaries."
+type: Issue
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-10-26T08:28:29.422Z"
+updated_at: "2026-10-26T09:21:56.824Z"
+author: codex-agent
+acceptance_criteria: "All emitted acquisition packet and plan numbers are finite bounded integers with positive zero; Seeded random plans survive JSON stringify/parse with Object.is-equal numbers and command --check succeeds; Regression fails with only implementation reverted and proof is recorded; Targeted tests, typecheck, available lint and npm plus Bun CI release gates pass"
+comments[7]{created_at,author,text}:
+  "2026-10-26T08:28:34.891Z",codex-agent,"No duplicate open item found. Preserve strict saved-plan comparison. Normalize canonical packet estimates and every numeric plan field at SDK return and JSON/TOON encoder boundaries; reject nonfinite, fractional and out-of-range plan values. Audit other package estimate producers for caller-number passthrough. Do not change dependency pins or release thresholds."
+  "2026-10-26T08:32:54.955Z",codex-agent,"Package-wide audit: acquisition SDK packet/plan outputs and JSON/TOON encoders now canonicalize every declared numeric field. index.ts projection estimates derive from bounded string lengths and positive sums; evidence-packing.ts byte/count outputs derive from bounded byte sizes and cardinalities. Found and fixed another affected estimate producer: receipt protocol overhead could round to signed zero or become negative after JSON whitespace compaction. Clamp derived overhead to zero for JSON and text. Receipt reports sum validated nonnegative estimates from a positive-zero accumulator. Added real installed CLI saved-plan checks for both signed-zero estimate fields."
+  "2026-10-26T08:34:11.997Z",codex-agent,"Behavioral revert proof: replaced only next-evidence.ts and context-receipts.ts with their HEAD implementations, kept all new tests unchanged, and rebuilt dist. Command: node --test --test-name-pattern=\"receipt estimates|500 random plans|every numeric plan field\" test/context-receipts.test.ts test/next-evidence.test.ts. Reverted result: exit 1, 0 passed and 3 failed (signed-zero receipt, signed-zero packet/plan property, missing numeric-bound refusal). Restored implementations and rebuilt: exit 0, 3 passed and 0 failed. Strict persisted-plan comparison is unchanged."
+  "2026-10-26T08:35:10.014Z",codex-agent,"Local verification passed: npm run build && npm run build:test && node --test test/next-evidence.test.ts test/context-receipts.test.ts (19 passed, 0 failed); npm run typecheck; npm run docstring (15 files, 54 declarations); git diff --check. No separate lint script or linter configuration exists; the repository docstring gate is its configured source lint check. Full npm and Bun release gates will run in CI at unchanged thresholds. Linked test execution succeeded; result tracking is disabled by project policy, so results are recorded here."
+  "2026-10-26T08:36:55.548Z",codex-agent,"Changelog regeneration/check passed. Strict health with merge drivers passed using a fresh temporary home and isolated Git identity. Ambient host health reports global pm-github host skew (pinned host 2026.10.23 versus extension 2026.10.25), already covered by pm-context-595f; no dependency, telemetry or history repair changes made. Existing provenance advisory remains non-gating."
+  "2026-10-26T08:37:55.522Z",codex-agent,"Implementation and regressions committed as c01d0ae. Ready-for-review PR: https://github.com/unbraind/pm-context/pull/183 . Full npm and Bun release gates on Node 22 and 26 are tracked at https://github.com/unbraind/pm-context/pull/183/checks . Local evidence and behavioral revert proof are complete. Release the claim for orchestrator handoff while the item remains in progress; do not close or merge."
+  "2026-10-26T09:21:56.824Z",codex-agent,"CI passed at e12cf46775042d01edb9e3067b78659ee449a99e: https://github.com/unbraind/pm-context/actions/runs/40293642180 . Node 22 and Node 26 each passed npm run release:check and bun run release:check: 414 tests passed, 0 failed in every gate. All configured source coverage thresholds passed unchanged; c8 aggregate was 100 percent statements, 99.95 percent branches, 100 percent functions and 100 percent lines. Both jobs also passed tracker health, committed-build drift and changelog checks. This final evidence-only tracker update will be committed and its CI checked before handoff. Item remains unclosed and claim released."
+files[6]{path,scope}:
+  context-receipts.ts,project
+  evidence-packing.ts,project
+  index.ts,project
+  next-evidence.ts,project
+  test/context-receipts.test.ts,project
+  test/next-evidence.test.ts,project
+tests[2]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  "npm run build && npm run build:test && node --test test/next-evidence.test.ts test/context-receipts.test.ts",project,180,codex-agent,"2026-10-26T08:32:56.485Z",local_mutation,fix/negative-zero-estimates
+  npm run typecheck && npm run docstring,project,180,codex-agent,"2026-10-26T08:35:04.390Z",local_mutation,fix/negative-zero-estimates
+docs[2]{path,scope}:
+  docs/next-evidence.md,project
+  README.md,project
+body: ""

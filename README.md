@@ -251,6 +251,8 @@ The JSON report adds `bundles`, with `totals`, `sessions`, `items`, and `receipt
   These are estimates, not tokenizer measurements, billing, or cognitive-use proof.
 - `protocol_tokens` separately estimates receipt/annotation overhead; headings,
   generated clocks and other framing are outside the fact-cost denominator.
+  Overhead is a nonnegative integer, clamped to positive zero when rendering
+  removes whitespace so JSON round trips preserve the estimate.
 - `unused_fact_ids` identifies unused facts in each detailed receipt. Aggregate
   metrics are computed before `--limit` truncates the detail arrays.
 
