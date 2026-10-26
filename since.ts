@@ -1,3 +1,5 @@
+import { buildSuggestedCommand } from "./suggested-command.ts";
+import type { SuggestedCommand } from "./suggested-command.ts";
 /** Resumable delta serving; SDK history remains the only durable event authority. */
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -19,8 +21,9 @@ export class SinceError extends PmCliError {
   remedy: string;
   /** Host usage-error status, also understood by direct SDK callers. */
   declare readonly exitCode: 2;
-  constructor(code: string, remedy: string) {
-    super(`${code}: ${remedy}`, 2, { code, nextSteps: [remedy] });
+  constructor(code: string, remedy: string, retryArgv?: string[]) {
+    const retry = retryArgv === undefined ? undefined : buildSuggestedCommand(retryArgv);
+    super(`${code}: ${remedy}`, 2, { code, nextSteps: [remedy], ...(retry ? { recovery: { suggested_retry: retry.command, suggested_retry_args: retry.argv } } : {}) });
     this.remedy = remedy;
   }
 }
@@ -84,6 +87,8 @@ export interface SincePack {
     deferred_own_claims: number;
     excerpt_omitted_chars: number;
     remedy: string;
+    /** Executable alternatives for complete comments/history. */
+    commands: SuggestedCommand[];
   };
   budget: { ceiling: number; token_upper_bound: number; unit: "utf8-bytes" };
 }
@@ -175,7 +180,7 @@ function validatePrefixes(streams: Event[][], previous: StreamFingerprint[]): st
     const stream = current.get(prefix.id);
     if (!stream || stream.length < prefix.count || digest(stream.slice(0, prefix.count).map((event) => event.key)) !== prefix.hash) {
       if (stream?.[0]?.op === "history_compact_baseline") { compacted.push(prefix.id); continue; }
-      throw new SinceError("HISTORY_EXPIRED", "Retained history changed or was pruned. Reorient with pm context --for handoff, then restart with --from <ISO timestamp>.");
+      throw new SinceError("HISTORY_EXPIRED", "Retained history changed or was pruned. Reorient using the structured retry, then restart with an explicit ISO timestamp.", ["pm", "context", "--for", "handoff"]);
     }
   }
   return compacted;
@@ -557,7 +562,7 @@ export async function buildSincePack(pmRoot: string, items: PmItem[], terminal: 
   }
   const pack: SincePack = {
     protocol: "pm-context-since/v1", cursor: `s1_${"0".repeat(64)}`, served_at: servedAt, restart_from: restartFrom, changes: [],
-    omission_receipt: { ...receipt, deferred_rows: rows.length, deferred_own_claims: rows.filter((row) => row.op === "own_claim").length, excerpt_omitted_chars: 0, remedy: "Resume --cursor for deferred rows; pm comments <id> or pm history <id> --full for complete excerpts and patches." },
+    omission_receipt: { ...receipt, deferred_rows: rows.length, deferred_own_claims: rows.filter((row) => row.op === "own_claim").length, excerpt_omitted_chars: 0, remedy: "Resume with the cursor for deferred rows; use the structured commands for complete excerpts and patches.", commands: [buildSuggestedCommand(["pm", "comments", "--help"]), buildSuggestedCommand(["pm", "history", "--help"])] },
     budget: { ceiling: options.tokenBudget, token_upper_bound: 0, unit: "utf8-bytes" },
   };
   const included = packSinceRows(pack, rows);

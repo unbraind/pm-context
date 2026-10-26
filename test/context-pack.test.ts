@@ -91,7 +91,7 @@ test("extension has required shape", () => {
 });
 
 test("activate registers context-pack command", async () => {
-  assert.deepEqual(await registeredCommands(), ["context-pack", "context-next-evidence", "context-evidence", "context-witnesses", "context-freshness record", "context-freshness resume", "context-pack since", "context-handoff", "context-usage"]);
+  assert.deepEqual(await registeredCommands(), ["context-phase", "context-pack", "context-next-evidence", "context-evidence", "context-witnesses", "context-freshness record", "context-freshness resume", "context-pack since", "context-handoff", "context-usage"]);
 });
 
 test("activate exposes selector aliases for both commands", async () => {
@@ -361,7 +361,7 @@ test("buildAgentHandoff extracts compact focus, blockers, next actions and refre
 test("buildAgentHandoff honors explicit suggested refresh command", () => {
   const handoff = buildAgentHandoff(
     buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }),
-    { suggestedCommand: "pm context-handoff --id pm-1" },
+    { suggestedArgv: ["pm", "context-handoff", "--id", "pm-1"] },
   );
   assert.equal(handoff.suggestedCommand, "pm context-handoff --id pm-1");
 });

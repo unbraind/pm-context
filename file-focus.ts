@@ -1,7 +1,8 @@
+import { buildSuggestedCommand } from "./suggested-command.ts";
 import { spawnSync } from "node:child_process";
 import { isAbsolute, join, posix, relative, win32 } from "node:path";
 import { readdir } from "node:fs/promises";
-import { getActiveExtensionRegistrations, readLocatedItem, readSettings, resolveItemTypeRegistry } from "@unbrained/pm-cli/sdk";
+import { PmCliError, getActiveExtensionRegistrations, readLocatedItem, readSettings, resolveItemTypeRegistry } from "@unbrained/pm-cli/sdk";
 import type { PmItem } from "./index.ts";
 
 /** A repository-normalized working set and reproducible refresh arguments. */
@@ -9,15 +10,18 @@ export interface FileFocus {
   root: string;
   files: string[];
   refresh: string;
+  /** Unquoted refresh flags, safe to append to a command argv. */
+  refresh_argv?: string[];
 }
 
 /** Actionable usage failure from Git discovery or path validation. */
-export class FileFocusError extends Error {
+export class FileFocusError extends PmCliError {
   readonly exitCode = 2;
-  readonly code: "NOT_GIT_REPOSITORY" | "UNKNOWN_BASE" | "GIT_FAILED" | "INVALID_FILE_FOCUS" | "TRACKER_READ_FAILED";
-  constructor(code: FileFocusError["code"], message: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "CommandError";
+  declare readonly code: "NOT_GIT_REPOSITORY" | "UNKNOWN_BASE" | "GIT_FAILED" | "INVALID_FILE_FOCUS" | "TRACKER_READ_FAILED";
+  constructor(code: FileFocusError["code"], message: string, options?: ErrorOptions, retryArgv?: string[]) {
+    const retry = retryArgv === undefined ? undefined : buildSuggestedCommand(retryArgv);
+    super(message, 2, { code, ...(retry ? { nextSteps: ["Use the structured retry after repairing the unreadable documents."], recovery: { suggested_retry: retry.command, suggested_retry_args: retry.argv } } : {}) });
+    this.cause = options?.cause;
     this.code = code;
   }
 }
@@ -46,11 +50,6 @@ export function normalizeFocusPath(value: string, root: string): string | undefi
   return path;
 }
 
-/** Quote one refresh argument without splitting spaces, commas or shell metacharacters. */
-function quote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
-
 /** Check tracker containment using repository-relative paths on native and Windows roots. */
 export function isTrackerPath(path: string, pmRoot: string, repoRoot: string): boolean {
   const tracker = normalizeFocusPath(pmRoot, repoRoot);
@@ -77,7 +76,7 @@ export function resolveFileFocus(options: Record<string, unknown>, args: string[
     : git(cwd, ["rev-parse", "--show-toplevel"])?.replace(/\n$/, "");
   if (!root) throw new FileFocusError("NOT_GIT_REPOSITORY", "File focus requires a Git working repository. Run from the repository containing the changed files.");
   const files = new Set<string>();
-  let refresh = "";
+  const refresh_argv: string[] = [];
   if (changed) {
     const base = typeof options.changed === "string" ? options.changed : args[0] ?? git(root, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"])?.trim() ?? "main";
     const commit = git(root, ["rev-parse", "--verify", "--end-of-options", `${base}^{commit}`])?.trim();
@@ -95,15 +94,16 @@ export function resolveFileFocus(options: Record<string, unknown>, args: string[
         if (!isTrackerPath(path, pmRoot, root)) files.add(path);
       }
     }
-    refresh += ` --changed ${quote(base)}`;
+    refresh_argv.push("--changed", base);
   }
   for (const path of explicit) {
     const normalized = normalizeFocusPath(path, root);
     if (normalized === undefined) throw new FileFocusError("INVALID_FILE_FOCUS", "Each --files path must be inside the Git repository. Use repository-relative paths.");
     files.add(normalized);
-    refresh += ` --files ${quote(normalized)}`;
+    refresh_argv.push("--files", normalized);
   }
-  return { root, files: [...files].sort(), refresh };
+  const refresh = ` ${buildSuggestedCommand(refresh_argv).command}`;
+  return { root, files: [...files].sort(), refresh, refresh_argv };
 }
 
 /** Match exact files and linked directory ancestors, retaining unique changed paths per item. */
@@ -125,11 +125,15 @@ export function rankFileFocus(items: PmItem[], matches: Map<string, string[]>): 
     || (a.priority ?? 2) - (b.priority ?? 2) || a.id.localeCompare(b.id));
 }
 
+/** Executable help for linking files when no target item has been chosen. */
+export function fileLinkCommand() { return buildSuggestedCommand(["pm", "files", "--help"]); }
+
 /** Render the unlinked working set with a concrete tracker-linking hint. */
 export function renderFileFocus(value: { unlinked_changed_files?: string[] }): string[] {
   if (!value.unlinked_changed_files) return [];
   return ["", "unlinked_changed_files:", ...value.unlinked_changed_files.map((path) => `- ${JSON.stringify(path)}`),
-    "Link relevant paths with: pm files <id> --add path=<path>"];
+    `Choose a target item and consult file-linking help: ${fileLinkCommand().command}`,
+    `argv: ${JSON.stringify(fileLinkCommand().argv)}`];
 }
 
 /** Enumerate all registered item folders through the canonical SDK parser without creating metadata caches. */
@@ -159,6 +163,6 @@ export async function readFileFocusItems(pmRoot: string): Promise<PmItem[]> {
     return [...items.values()];
   } catch (error) {
     const detail = String(error);
-    throw new FileFocusError("TRACKER_READ_FAILED", `Cannot completely read tracker items at ${itemPath}: ${detail}. Run pm validate and resolve unreadable or duplicate documents before retrying file focus.`, { cause: error });
+    throw new FileFocusError("TRACKER_READ_FAILED", `Cannot completely read tracker items at ${itemPath}: ${detail}. Resolve unreadable or duplicate documents before retrying file focus.`, { cause: error }, ["pm", "validate"]);
   }
 }

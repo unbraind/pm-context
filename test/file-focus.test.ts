@@ -202,8 +202,8 @@ test("changed uses committed branch edits, index, worktree and untracked paths w
       assert.match(output, /matched_files: src\/one.ts/);
       assert.match(output, /unlinked_changed_files:/);
       assert.match(output, /unlinked.ts/);
-      assert.match(output, /pm files <id> --add/);
-      if (format !== "markdown" && !explain) assert.match(output, /--changed 'main'/);
+      assert.match(output, /pm files --help/);
+      if (format !== "markdown" && !explain) assert.match(output, /--changed main/);
     }
   }
   const explained = JSON.parse(f.run("--changed", "main", "--format", "json", "--explain")) as { entries: { id: string; matched_files: string[] }[]; unlinked_changed_files: string[] };
@@ -226,7 +226,7 @@ test("explicit repeated files preserve commas and spaces, combine with status an
   assert.match(filteredRefresh, /--status in_progress --type Task --tag example/);
   const idRefresh = f.run("--files", "src/one.ts", "--id", f.one, "--format", "agent");
   assert.match(idRefresh, /--id focus-one/);
-  assert.match(refresh, /--files 'src\/one.ts'/);
+  assert.match(refresh, /--files src\/one.ts/);
 });
 
 test("linked directories rank by unique overlap before status and priority and preserve neighborhoods and budgets", async (t) => {
@@ -265,7 +265,7 @@ test("default base honors origin/HEAD, falls back to main and finds changes from
   git(f.root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk");
   assert.deepEqual(resolveFileFocus({ changed: true }, [], join(f.root, "src"), f.pmRoot)!.files, []);
   const refresh = f.run("--changed", "--format", "agent");
-  assert.match(refresh, /--changed 'origin\/trunk'/);
+  assert.match(refresh, /--changed origin\/trunk/);
   assert.doesNotMatch(refresh, /refs\/remotes/);
   assert.deepEqual(resolveFileFocus({ changed: "main" }, [], f.root, f.pmRoot)!.files, ["src/one.ts"]);
 });

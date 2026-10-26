@@ -433,6 +433,130 @@ model proposals remain unchecked. The command performs no edits or model calls.
 The SDK exports `checkContextWitnesses`, packet parsing and encoding, and typed
 `WitnessError` refusals. See the [packet example and SDK contract](docs/witnesses.md).
 
+## Safe suggested commands
+
+Every generated command starts as argv and uses `buildSuggestedCommand` with one
+`quotePosixArgument` renderer. Plain tokens such as `title` remain readable;
+spaces, quotes, operators, substitutions, backticks and control characters are
+single-quoted, with embedded apostrophes escaped as `'\''`. Empty arguments are
+preserved; NUL bytes and malformed Unicode refuse because UTF-8 argv cannot
+represent them exactly. Commands are bounded to 4,096 arguments and 262,144 JSON bytes.
+
+JSON and TOON phase packets pair `restore_with` with `restore_argv` for supported
+field projections, derived from SDK `listGetProjectionFields`, metadata-only
+`listListProjectionFields` and the current runtime field registry. The core-only
+get/list difference identifies reserved derived meanings before runtime fields
+are added. Registering a field named `notes_count`, `linked` or another derived
+selector never makes that selector restore the raw stored metadata value. Unsupported keys carry `restore_unavailable` with code
+`UNSUPPORTED_FIELD_PROJECTION` and a reason; neither command field is emitted.
+Restorations request JSON so empty collections remain visible. Pack `refresh_command`, `link_command`, delta receipt
+`commands`, and `session_restore` use `{command, argv}`. Handoffs pair
+`suggestedCommand` with `suggestedArgv`. Typed refusal recovery pairs SDK
+`suggested_retry` with `suggested_retry_args`. Execute the array without a shell;
+the string is a POSIX display, not an independent source of arguments.
+
+```ts
+import { buildSuggestedCommand, commandExamples } from "pm-context";
+
+const suggestion = buildSuggestedCommand([
+  "pm", "get", "project-task", "--fields", "title",
+]);
+// suggestion.command: pm get project-task --fields title
+// suggestion.argv: ["pm", "get", "project-task", "--fields", "title"]
+const examples = commandExamples(); // fresh {command, argv} examples for help
+```
+
+Direct SDK handoff overrides now use `suggestedArgv`; free-form
+`suggestedCommand` overrides refuse instead of guessing shell syntax. File-focus
+refreshes append `refresh_argv`, never display fragments. Static host help
+examples use the same structured builder. Suggestions are not executed by this package. File-linking and delta help
+commands use executable `--help` calls until the caller chooses a target. Static
+help examples use illustrative item IDs; replace those IDs in argv and rebuild
+the display. The generic builder guarantees argv fidelity, not that arbitrary
+caller-supplied arguments are valid for a CLI command.
+
+## Task-phase context contracts
+
+`context-phase` binds mandatory top-level tracker fields to **investigation**,
+**implementation**, **review** and **handoff**. It returns every selected field
+losslessly or refuses the entire request with a typed code and remedy. Selecting
+a phase grants no authority, changes no status and executes no linked tests.
+
+```sh
+pm context-phase --packet docs/examples/task-phase.json --format toon
+pm context-phase --packet docs/examples/task-phase.json --phase review --previous-phase investigation --format json
+```
+
+Replace the example item id with a real tracker id. All four contracts are
+required; each has 1–32 unique field names and applies to every selected item.
+Mandatory means **present**, so explicit null, empty strings and empty arrays
+are retained. Missing fields, unavailable sources, invalid values and inadequate
+budgets refuse with exit 2 and `next_steps`. Nothing is truncated to fit. A
+request selects 1–32 unique items, optionally restores 0–32 `include_fields`, and
+sets `byte_budget` to an integer from 512 through 262144 (default 16000). Both
+encodings include an exact `bytes` measurement of the complete UTF-8 output,
+including the newline. Unknown keys, sparse arrays, nonfinite numbers, excessive
+nesting and requests over 262144 bytes are rejected at the shared boundary.
+
+The packet explains each added, removed and retained requirement relative to
+`previous_phase` **in the same supplied contracts**. This is a requirement diff.
+It does not attest that tracker contents are unchanged since an earlier packet.
+Optional fields stay out unless selected. SDK omission receipts identify every
+omitted item/field with an exact `pm get` restoration command, including
+heterogeneous item schemas. `--include-fields docs,tests` restores these fields
+inside a packet when both are present on every selected item.
+
+```ts
+import { buildPhaseContext, encodePhaseContext } from "pm-context";
+import type { PhaseContextRequest } from "pm-context";
+
+const request: PhaseContextRequest = {
+  phase: "investigation",
+  items: ["project-task"],
+  contracts: {
+    investigation: ["title", "description"],
+    implementation: ["title", "body"],
+    review: ["title", "acceptance_criteria", "tests"],
+    handoff: ["title", "status", "body"],
+  },
+  session: { version: 1, id: "task-session", token_budget: 50000,
+    spent_tokens: 0, seen_item_ids: [] },
+};
+const initial = await buildPhaseContext(request, trackerRoot);
+const review = await buildPhaseContext({ ...request, phase: "review",
+  previous_phase: "investigation", session: initial.read_session!.next_state,
+}, trackerRoot);
+const output = encodePhaseContext(review);
+```
+
+Carry the SDK `read_session.next_state` in the next request's `session`. Each
+fact id binds the item, field and exact current SDK value. Shared unchanged
+fields reuse the SDK's `session:<session-id>:<fact-id>` references; newly required
+or changed fields arrive in full. Resolve references from earlier `facts` by id.
+`bindings` always retain item/field coordinates, the mandatory marker and native
+restoration availability. Execute a present `bindings[].restore_argv` directly;
+otherwise inspect `restore_unavailable`. Mandatory values remain in the packet
+even when no native projection exists. The legacy SDK placeholder display is
+omitted; `session_restore` only probes the concrete selected item's identity with
+`--fields id --output-budget unbounded --json`. Broad depth/full reads can
+replace stored count fields with derived counts, so field recovery is described
+exclusively by each binding. Concrete field references restore through bindings. SDK charging conservatively includes the removed legacy template;
+`bytes` exactly measures the selected JSON or TOON transport. Both ceilings
+must fit. Refusals do not advance caller state.
+
+Every call rereads the authoritative SDK document; replaying old requests or
+sessions cannot restore old tracker values. Sessions are caller-carried and
+immutable: serialize calls within a budget group. Independent callers can read
+concurrently, but a session is not a cross-process shared budget or a durable
+checkpoint. There is no import/sync writer or journaled mutation plan. The packet
+is a per-item observation rather than a transaction-wide snapshot. Item fields,
+linked metadata and history stay untouched; artifacts are not opened. The source
+reader is shared with `context-freshness` and deliberately avoids SDK cache writes.
+
+See [validation and measured public data](docs/task-phase-validation.md).
+
+`context-phase` also works in a plain tracker with no Git executable available.
+
 ## Without git
 
 Next-evidence acquisition plans, criterion evidence packs, item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a

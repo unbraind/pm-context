@@ -1,15 +1,18 @@
+import { PmCliError } from "@unbrained/pm-cli/sdk";
 import type { PmItem } from "./index.ts";
 /** A repository-normalized working set and reproducible refresh arguments. */
 export interface FileFocus {
     root: string;
     files: string[];
     refresh: string;
+    /** Unquoted refresh flags, safe to append to a command argv. */
+    refresh_argv?: string[];
 }
 /** Actionable usage failure from Git discovery or path validation. */
-export declare class FileFocusError extends Error {
+export declare class FileFocusError extends PmCliError {
     readonly exitCode = 2;
     readonly code: "NOT_GIT_REPOSITORY" | "UNKNOWN_BASE" | "GIT_FAILED" | "INVALID_FILE_FOCUS" | "TRACKER_READ_FAILED";
-    constructor(code: FileFocusError["code"], message: string, options?: ErrorOptions);
+    constructor(code: FileFocusError["code"], message: string, options?: ErrorOptions, retryArgv?: string[]);
 }
 /** Convert native or slash-separated links to safe paths relative to the repository root. */
 export declare function normalizeFocusPath(value: string, root: string): string | undefined;
@@ -21,6 +24,8 @@ export declare function resolveFileFocus(options: Record<string, unknown>, args:
 export declare function matchFileFocus(items: PmItem[], focus: FileFocus, links: (value: unknown) => string[]): Map<string, string[]>;
 /** Rank focus by unique overlap, lifecycle status, priority, then deterministic id. */
 export declare function rankFileFocus(items: PmItem[], matches: Map<string, string[]>): PmItem[];
+/** Executable help for linking files when no target item has been chosen. */
+export declare function fileLinkCommand(): import("./suggested-command.ts").SuggestedCommand;
 /** Render the unlinked working set with a concrete tracker-linking hint. */
 export declare function renderFileFocus(value: {
     unlinked_changed_files?: string[];

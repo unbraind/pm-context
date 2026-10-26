@@ -1,3 +1,8 @@
+import type { SuggestedCommand } from "./suggested-command.ts";
+export { buildSuggestedCommand, buildRestoreCommand, quotePosixArgument } from "./suggested-command.ts";
+export type { SuggestedCommand, SuggestedRestore } from "./suggested-command.ts";
+export { buildPhaseContext, encodePhaseContext, parsePhaseContextRequest, readPhaseContextJson, PhaseContextError, TASK_PHASES } from "./task-phase.ts";
+export type { TaskPhase, PhaseContextRequest, PhaseContextPacket, PhaseFieldBinding, PhaseFieldRestoration, PhaseFieldFact, PhaseFieldChange } from "./task-phase.ts";
 export { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
 export type { EvidenceRead, NextEvidencePacket, NextEvidenceStep, NextEvidencePlan } from "./next-evidence.ts";
 export { packCriterionEvidence, encodeEvidencePack, parseEvidencePacket, readEvidencePacket, EvidencePackingError } from "./evidence-packing.ts";
@@ -189,6 +194,10 @@ export interface ContextPack {
         kind: string;
     }>;
     unlinked_changed_files?: string[];
+    /** Literal argv template for attaching a file link. */
+    link_command?: SuggestedCommand;
+    /** Native argv and POSIX display for command-owned JSON packets. */
+    refresh_command?: SuggestedCommand;
     deps?: ContextPackDepInfo[];
 }
 export interface AgentHandoff {
@@ -235,7 +244,11 @@ export interface AgentHandoff {
     }>;
     deps?: ContextPackDepInfo[];
     unlinked_changed_files?: string[];
+    /** Literal argv template for attaching a file link. */
+    link_command?: SuggestedCommand;
     suggestedCommand: string;
+    /** Execute this array directly instead of evaluating suggestedCommand. */
+    suggestedArgv: string[];
 }
 export interface SelectionOptions {
     ids: string[];
@@ -269,6 +282,9 @@ export declare function validateSections(format: "markdown" | "agent" | "json", 
 export declare function resolveSelectionOptions(options: Record<string, unknown>, defaults?: {
     fallbackStatus?: string;
 }): SelectionOptions;
+/** Build a refresh argv before applying any display quoting. */
+export declare function buildSuggestedAgentCommandArgv(input: SuggestedAgentCommandInput): string[];
+/** Render the refresh argv with the shared POSIX argument quoting policy. */
 export declare function buildSuggestedAgentCommand(input: SuggestedAgentCommandInput): string;
 export declare function sortContextItems(items: PmItem[]): PmItem[];
 export declare function extractRelationships(item: PmItem): Array<{
@@ -281,12 +297,14 @@ export declare function markdownEscape(value: unknown): string;
 export declare function renderMarkdown(pack: ContextPack, options?: RenderOptions): string;
 export declare function buildAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
-    suggestedCommand?: string;
+    suggestedArgv?: string[];
+    suggestedCommand?: never;
     relationshipRegistry?: RelationshipKindRegistry;
 }): AgentHandoff;
 export declare function renderAgentHandoff(pack: ContextPack, options?: {
     recentLimit?: number;
-    suggestedCommand?: string;
+    suggestedArgv?: string[];
+    suggestedCommand?: never;
     sections?: string[];
     compress?: boolean;
     relationshipRegistry?: RelationshipKindRegistry;
@@ -370,6 +388,8 @@ export interface ContextExplainReport {
     available_signals: readonly string[];
     entries: ContextExplainEntry[];
     unlinked_changed_files?: string[];
+    /** Literal argv template for attaching a file link. */
+    link_command?: SuggestedCommand;
 }
 /**
  * Build the `--explain` report from the SDK relevance model for the emitted
@@ -387,6 +407,8 @@ export declare function buildContextExplain(items: readonly PmItem[], options: S
 export declare function renderContextExplain(report: ContextExplainReport, options?: {
     compress?: boolean;
 }): string;
+/** Return fresh structured examples for SDK/JSON/TOON callers and host help registration. */
+export declare function commandExamples(): Record<"context-pack" | "context-handoff" | "context-usage", SuggestedCommand[]>;
 /** Register context commands and renderers with checked host behavior and package metadata. */
 declare const _default: {
     name: string;

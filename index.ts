@@ -1,3 +1,11 @@
+import { buildSuggestedCommand } from "./suggested-command.ts";
+import type { SuggestedCommand } from "./suggested-command.ts";
+export { buildSuggestedCommand, buildRestoreCommand, quotePosixArgument } from "./suggested-command.ts";
+export type { SuggestedCommand, SuggestedRestore } from "./suggested-command.ts";
+import { buildPhaseContext, encodePhaseContext, readPhaseContextJson, PhaseContextError } from "./task-phase.ts";
+import type { PhaseContextRequest } from "./task-phase.ts";
+export { buildPhaseContext, encodePhaseContext, parsePhaseContextRequest, readPhaseContextJson, PhaseContextError, TASK_PHASES } from "./task-phase.ts";
+export type { TaskPhase, PhaseContextRequest, PhaseContextPacket, PhaseFieldBinding, PhaseFieldRestoration, PhaseFieldFact, PhaseFieldChange } from "./task-phase.ts";
 import { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
 export { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
 export type { EvidenceRead, NextEvidencePacket, NextEvidenceStep, NextEvidencePlan } from "./next-evidence.ts";
@@ -15,7 +23,7 @@ import { buildSincePack, encodeSincePack } from "./since.ts";
 import type { ExtensionModule } from "@unbrained/pm-cli/sdk/authoring";
 import { writeFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
-import { resolveFileFocus, matchFileFocus, rankFileFocus, renderFileFocus, readFileFocusItems } from "./file-focus.ts";
+import { resolveFileFocus, matchFileFocus, rankFileFocus, renderFileFocus, fileLinkCommand, readFileFocusItems } from "./file-focus.ts";
 import type { FileFocus } from "./file-focus.ts";
 import type {
   CommandHandlerContext,
@@ -230,6 +238,10 @@ export interface ContextPack {
   links: Array<{ itemId: string; kind: "doc" | "file"; value: string }>;
   relationships: Array<{ from: string; to: string; kind: string }>;
   unlinked_changed_files?: string[];
+  /** Literal argv template for attaching a file link. */
+  link_command?: SuggestedCommand;
+  /** Native argv and POSIX display for command-owned JSON packets. */
+  refresh_command?: SuggestedCommand;
   deps?: ContextPackDepInfo[];
 }
 
@@ -250,7 +262,11 @@ export interface AgentHandoff {
   links: Array<{ itemId: string; kind: "doc" | "file"; value: string }>;
   deps?: ContextPackDepInfo[];
   unlinked_changed_files?: string[];
+  /** Literal argv template for attaching a file link. */
+  link_command?: SuggestedCommand;
   suggestedCommand: string;
+  /** Execute this array directly instead of evaluating suggestedCommand. */
+  suggestedArgv: string[];
 }
 
 export interface SelectionOptions {
@@ -371,11 +387,6 @@ function intOptionMin0(options: Record<string, unknown>, keys: string[], fallbac
   return fallback;
 }
 
-function shellQuote(value: string): string {
-  if (/^[A-Za-z0-9._/:=,-]+$/.test(value)) return value;
-  return `'${value.replace(/'/g, "'\\''")}'`;
-}
-
 export function resolveSelectionOptions(
   options: Record<string, unknown>,
   defaults: { fallbackStatus?: string } = {},
@@ -394,18 +405,19 @@ export function resolveSelectionOptions(
 function idSelectorArgs(ids: string[]): string[] {
   const normalizedIds = Array.from(new Set(ids.map((id) => id.trim()).filter(Boolean)));
   if (normalizedIds.length === 0) return [];
-  if (normalizedIds.length === 1) return ["--id", shellQuote(normalizedIds[0])];
-  return ["--ids", shellQuote(normalizedIds.join(","))];
+  if (normalizedIds.length === 1) return ["--id", normalizedIds[0]];
+  return ["--ids", normalizedIds.join(",")];
 }
 
-export function buildSuggestedAgentCommand(input: SuggestedAgentCommandInput): string {
+/** Build a refresh argv before applying any display quoting. */
+export function buildSuggestedAgentCommandArgv(input: SuggestedAgentCommandInput): string[] {
   const args: string[] = ["pm", input.commandName];
   if (input.selection.ids.length > 0) {
     args.push(...idSelectorArgs(input.selection.ids));
   } else {
-    if (input.selection.status) args.push("--status", shellQuote(input.selection.status));
-    if (input.selection.type) args.push("--type", shellQuote(input.selection.type));
-    if (input.selection.tag) args.push("--tag", shellQuote(input.selection.tag));
+    if (input.selection.status) args.push("--status", input.selection.status);
+    if (input.selection.type) args.push("--type", input.selection.type);
+    if (input.selection.tag) args.push("--tag", input.selection.tag);
   }
   if (input.includeFormatFlag) args.push("--format", "agent");
   if (input.limit !== input.defaultLimit) args.push("--limit", String(input.limit));
@@ -415,14 +427,19 @@ export function buildSuggestedAgentCommand(input: SuggestedAgentCommandInput): s
   if (input.compress) args.push("--compress");
   if (typeof input.maxItems === "number" && input.maxItems > 0) args.push("--max-items", String(input.maxItems));
   if (input.sections && input.sections.length > 0) {
-    for (const section of input.sections) args.push("--section", shellQuote(section));
+    for (const section of input.sections) args.push("--section", section);
   }
   if (!input.neighborhood) {
     args.push("--without-neighborhood");
   } else if (input.neighborhoodDepth !== 1) {
     args.push("--neighborhood-depth", String(input.neighborhoodDepth));
   }
-  return args.join(" ");
+  return buildSuggestedCommand(args).argv;
+}
+
+/** Render the refresh argv with the shared POSIX argument quoting policy. */
+export function buildSuggestedAgentCommand(input: SuggestedAgentCommandInput): string {
+  return buildSuggestedCommand(buildSuggestedAgentCommandArgv(input)).command;
 }
 
 function normalizeText(value: unknown): string {
@@ -656,7 +673,7 @@ export function buildContextPack(allItems: PmItem[], options: ContextPackOptions
       byStatus,
       byType,
     },
-    ...(fileMatches ? { unlinked_changed_files: options.fileFocus!.files.filter((file) => ![...fileMatches.values()].some((matches) => matches.includes(file))) } : {}),
+    ...(fileMatches ? { unlinked_changed_files: options.fileFocus!.files.filter((file) => ![...fileMatches.values()].some((matches) => matches.includes(file))), link_command: fileLinkCommand() } : {}),
     items: packItems,
     neighbors: packNeighbors,
     links: buildLinks(selectedAndNeighbors),
@@ -776,7 +793,7 @@ function updatedTimestamp(item: PmItem): number {
 
 export function buildAgentHandoff(
   pack: ContextPack,
-  options: { recentLimit?: number; suggestedCommand?: string; relationshipRegistry?: RelationshipKindRegistry } = {},
+  options: { recentLimit?: number; suggestedArgv?: string[]; suggestedCommand?: never; relationshipRegistry?: RelationshipKindRegistry } = {},
 ): AgentHandoff {
   const allVisible = [...pack.items, ...pack.neighbors];
   const focusIds = new Set(pack.items.map((item) => item.id));
@@ -809,10 +826,11 @@ export function buildAgentHandoff(
           ? `priority ${item.priority}`
           : "selected focus item",
     }));
+  if (Object.hasOwn(options, "suggestedCommand")) throw new CommandError("Supply suggestedArgv instead of a free-form suggestedCommand shell string.", EXIT_CODE.USAGE);
   const ids = pack.items.map((item) => item.id).join(",");
-  const suggestedCommand = normalizeText(options.suggestedCommand) || (ids
-    ? `pm context-pack --id ${ids} --format agent`
-    : "pm context-pack --status in_progress --format agent");
+  const suggestion = buildSuggestedCommand(options.suggestedArgv ?? (ids
+    ? ["pm", "context-pack", "--id", ids, "--format", "agent"]
+    : ["pm", "context-pack", "--status", "in_progress", "--format", "agent"]));
   const recentLimit = options.recentLimit ?? 5;
   const recent = [...allVisible]
     .filter((item) => !isClosedStatus(itemStatus(item)))
@@ -848,14 +866,15 @@ export function buildAgentHandoff(
     recent,
     links: pack.links.slice(0, 12),
     deps: pack.deps,
-    ...(pack.unlinked_changed_files ? { unlinked_changed_files: pack.unlinked_changed_files } : {}),
-    suggestedCommand,
+    ...(pack.unlinked_changed_files ? { unlinked_changed_files: pack.unlinked_changed_files, link_command: fileLinkCommand() } : {}),
+    suggestedCommand: suggestion.command,
+    suggestedArgv: suggestion.argv,
   };
 }
 
 export function renderAgentHandoff(
   pack: ContextPack,
-  options: { recentLimit?: number; suggestedCommand?: string; sections?: string[]; compress?: boolean; relationshipRegistry?: RelationshipKindRegistry } = {},
+  options: { recentLimit?: number; suggestedArgv?: string[]; suggestedCommand?: never; sections?: string[]; compress?: boolean; relationshipRegistry?: RelationshipKindRegistry } = {},
 ): string {
   const handoff = buildAgentHandoff(pack, options);
   const sectionFilter = options.sections?.map((s) => s.toLowerCase());
@@ -948,7 +967,7 @@ export function renderAgentHandoff(
   }
 
   if (include("refresh")) {
-    lines.push("", "## Refresh", "", `\`${handoff.suggestedCommand}\``, "");
+    lines.push("", "## Refresh", "", `\`${handoff.suggestedCommand}\``, `argv: ${JSON.stringify(handoff.suggestedArgv)}`, "");
   }
 
   let output = `${lines.join("\n")}\n`;
@@ -1177,6 +1196,8 @@ export interface ContextExplainReport {
   available_signals: readonly string[];
   entries: ContextExplainEntry[];
   unlinked_changed_files?: string[];
+  /** Literal argv template for attaching a file link. */
+  link_command?: SuggestedCommand;
 }
 
 /**
@@ -1338,7 +1359,68 @@ async function measureContextOutput(ctx: CommandHandlerContext, pack: ContextPac
   }
 }
 
+/** Return fresh structured examples for SDK/JSON/TOON callers and host help registration. */
+export function commandExamples(): Record<"context-pack" | "context-handoff" | "context-usage", SuggestedCommand[]> {
+  return {
+    "context-pack": [
+      buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--include-body", "--output", "context.md"]),
+      buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--format", "agent"]),
+      buildSuggestedCommand(["pm", "context-pack", "--ids", "pm-1234,pm-5678", "--state", "blocked", "--format", "compact"]),
+      buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--format", "compact", "--recent", "8"]),
+      buildSuggestedCommand(["pm", "context-pack", "--status", "in_progress", "--tag", "release", "--format", "json"]),
+      buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--compress", "--format", "json"]),
+      buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--format", "agent", "--include-deps", "--section", "focus", "--section", "blockers"]),
+      buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--max-items", "10"]),
+      buildSuggestedCommand(["pm", "context-pack", "--status", "in_progress", "--explain"]),
+    ],
+    "context-handoff": [
+      buildSuggestedCommand(["pm", "context-handoff", "--id", "pm-1234"]),
+      buildSuggestedCommand(["pm", "context-handoff", "--ids", "pm-1234,pm-5678", "--state", "blocked"]),
+      buildSuggestedCommand(["pm", "context-handoff", "--status", "blocked", "--recent", "8"]),
+      buildSuggestedCommand(["pm", "context-handoff", "--tag", "release", "--without-neighborhood"]),
+      buildSuggestedCommand(["pm", "context-handoff", "--id", "pm-1234", "--format", "json"]),
+      buildSuggestedCommand(["pm", "context-handoff", "--id", "pm-1234", "--compress", "--include-deps"]),
+    ],
+    "context-usage": [
+      buildSuggestedCommand(["pm", "context-usage"]),
+      buildSuggestedCommand(["pm", "context-usage", "--format", "json"]),
+      buildSuggestedCommand(["pm", "context-usage", "--surface", "next", "--since", "7d"]),
+      buildSuggestedCommand(["pm", "context-usage", "--by", "agent-a", "--limit", "50"]),
+    ],
+  };
+}
+
+/** Register commands with structured help and argv-first refresh suggestions. */
 function setupCommands(api: ExtensionApi): void {
+  api.registerCommand({
+    name: "context-phase",
+    description: "Preserve mandatory task-phase fields or refuse; explain changes and reuse SDK session facts.",
+    flags: [
+      { long: "--packet", value_name: "file", description: "JSON request with four phase contracts and selected item ids", type: "string" },
+      { long: "--phase", value_name: "phase", description: "Override phase: investigation, implementation, review or handoff", type: "string" },
+      { long: "--previous-phase", value_name: "phase", description: "Compare requirements against this phase in the same contract", type: "string" },
+      { long: "--include-fields", value_name: "fields", description: "Restore comma-separated optional top-level fields", type: "string" },
+      { long: "--byte-budget", value_name: "n", description: "Complete transport byte ceiling, 512-262144 (default 16000)", type: "string" },
+      { long: "--format", value_name: "format", description: "toon (default) or json", type: "string" },
+    ],
+    async run(ctx: CommandHandlerContext) {
+      const path = stringOption(ctx.options, "packet");
+      if (!path || ctx.args.length) throw new PhaseContextError("INVALID_REQUEST", "Supply --packet JSON without positional arguments.");
+      const input = readPhaseContextJson(path);
+      if (input === null || typeof input !== "object" || Array.isArray(input)) throw new PhaseContextError("INVALID_REQUEST", "Supply a JSON object with phase, contracts and items.");
+      const overrides: Record<string, unknown> = {};
+      for (const [option, camel, key] of [["phase", "phase", "phase"], ["previous-phase", "previousPhase", "previous_phase"], ["format", "format", "format"]]) {
+        const value = Object.hasOwn(ctx.options, option) ? ctx.options[option] : ctx.options[camel];
+        if (value !== undefined) overrides[key] = value;
+      }
+      const fields = Object.hasOwn(ctx.options, "include-fields") ? ctx.options["include-fields"] : ctx.options.includeFields;
+      if (fields !== undefined) overrides.include_fields = typeof fields === "string" ? fields.split(",") : fields;
+      const budget = Object.hasOwn(ctx.options, "byte-budget") ? ctx.options["byte-budget"] : ctx.options.byteBudget;
+      if (budget !== undefined) overrides.byte_budget = typeof budget === "string" && budget.trim() ? Number(budget) : budget;
+      if (ctx.global.json && overrides.format === undefined) overrides.format = "json";
+      return renderedCommandResult(encodePhaseContext(await buildPhaseContext({ ...input, ...overrides } as unknown as PhaseContextRequest, ctx.pm_root)));
+    },
+  });
   const contextPackDefaultLimit = 25;
   const contextHandoffDefaultLimit = 12;
   const defaultRecentLimit = 5;
@@ -1346,17 +1428,7 @@ function setupCommands(api: ExtensionApi): void {
     name: "context-pack",
     description: "Generate a durable pm context pack for handoffs and reviews.",
     intent: "turn selected pm work into portable context",
-    examples: [
-      "pm context-pack --id pm-1234 --include-body --output context.md",
-      "pm context-pack --id pm-1234 --format agent",
-      "pm context-pack --ids pm-1234,pm-5678 --state blocked --format compact",
-      "pm context-pack --id pm-1234 --format compact --recent 8",
-      "pm context-pack --status in_progress --tag release --format json",
-      "pm context-pack --id pm-1234 --compress --format json",
-      "pm context-pack --id pm-1234 --format agent --include-deps --section focus --section blockers",
-      "pm context-pack --id pm-1234 --max-items 10",
-      "pm context-pack --status in_progress --explain",
-    ],
+    examples: commandExamples()["context-pack"].map((example) => example.command),
     arguments: [{ name: "base", required: false, description: "Git base for --changed (defaults to origin/HEAD, then main)" }],
     flags: [
       { long: "--changed", description: "Focus linked files changed from an optional Git base, including working changes", type: "boolean" },
@@ -1442,6 +1514,7 @@ function setupCommands(api: ExtensionApi): void {
           }));
           explainReport.available_signals = ["file_overlap", "status", "priority"];
           explainReport.unlinked_changed_files = pack.unlinked_changed_files;
+          explainReport.link_command = fileLinkCommand();
           explainReport.model = "file_overlap_status_priority";
         }
         const output = format === "json"
@@ -1454,7 +1527,7 @@ function setupCommands(api: ExtensionApi): void {
         }
         return renderedCommandResult(output);
       }
-      let suggestedCommand = buildSuggestedAgentCommand({
+      const suggestedArgv = buildSuggestedAgentCommandArgv({
         commandName: "context-pack",
         selection,
         limit,
@@ -1471,14 +1544,15 @@ function setupCommands(api: ExtensionApi): void {
         sections: sections.length > 0 ? sections : undefined,
       });
       if (fileFocus) {
-        suggestedCommand += fileFocus.refresh;
+        suggestedArgv.push(...fileFocus.refresh_argv!);
         if (selection.ids.length > 0) {
-          if (selection.status) suggestedCommand += ` --status ${shellQuote(selection.status)}`;
-          if (selection.type) suggestedCommand += ` --type ${shellQuote(selection.type)}`;
-          if (selection.tag) suggestedCommand += ` --tag ${shellQuote(selection.tag)}`;
+          if (selection.status) suggestedArgv.push("--status", selection.status);
+          if (selection.type) suggestedArgv.push("--type", selection.type);
+          if (selection.tag) suggestedArgv.push("--tag", selection.tag);
         }
       }
-      const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
+      pack.refresh_command = buildSuggestedCommand(suggestedArgv);
+      const renderOpts = { recentLimit, suggestedArgv, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
       let output = format === "json"
         ? `${JSON.stringify(pack, null, compress ? 0 : 2)}\n`
         : format === "agent"
@@ -1609,14 +1683,7 @@ function setupCommands(api: ExtensionApi): void {
     name: "context-handoff",
     description: "Generate an agent-ready handoff with concise defaults.",
     intent: "produce compact, actionable handoff context for another agent",
-    examples: [
-      "pm context-handoff --id pm-1234",
-      "pm context-handoff --ids pm-1234,pm-5678 --state blocked",
-      "pm context-handoff --status blocked --recent 8",
-      "pm context-handoff --tag release --without-neighborhood",
-      "pm context-handoff --id pm-1234 --format json",
-      "pm context-handoff --id pm-1234 --compress --include-deps",
-    ],
+    examples: commandExamples()["context-handoff"].map((example) => example.command),
     flags: [
       { long: "--session", value_name: "id", description: "Usage session id (defaults to PM_CONTEXT_SESSION or the receipt id)", type: "string" },
       { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
@@ -1680,7 +1747,7 @@ function setupCommands(api: ExtensionApi): void {
         packer,
         relationshipRegistry,
       });
-      const suggestedCommand = buildSuggestedAgentCommand({
+      const suggestedArgv = buildSuggestedAgentCommandArgv({
         commandName: "context-handoff",
         selection,
         limit,
@@ -1695,7 +1762,8 @@ function setupCommands(api: ExtensionApi): void {
         maxItems,
         sections: sections.length > 0 ? sections : undefined,
       });
-      const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
+      pack.refresh_command = buildSuggestedCommand(suggestedArgv);
+      const renderOpts = { recentLimit, suggestedArgv, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
       const handoff = buildAgentHandoff(pack, renderOpts);
       let output = format === "json"
         ? `${JSON.stringify(handoff, null, compress ? 0 : 2)}\n`
@@ -1719,12 +1787,7 @@ function setupCommands(api: ExtensionApi): void {
     name: "context-usage",
     description: "Report which items pm context/next served and which of those were actually touched.",
     intent: "measure whether served context is being used",
-    examples: [
-      "pm context-usage",
-      "pm context-usage --format json",
-      "pm context-usage --surface next --since 7d",
-      "pm context-usage --by agent-a --limit 50",
-    ],
+    examples: commandExamples()["context-usage"].map((example) => example.command),
     flags: [
       { long: "--session", value_name: "id", description: "Filter bundle receipts to a session", type: "string" },
       { long: "--receipt", value_name: "id", description: "Filter or report usage against one bundle receipt", type: "string" },
@@ -1814,7 +1877,7 @@ export default {
     setupCommands(api);
     if (typeof api.registerRenderer === "function") {
       const rendererOwnership = {
-        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-next-evidence"],
+        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-next-evidence", "context-phase"],
         resultDiscriminator: isRenderedCommandResult,
       };
       api.registerRenderer("toon", renderCommandResult, rendererOwnership);
