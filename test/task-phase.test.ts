@@ -188,6 +188,7 @@ test("strict emitted counters and extreme serialized values cannot produce a suc
 
 test("installed CLI and compiled SDK work with Git absent and expose typed private-path-free refusals", async (t) => {
   const { root, client, item } = await tracker(); t.after(() => rmSync(root, { recursive: true, force: true }));
+  await update(item.id, { body: "Complete mandatory body. ".repeat(250), author: "fixture" }, client);
   const packageRoot = resolve(import.meta.dirname, "..");
   const installed = join(client.pmRoot, "extensions", "pm-context"); mkdirSync(installed, { recursive: true });
   cpSync(join(packageRoot, "manifest.json"), join(installed, "manifest.json"));
@@ -232,6 +233,10 @@ test("installed CLI and compiled SDK work with Git absent and expose typed priva
       assert.equal(out.errorMessage, undefined);
     }
     await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: {}, global: {} }), code("INVALID_REQUEST"));
+    for (const invalid of [null, [], 2]) {
+      writeFileSync(bad, JSON.stringify(invalid));
+      await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: { packet: bad }, global: {} }), code("INVALID_REQUEST"));
+    }
   }
   assert.equal(fingerprint(client.pmRoot), before);
 });
