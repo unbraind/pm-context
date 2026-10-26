@@ -1,3 +1,4 @@
+import type { SuggestedCommand } from "./suggested-command.ts";
 import { PmCliError } from "@unbrained/pm-cli/sdk";
 import type { PmItem } from "./index.ts";
 /** Runtime snapshots are disposable, bounded, and never stored in item history. */
@@ -14,7 +15,7 @@ export declare class SinceError extends PmCliError {
     remedy: string;
     /** Host usage-error status, also understood by direct SDK callers. */
     readonly exitCode: 2;
-    constructor(code: string, remedy: string);
+    constructor(code: string, remedy: string, retryArgv?: string[]);
 }
 /** One immutable event or one current own-claim reminder, ranked as a whole. */
 export interface DeltaRow {
@@ -72,6 +73,8 @@ export interface SincePack {
         deferred_own_claims: number;
         excerpt_omitted_chars: number;
         remedy: string;
+        /** Executable alternatives for complete comments/history. */
+        commands: SuggestedCommand[];
     };
     budget: {
         ceiling: number;

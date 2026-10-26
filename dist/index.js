@@ -1,3 +1,5 @@
+import { buildSuggestedCommand } from "./suggested-command.js";
+export { buildSuggestedCommand, buildRestoreCommand, quotePosixArgument } from "./suggested-command.js";
 import { buildPhaseContext, encodePhaseContext, readPhaseContextJson, PhaseContextError } from "./task-phase.js";
 export { buildPhaseContext, encodePhaseContext, parsePhaseContextRequest, readPhaseContextJson, PhaseContextError, TASK_PHASES } from "./task-phase.js";
 import { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.js";
@@ -11,7 +13,7 @@ export { createFreshnessReader, encodeFreshness, FRESHNESS_LIMITS, FreshnessErro
 import { buildSincePack, encodeSincePack } from "./since.js";
 import { writeFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
-import { resolveFileFocus, matchFileFocus, rankFileFocus, renderFileFocus, readFileFocusItems } from "./file-focus.js";
+import { resolveFileFocus, matchFileFocus, rankFileFocus, renderFileFocus, fileLinkCommand, readFileFocusItems } from "./file-focus.js";
 import { createRelationshipKindRegistry, readSettings, resolveRuntimeStatusRegistry, resolveWorkspaceRelationshipKindRegistry, } from "@unbrained/pm-cli/sdk";
 import { listAllComplete } from "@unbrained/pm-cli/sdk/core";
 import { buildItemContextRelevanceCandidates, certifyCompleteListResult, PmCompleteListValidationError, defaultScoreContextCandidates, packContextCandidates, recordContextUsageServing, } from "@unbrained/pm-cli/sdk/query";
@@ -148,11 +150,6 @@ function intOptionMin0(options, keys, fallback) {
     }
     return fallback;
 }
-function shellQuote(value) {
-    if (/^[A-Za-z0-9._/:=,-]+$/.test(value))
-        return value;
-    return `'${value.replace(/'/g, "'\\''")}'`;
-}
 export function resolveSelectionOptions(options, defaults = {}) {
     const ids = Array.from(new Set([...asArray(options.id), ...asArray(options.ids)]));
     const status = stringOption(options, "status", "state");
@@ -169,21 +166,22 @@ function idSelectorArgs(ids) {
     if (normalizedIds.length === 0)
         return [];
     if (normalizedIds.length === 1)
-        return ["--id", shellQuote(normalizedIds[0])];
-    return ["--ids", shellQuote(normalizedIds.join(","))];
+        return ["--id", normalizedIds[0]];
+    return ["--ids", normalizedIds.join(",")];
 }
-export function buildSuggestedAgentCommand(input) {
+/** Build a refresh argv before applying any display quoting. */
+export function buildSuggestedAgentCommandArgv(input) {
     const args = ["pm", input.commandName];
     if (input.selection.ids.length > 0) {
         args.push(...idSelectorArgs(input.selection.ids));
     }
     else {
         if (input.selection.status)
-            args.push("--status", shellQuote(input.selection.status));
+            args.push("--status", input.selection.status);
         if (input.selection.type)
-            args.push("--type", shellQuote(input.selection.type));
+            args.push("--type", input.selection.type);
         if (input.selection.tag)
-            args.push("--tag", shellQuote(input.selection.tag));
+            args.push("--tag", input.selection.tag);
     }
     if (input.includeFormatFlag)
         args.push("--format", "agent");
@@ -201,7 +199,7 @@ export function buildSuggestedAgentCommand(input) {
         args.push("--max-items", String(input.maxItems));
     if (input.sections && input.sections.length > 0) {
         for (const section of input.sections)
-            args.push("--section", shellQuote(section));
+            args.push("--section", section);
     }
     if (!input.neighborhood) {
         args.push("--without-neighborhood");
@@ -209,7 +207,11 @@ export function buildSuggestedAgentCommand(input) {
     else if (input.neighborhoodDepth !== 1) {
         args.push("--neighborhood-depth", String(input.neighborhoodDepth));
     }
-    return args.join(" ");
+    return buildSuggestedCommand(args).argv;
+}
+/** Render the refresh argv with the shared POSIX argument quoting policy. */
+export function buildSuggestedAgentCommand(input) {
+    return buildSuggestedCommand(buildSuggestedAgentCommandArgv(input)).command;
 }
 function normalizeText(value) {
     return typeof value === "string" ? value.trim() : "";
@@ -453,7 +455,7 @@ export function buildContextPack(allItems, options = {}) {
             byStatus,
             byType,
         },
-        ...(fileMatches ? { unlinked_changed_files: options.fileFocus.files.filter((file) => ![...fileMatches.values()].some((matches) => matches.includes(file))) } : {}),
+        ...(fileMatches ? { unlinked_changed_files: options.fileFocus.files.filter((file) => ![...fileMatches.values()].some((matches) => matches.includes(file))), link_command: fileLinkCommand() } : {}),
         items: packItems,
         neighbors: packNeighbors,
         links: buildLinks(selectedAndNeighbors),
@@ -599,10 +601,12 @@ export function buildAgentHandoff(pack, options = {}) {
                 ? `priority ${item.priority}`
                 : "selected focus item",
     }));
+    if (Object.hasOwn(options, "suggestedCommand"))
+        throw new CommandError("Supply suggestedArgv instead of a free-form suggestedCommand shell string.", EXIT_CODE.USAGE);
     const ids = pack.items.map((item) => item.id).join(",");
-    const suggestedCommand = normalizeText(options.suggestedCommand) || (ids
-        ? `pm context-pack --id ${ids} --format agent`
-        : "pm context-pack --status in_progress --format agent");
+    const suggestion = buildSuggestedCommand(options.suggestedArgv ?? (ids
+        ? ["pm", "context-pack", "--id", ids, "--format", "agent"]
+        : ["pm", "context-pack", "--status", "in_progress", "--format", "agent"]));
     const recentLimit = options.recentLimit ?? 5;
     const recent = [...allVisible]
         .filter((item) => !isClosedStatus(itemStatus(item)))
@@ -638,8 +642,9 @@ export function buildAgentHandoff(pack, options = {}) {
         recent,
         links: pack.links.slice(0, 12),
         deps: pack.deps,
-        ...(pack.unlinked_changed_files ? { unlinked_changed_files: pack.unlinked_changed_files } : {}),
-        suggestedCommand,
+        ...(pack.unlinked_changed_files ? { unlinked_changed_files: pack.unlinked_changed_files, link_command: fileLinkCommand() } : {}),
+        suggestedCommand: suggestion.command,
+        suggestedArgv: suggestion.argv,
     };
 }
 export function renderAgentHandoff(pack, options = {}) {
@@ -733,7 +738,7 @@ export function renderAgentHandoff(pack, options = {}) {
         }
     }
     if (include("refresh")) {
-        lines.push("", "## Refresh", "", `\`${handoff.suggestedCommand}\``, "");
+        lines.push("", "## Refresh", "", `\`${handoff.suggestedCommand}\``, `argv: ${JSON.stringify(handoff.suggestedArgv)}`, "");
     }
     let output = `${lines.join("\n")}\n`;
     if (compress) {
@@ -1074,6 +1079,37 @@ async function measureContextOutput(ctx, pack, output, format, command, compress
         return fallback;
     }
 }
+/** Return fresh structured examples for SDK/JSON/TOON callers and host help registration. */
+export function commandExamples() {
+    return {
+        "context-pack": [
+            buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--include-body", "--output", "context.md"]),
+            buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--format", "agent"]),
+            buildSuggestedCommand(["pm", "context-pack", "--ids", "pm-1234,pm-5678", "--state", "blocked", "--format", "compact"]),
+            buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--format", "compact", "--recent", "8"]),
+            buildSuggestedCommand(["pm", "context-pack", "--status", "in_progress", "--tag", "release", "--format", "json"]),
+            buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--compress", "--format", "json"]),
+            buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--format", "agent", "--include-deps", "--section", "focus", "--section", "blockers"]),
+            buildSuggestedCommand(["pm", "context-pack", "--id", "pm-1234", "--max-items", "10"]),
+            buildSuggestedCommand(["pm", "context-pack", "--status", "in_progress", "--explain"]),
+        ],
+        "context-handoff": [
+            buildSuggestedCommand(["pm", "context-handoff", "--id", "pm-1234"]),
+            buildSuggestedCommand(["pm", "context-handoff", "--ids", "pm-1234,pm-5678", "--state", "blocked"]),
+            buildSuggestedCommand(["pm", "context-handoff", "--status", "blocked", "--recent", "8"]),
+            buildSuggestedCommand(["pm", "context-handoff", "--tag", "release", "--without-neighborhood"]),
+            buildSuggestedCommand(["pm", "context-handoff", "--id", "pm-1234", "--format", "json"]),
+            buildSuggestedCommand(["pm", "context-handoff", "--id", "pm-1234", "--compress", "--include-deps"]),
+        ],
+        "context-usage": [
+            buildSuggestedCommand(["pm", "context-usage"]),
+            buildSuggestedCommand(["pm", "context-usage", "--format", "json"]),
+            buildSuggestedCommand(["pm", "context-usage", "--surface", "next", "--since", "7d"]),
+            buildSuggestedCommand(["pm", "context-usage", "--by", "agent-a", "--limit", "50"]),
+        ],
+    };
+}
+/** Register commands with structured help and argv-first refresh suggestions. */
 function setupCommands(api) {
     api.registerCommand({
         name: "context-phase",
@@ -1117,17 +1153,7 @@ function setupCommands(api) {
         name: "context-pack",
         description: "Generate a durable pm context pack for handoffs and reviews.",
         intent: "turn selected pm work into portable context",
-        examples: [
-            "pm context-pack --id pm-1234 --include-body --output context.md",
-            "pm context-pack --id pm-1234 --format agent",
-            "pm context-pack --ids pm-1234,pm-5678 --state blocked --format compact",
-            "pm context-pack --id pm-1234 --format compact --recent 8",
-            "pm context-pack --status in_progress --tag release --format json",
-            "pm context-pack --id pm-1234 --compress --format json",
-            "pm context-pack --id pm-1234 --format agent --include-deps --section focus --section blockers",
-            "pm context-pack --id pm-1234 --max-items 10",
-            "pm context-pack --status in_progress --explain",
-        ],
+        examples: commandExamples()["context-pack"].map((example) => example.command),
         arguments: [{ name: "base", required: false, description: "Git base for --changed (defaults to origin/HEAD, then main)" }],
         flags: [
             { long: "--changed", description: "Focus linked files changed from an optional Git base, including working changes", type: "boolean" },
@@ -1213,6 +1239,7 @@ function setupCommands(api) {
                     }));
                     explainReport.available_signals = ["file_overlap", "status", "priority"];
                     explainReport.unlinked_changed_files = pack.unlinked_changed_files;
+                    explainReport.link_command = fileLinkCommand();
                     explainReport.model = "file_overlap_status_priority";
                 }
                 const output = format === "json"
@@ -1225,7 +1252,7 @@ function setupCommands(api) {
                 }
                 return renderedCommandResult(output);
             }
-            let suggestedCommand = buildSuggestedAgentCommand({
+            const suggestedArgv = buildSuggestedAgentCommandArgv({
                 commandName: "context-pack",
                 selection,
                 limit,
@@ -1242,17 +1269,18 @@ function setupCommands(api) {
                 sections: sections.length > 0 ? sections : undefined,
             });
             if (fileFocus) {
-                suggestedCommand += fileFocus.refresh;
+                suggestedArgv.push(...fileFocus.refresh_argv);
                 if (selection.ids.length > 0) {
                     if (selection.status)
-                        suggestedCommand += ` --status ${shellQuote(selection.status)}`;
+                        suggestedArgv.push("--status", selection.status);
                     if (selection.type)
-                        suggestedCommand += ` --type ${shellQuote(selection.type)}`;
+                        suggestedArgv.push("--type", selection.type);
                     if (selection.tag)
-                        suggestedCommand += ` --tag ${shellQuote(selection.tag)}`;
+                        suggestedArgv.push("--tag", selection.tag);
                 }
             }
-            const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
+            pack.refresh_command = buildSuggestedCommand(suggestedArgv);
+            const renderOpts = { recentLimit, suggestedArgv, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
             let output = format === "json"
                 ? `${JSON.stringify(pack, null, compress ? 0 : 2)}\n`
                 : format === "agent"
@@ -1386,14 +1414,7 @@ function setupCommands(api) {
         name: "context-handoff",
         description: "Generate an agent-ready handoff with concise defaults.",
         intent: "produce compact, actionable handoff context for another agent",
-        examples: [
-            "pm context-handoff --id pm-1234",
-            "pm context-handoff --ids pm-1234,pm-5678 --state blocked",
-            "pm context-handoff --status blocked --recent 8",
-            "pm context-handoff --tag release --without-neighborhood",
-            "pm context-handoff --id pm-1234 --format json",
-            "pm context-handoff --id pm-1234 --compress --include-deps",
-        ],
+        examples: commandExamples()["context-handoff"].map((example) => example.command),
         flags: [
             { long: "--session", value_name: "id", description: "Usage session id (defaults to PM_CONTEXT_SESSION or the receipt id)", type: "string" },
             { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
@@ -1457,7 +1478,7 @@ function setupCommands(api) {
                 packer,
                 relationshipRegistry,
             });
-            const suggestedCommand = buildSuggestedAgentCommand({
+            const suggestedArgv = buildSuggestedAgentCommandArgv({
                 commandName: "context-handoff",
                 selection,
                 limit,
@@ -1472,7 +1493,8 @@ function setupCommands(api) {
                 maxItems,
                 sections: sections.length > 0 ? sections : undefined,
             });
-            const renderOpts = { recentLimit, suggestedCommand, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
+            pack.refresh_command = buildSuggestedCommand(suggestedArgv);
+            const renderOpts = { recentLimit, suggestedArgv, compress, relationshipRegistry, sections: sections.length > 0 ? sections : undefined };
             const handoff = buildAgentHandoff(pack, renderOpts);
             let output = format === "json"
                 ? `${JSON.stringify(handoff, null, compress ? 0 : 2)}\n`
@@ -1495,12 +1517,7 @@ function setupCommands(api) {
         name: "context-usage",
         description: "Report which items pm context/next served and which of those were actually touched.",
         intent: "measure whether served context is being used",
-        examples: [
-            "pm context-usage",
-            "pm context-usage --format json",
-            "pm context-usage --surface next --since 7d",
-            "pm context-usage --by agent-a --limit 50",
-        ],
+        examples: commandExamples()["context-usage"].map((example) => example.command),
         flags: [
             { long: "--session", value_name: "id", description: "Filter bundle receipts to a session", type: "string" },
             { long: "--receipt", value_name: "id", description: "Filter or report usage against one bundle receipt", type: "string" },

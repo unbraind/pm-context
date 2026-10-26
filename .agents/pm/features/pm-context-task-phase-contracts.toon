@@ -6,10 +6,10 @@ status: in_progress
 priority: 2
 tags: []
 created_at: "2026-10-26T02:25:01.719Z"
-updated_at: "2026-10-26T03:15:54.979Z"
+updated_at: "2026-10-26T14:33:54.015Z"
 author: codex-agent
 acceptance_criteria: Four phase fixtures preserve every mandatory field or refuse; unrelated fields are omitted with restore selectors; one phase switch reuses unchanged SDK session references.
-comments[10]{created_at,author,text}:
+comments[14]{created_at,author,text}:
   "2026-10-26T02:25:10.836Z",codex-agent,"Plan: one strict bounded request schema, typed SDK and context-phase command, all-or-refuse mandatory fields, exact omission restoration, SDK sessions keyed by item/field/value so changed projections cannot reuse stale facts. Stateless caller-carried session input; no new tracker mutation, import/sync writer, journal, lease or shared checkpoint. Validate four phases, seeded 500-sequence SDK-read model, extreme input/output values, installed no-git CLI, behavioral revert proof and read-only committed public snapshot. Local targeted tests/typecheck/docstrings; npm and Bun full gates in CI at unchanged thresholds. CLI registry reports 2026.10.25; retain package SDK pin 2026.10.23 per queue rules."
   "2026-10-26T02:36:27.982Z",codex,"Implementation uses SDK intent composition/resolution, SDK omission receipts and SDK session suppression/accounting over the existing cache-free freshness reader. Field facts bind target item, field and current SDK JSON value; new phase fields cannot alias older projections. Full metadata fixtures exposed SDK optional properties with undefined values in linked files/docs; accept only ordinary JSON omission of optional object properties, retain exact whitespace and relationships, reject sparse arrays/nonfinite values. Reference model reads SDK get output through standard JSON transport, with no handwritten normalization. Installed CLI testing also caught camelCase option normalization; all command overrides now accept the host-normalized keys."
   "2026-10-26T02:42:21.466Z",codex-agent,"Public committed snapshot 41fa36e1eae25b7ce692de6b9d198c0b05730acd: 93 items, 1794 source fields, 744 phase/format attempts; 658 successful packets, 84 MISSING_FIELD review refusals, 2 BUDGET_TOO_SMALL implementation refusals; 1316 exact mandatory-value checks, 11518 omission selectors, 92 successful switches reusing 92 unchanged SDK title references. JSON: 329 packets, 1168385 bytes, range 2245-7687; TOON: 329 packets, 983116 bytes, range 1885-6929. Read-only non-Git copy, no Git on PATH, all source hashes unchanged. Local strict tracker health reports existing installed pm-github host skew (pinned host 2026.10.23 versus extension 2026.10.25); verify fresh CI before attributing a gate failure to this feature. Prior progress comment inherited the project default author; subsequent writes explicitly use codex-agent."
@@ -20,13 +20,21 @@ comments[10]{created_at,author,text}:
   "2026-10-26T03:08:12.653Z",codex-agent,"Both npm release gates pass on Node 22 and 26 at f3ea0a3 in https://github.com/unbraind/pm-context/actions/runs/40262200866; Bun gates are still running. Boundary review found a related strict-input gap: the shared legacy option helper trimmed blank CLI overrides into absence, silently retaining a packet phase or default budget. The phase CLI adapter now preserves raw override values and lets its one strict request schema refuse blanks/nulls/wrong types. Added five real installed blank-flag cases and source/compiled harness refusals; positive installed packets also preserve a mandatory body over 6 KB. Focused CLI and registration checks pass 2/2. Final npm/Bun gate evidence must use the subsequent corrected head."
   "2026-10-26T03:08:58.223Z",codex-agent,"Strict CLI override revert proof: replace only the raw phase/format adapter read with the previous trim-and-ignore helper; node --test --test-name-pattern=\"installed CLI\" test/task-phase.test.ts fails 1/1 with Missing expected rejection for a blank phase in the source extension host. Exact source bytes restored afterward. The positive final adapter had already passed the installed CLI and registration checks 2/2, including the larger mandatory body and both alias spellings. All five blank CLI flags now reach the single request schema and refuse instead of being ignored."
   "2026-10-26T03:15:54.977Z",codex-agent,"Verified full CI success at product head 3508a58851cba2709055a1d169f4fbeaac26f715: https://github.com/unbraind/pm-context/actions/runs/40262690108 . npm run release:check and bun run release:check both pass on Node 22 and 26: 419/419 tests per gate, zero failures or skips (1676 aggregate passes). Native coverage covers 15 sources at 100% lines/branches/functions. c8: 100% statements/functions/lines, 99.95% branches, unchanged 99.9% branch threshold; task-phase.ts remains 100% in all four dimensions. Fresh tracker health, build-current, dependency audit, package dry run, changelog, publication-attestation and CodeQL checks pass. Current-build public validation reran with identical 93-item/744-attempt numbers and unchanged source hashes. Ready PR: https://github.com/unbraind/pm-context/pull/181 . Automated review approval is unavailable: CodeRabbit auto-review disabled, Sourcery quota exhausted, Greptile trial ended; their statuses do not supply review approval. Item remains in_progress and released for orchestrator verification; do not merge or release the package."
-files[5]{path,scope}:
+  "2026-10-26T14:13:35.964Z",codex-agent,"Blocking read-only review of PR 181 identified shell injection through an omitted metadata key in restore_with. Extend this item with class-wide command provenance: one structured argv builder and one POSIX argument quoting function; add argv fields alongside display strings in phase bindings/omission receipts, handoff/pack refreshes, file-focus guides and delta recovery commands. Refuse legacy free-form command overrides rather than evaluating or guessing shell syntax. Audit all runtime command suggestions, route static executable examples too, and distinguish explanatory prose from executable suggestions. Add seeded adversarial key/value shell round trips and the fixed semicolon case, prove no side effects, record a behavioral interpolation revert, run targeted checks and unchanged npm/Bun CI gates. Current npm CLI registry is 2026.10.26; retain the pinned SDK."
+  "2026-10-26T14:25:51.699Z",codex-agent,"Class-wide implementation now starts with dense bounded argv and renders through one POSIX single-quote function. Phase bindings and omissions carry restore_argv; handoffs carry suggestedArgv; pack refresh/link examples carry command+argv objects; file-focus appends raw refresh argv; delta recovery carries command+argv and SDK suggested_retry_args. Legacy suggestedCommand shell-string input refuses with a structured-array remedy. Static registered help examples route through the same builder. Existing SDK quoteCommandArg uses a different double-quote policy, so it cannot satisfy the explicit POSIX single-quote contract. Core SDK session receipts expose an unquoted placeholder restore template and no argv; suppress that template from the package wire format, provide session_restore command+argv, and retain conservative SDK charging for the internal legacy template. New renderer coverage is 100/100/100/100; three command tests, including 500 seeded shell splits and real non-Git metadata, pass."
+  "2026-10-26T14:30:08.396Z",codex-agent,"Interpolation revert proof: restore only the omitted-key restore_with interpolation in buildPhaseContext, keeping the new restore_argv and all tests. node --test --test-name-pattern=\"fixed review key\" test/suggested-command.test.ts fails 1/1: the real shell returns field a instead of a;printf X and loses the trailing budget arguments. Source restored exactly; the property suite passes 3/3 with the builder. Broader targeted checks pass except expected snapshots that required unnecessary quotes around plain Git tokens; updated them to the required minimal quoting. Public snapshot rerun still yields 93 items, 744 attempts, 658 successes, 86 typed refusals, 1316 retained mandatory values, 11518 omission selectors and 92 reused references, with unchanged source bytes. Added argv transport costs: JSON 1801950 bytes (3305-10741), TOON 1772334 bytes (3214-10651), 329 successes each."
+  "2026-10-26T14:33:52.801Z",codex-agent,"Targeted validation for the review correction: command/pack/renderer suites pass 62/62; selected phase preservation/reuse/output/installed CLI tests pass 4/4; the real Git refresh regression passes 1/1 after updating minimally quoted plain-token expectations. Context receipt and delta production checks passed; no product regressions were hidden by snapshot updates. npm run build, npm run typecheck, npm run build:test, npm run docstring and changelog checks pass. The package has no standalone lint script. pm test --run --progress --only-last executes the new command suite 3/3; tracking remains disabled, so this comment retains the receipt. Runtime-source grep found no remaining generated pm commands built with data interpolation or concatenation: only the shared builder/rendered output remains. Await final full npm/Bun CI before claiming complete gates."
+files[9]{path,scope}:
+  file-focus.ts,project
   index.ts,project
+  since.ts,project
+  suggested-command.ts,project
   task-phase.ts,project
   test/context-pack.test.ts,project
+  test/suggested-command.test.ts,project
   test/task-phase-public.ts,project
   test/task-phase.test.ts,project
-tests[2]:
+tests[3]:
   - command: node --test --test-name-pattern=four test/task-phase.test.ts
     scope: project
     provenance:
@@ -40,6 +48,14 @@ tests[2]:
     provenance:
       author: codex-agent
       created_at: "2026-10-26T02:51:07.342Z"
+      source_kind: local_mutation
+      source_ref: feat/task-phase-context-contracts
+  - command: node --test test/suggested-command.test.ts
+    scope: project
+    timeout_seconds: 120
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-26T14:25:50.346Z"
       source_kind: local_mutation
       source_ref: feat/task-phase-context-contracts
 docs[3]{path,scope}:

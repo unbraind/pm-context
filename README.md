@@ -431,6 +431,40 @@ model proposals remain unchecked. The command performs no edits or model calls.
 The SDK exports `checkContextWitnesses`, packet parsing and encoding, and typed
 `WitnessError` refusals. See the [packet example and SDK contract](docs/witnesses.md).
 
+## Safe suggested commands
+
+Every generated command starts as argv and uses `buildSuggestedCommand` with one
+`quotePosixArgument` renderer. Plain tokens such as `title` remain readable;
+spaces, quotes, operators, substitutions, backticks and control characters are
+single-quoted, with embedded apostrophes escaped as `'\''`. Empty arguments are
+preserved; NUL bytes refuse because an operating system cannot represent them in
+argv. Commands are bounded to 4,096 arguments and 262,144 JSON bytes.
+
+JSON and TOON phase packets pair `restore_with` with `restore_argv` on every
+binding and omission. Pack `refresh_command`, `link_command`, delta receipt
+`commands`, and `session_restore` use `{command, argv}`. Handoffs pair
+`suggestedCommand` with `suggestedArgv`. Typed refusal recovery pairs SDK
+`suggested_retry` with `suggested_retry_args`. Execute the array without a shell;
+the string is a POSIX display, not an independent source of arguments.
+
+```ts
+import { buildSuggestedCommand, commandExamples } from "pm-context";
+
+const suggestion = buildSuggestedCommand([
+  "pm", "get", "project-task", "--fields", "a;printf X",
+]);
+// suggestion.command: pm get project-task --fields 'a;printf X'
+// suggestion.argv: ["pm", "get", "project-task", "--fields", "a;printf X"]
+const examples = commandExamples(); // fresh {command, argv} examples for help
+```
+
+Direct SDK handoff overrides now use `suggestedArgv`; free-form
+`suggestedCommand` overrides refuse instead of guessing shell syntax. File-focus
+refreshes append `refresh_argv`, never display fragments. Static host help
+examples use the same structured builder. Suggestions and templates are not
+executed by this package. Replace template placeholders in argv, then rebuild
+the display; never substitute data into the rendered shell string.
+
 ## Task-phase context contracts
 
 `context-phase` binds mandatory top-level tracker fields to **investigation**,
@@ -490,10 +524,11 @@ fact id binds the item, field and exact current SDK value. Shared unchanged
 fields reuse the SDK's `session:<session-id>:<fact-id>` references; newly required
 or changed fields arrive in full. Resolve references from earlier `facts` by id.
 `bindings` always retain item/field coordinates, the mandatory marker and native
-restoration command. The SDK receipt's generic item restoration template does
-not apply to these field fact ids: use `bindings[].restore_with`. Session
-accounting measures the complete compact JSON object using the SDK estimator;
-`bytes` separately measures the selected JSON or TOON transport. Both ceilings
+restoration command. Execute `bindings[].restore_argv` directly. The legacy SDK
+placeholder display is omitted from the receipt; `session_restore` carries its
+quoted generic template and argv. Concrete field references restore through
+bindings. SDK charging conservatively includes the removed legacy template;
+`bytes` exactly measures the selected JSON or TOON transport. Both ceilings
 must fit. Refusals do not advance caller state.
 
 Every call rereads the authoritative SDK document; replaying old requests or

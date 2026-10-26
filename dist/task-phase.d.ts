@@ -1,3 +1,4 @@
+import type { SuggestedCommand, SuggestedRestore } from "./suggested-command.ts";
 import { PmCliError } from "@unbrained/pm-cli/sdk";
 import type { OutputOmissionReceipt, PmReadOutputSessionReceipt, PmReadOutputSessionReference, PmReadOutputSessionState } from "@unbrained/pm-cli/sdk";
 /** Phase selection describes a projection, never authority or a lifecycle transition. */
@@ -24,12 +25,11 @@ export declare class PhaseContextError extends PmCliError {
     constructor(code: PhaseContextError["code"], remedy: string);
 }
 /** Coordinates survive SDK reference suppression so every mandatory value remains resolvable. */
-export interface PhaseFieldBinding {
+export interface PhaseFieldBinding extends SuggestedRestore {
     item: string;
     field: string;
     fact: string;
     mandatory: boolean;
-    restore_with: string;
 }
 /** Exact authoritative SDK field value; JSON strings preserve nested native collections. */
 export interface PhaseFieldFact {
@@ -52,15 +52,21 @@ export interface PhaseContextPacket {
     changes: PhaseFieldChange[];
     bindings: PhaseFieldBinding[];
     facts: Array<PhaseFieldFact | PmReadOutputSessionReference>;
-    omission_receipt: OutputOmissionReceipt;
+    omission_receipt: Omit<OutputOmissionReceipt, "omitted_field_groups"> & {
+        omitted_field_groups: Array<{
+            name: string;
+        } & SuggestedRestore>;
+    };
     /** Exact complete encoded size including the trailing newline and this counter. */
     bytes: number;
     byte_budget: number;
     format: "json" | "toon";
     /** SDK session ids name field facts; bindings carry their native item restore commands. */
     session_fact_scope: "item-field-value;restore-with-bindings";
-    /** SDK-owned accounting uses compact JSON, independently of transport encoding. */
-    read_session?: PmReadOutputSessionReceipt;
+    /** SDK-owned charging conservatively includes its removed legacy restore template. */
+    read_session?: Omit<PmReadOutputSessionReceipt, "restore_reference_with">;
+    /** Safe generic template; concrete field restorations are carried by bindings. */
+    session_restore?: SuggestedCommand;
 }
 /** Validate untrusted input once before reading sources; never normalize tracker content. */
 export declare function parsePhaseContextRequest(value: unknown): PhaseContextRequest;

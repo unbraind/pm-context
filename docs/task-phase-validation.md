@@ -60,10 +60,10 @@ The remaining switch refuses its body budget. Every source byte remains unchange
 
 | Encoding | Successful packets | Total UTF-8 bytes | Min | Max |
 | --- | ---: | ---: | ---: | ---: |
-| JSON | 329 | 1,168,385 | 2,245 | 7,687 |
-| TOON | 329 | 983,116 | 1,885 | 6,929 |
+| JSON | 329 | 1,801,950 | 3,305 | 10,741 |
+| TOON | 329 | 1,772,334 | 3,214 | 10,651 |
 
-Sizes include explanations, bindings, facts, omission receipts and final newline.
+Sizes include explanations, bindings, facts, omission receipts, command argv and final newline. These figures were rerun after adding safe command suggestions; the earlier product-head CI receipt below predates that additive wire-format change.
 They are transport measurements rather than tokenizer measurements.
 
 ## Behavioral guarantees
@@ -145,3 +145,40 @@ reports 100% statements/functions/lines and 99.95% branches at the unchanged
 Fresh tracker health, committed-output verification, dependency audit, package
 dry run, changelog and publication-attestation checks pass. CodeQL also passes.
 The final pull request reports the subsequent evidence-only head's CI run too.
+
+## Command suggestion review correction
+
+Blocking review of PR 181 found unquoted omitted metadata keys in shell restore
+commands. `buildSuggestedCommand` now validates/copies argv before rendering;
+`quotePosixArgument` is the only POSIX display quoting function. It leaves plain
+safe tokens readable, quotes all other arguments with single quotes, escapes
+embedded apostrophes and refuses NUL bytes. Phase bindings/omissions, handoff
+refreshes, file-focus flags/link guides, delta recovery and registered examples
+all use this path. JSON/TOON outputs retain executable arrays. `commandExamples`
+returns fresh structured host examples. Legacy shell-string overrides refuse.
+
+The core SDK supplies a legacy placeholder display without argv. The package
+omits that field and supplies `session_restore` with quoted display and argv;
+SDK charging conservatively includes its internal legacy template. Concrete
+field facts always restore through the binding's `restore_argv`.
+
+`test/suggested-command.test.ts` checks 500 seeded random key/value commands,
+including spaces, quotes, operators, substitutions, backticks, control characters,
+leading hyphens, Unicode and empty values. A real POSIX shell splits each display
+and NUL-frames the resulting argv; exact equality and absence of a marker file
+prove transport fidelity. Real non-Git SDK metadata includes the fixed
+`a;printf X` review key. Both JSON and TOON outputs, handoff selectors, linking
+examples and typed recovery commands undergo the same shell check.
+
+Behavioral revert: restore only interpolation of the omitted key in
+`buildPhaseContext`, preserving the structured argv and every test. Run:
+
+```sh
+node --test --test-name-pattern='fixed review key' test/suggested-command.test.ts
+```
+
+Result: **1/1 failed**. The shell returned field `a` instead of `a;printf X` and
+lost the trailing output-budget arguments. Exact source bytes were restored;
+all three command tests pass with the builder. Targeted renderer coverage is
+100% statements/branches/functions/lines. The PR records the correction's final
+npm and Bun CI run separately from the earlier product-head receipt above.

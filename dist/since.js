@@ -1,3 +1,4 @@
+import { buildSuggestedCommand } from "./suggested-command.js";
 /** Resumable delta serving; SDK history remains the only durable event authority. */
 import { createHash, randomUUID } from "node:crypto";
 import { readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -11,8 +12,9 @@ export const SINCE_RETENTION = { count: 200, bytes: 4_194_304, directory: "runti
 export class SinceError extends PmCliError {
     /** Action that restores a usable starting point. */
     remedy;
-    constructor(code, remedy) {
-        super(`${code}: ${remedy}`, 2, { code, nextSteps: [remedy] });
+    constructor(code, remedy, retryArgv) {
+        const retry = retryArgv === undefined ? undefined : buildSuggestedCommand(retryArgv);
+        super(`${code}: ${remedy}`, 2, { code, nextSteps: [remedy], ...(retry ? { recovery: { suggested_retry: retry.command, suggested_retry_args: retry.argv } } : {}) });
         this.remedy = remedy;
     }
 }
@@ -104,7 +106,7 @@ function validatePrefixes(streams, previous) {
                 compacted.push(prefix.id);
                 continue;
             }
-            throw new SinceError("HISTORY_EXPIRED", "Retained history changed or was pruned. Reorient with pm context --for handoff, then restart with --from <ISO timestamp>.");
+            throw new SinceError("HISTORY_EXPIRED", "Retained history changed or was pruned. Reorient using the structured retry, then restart with an explicit ISO timestamp.", ["pm", "context", "--for", "handoff"]);
         }
     }
     return compacted;
@@ -589,7 +591,7 @@ export async function buildSincePack(pmRoot, items, terminal, options) {
     }
     const pack = {
         protocol: "pm-context-since/v1", cursor: `s1_${"0".repeat(64)}`, served_at: servedAt, restart_from: restartFrom, changes: [],
-        omission_receipt: { ...receipt, deferred_rows: rows.length, deferred_own_claims: rows.filter((row) => row.op === "own_claim").length, excerpt_omitted_chars: 0, remedy: "Resume --cursor for deferred rows; pm comments <id> or pm history <id> --full for complete excerpts and patches." },
+        omission_receipt: { ...receipt, deferred_rows: rows.length, deferred_own_claims: rows.filter((row) => row.op === "own_claim").length, excerpt_omitted_chars: 0, remedy: "Resume with the cursor for deferred rows; use the structured commands for complete excerpts and patches.", commands: [buildSuggestedCommand(["pm", "comments", "<id>"]), buildSuggestedCommand(["pm", "history", "<id>", "--full"])] },
         budget: { ceiling: options.tokenBudget, token_upper_bound: 0, unit: "utf8-bytes" },
     };
     const included = packSinceRows(pack, rows);

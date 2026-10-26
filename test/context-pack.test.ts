@@ -361,7 +361,7 @@ test("buildAgentHandoff extracts compact focus, blockers, next actions and refre
 test("buildAgentHandoff honors explicit suggested refresh command", () => {
   const handoff = buildAgentHandoff(
     buildContextPack(items, { ids: ["pm-1"], generatedAt: "now" }),
-    { suggestedCommand: "pm context-handoff --id pm-1" },
+    { suggestedArgv: ["pm", "context-handoff", "--id", "pm-1"] },
   );
   assert.equal(handoff.suggestedCommand, "pm context-handoff --id pm-1");
 });

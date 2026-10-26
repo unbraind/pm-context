@@ -1,3 +1,5 @@
+import { buildRestoreCommand, buildSuggestedCommand } from "./suggested-command.ts";
+import type { SuggestedCommand, SuggestedRestore } from "./suggested-command.ts";
 /** Mandatory field contracts over cache-free SDK reads and caller-carried SDK sessions. */
 import { createHash } from "node:crypto";
 import { encode } from "@toon-format/toon";
@@ -36,12 +38,11 @@ export class PhaseContextError extends PmCliError {
   }
 }
 /** Coordinates survive SDK reference suppression so every mandatory value remains resolvable. */
-export interface PhaseFieldBinding {
+export interface PhaseFieldBinding extends SuggestedRestore {
   item: string;
   field: string;
   fact: string;
   mandatory: boolean;
-  restore_with: string;
 }
 /** Exact authoritative SDK field value; JSON strings preserve nested native collections. */
 export interface PhaseFieldFact { id: string; value_json: string }
@@ -57,15 +58,17 @@ export interface PhaseContextPacket {
   changes: PhaseFieldChange[];
   bindings: PhaseFieldBinding[];
   facts: Array<PhaseFieldFact | PmReadOutputSessionReference>;
-  omission_receipt: OutputOmissionReceipt;
+  omission_receipt: Omit<OutputOmissionReceipt, "omitted_field_groups"> & { omitted_field_groups: Array<{ name: string } & SuggestedRestore> };
   /** Exact complete encoded size including the trailing newline and this counter. */
   bytes: number;
   byte_budget: number;
   format: "json" | "toon";
   /** SDK session ids name field facts; bindings carry their native item restore commands. */
   session_fact_scope: "item-field-value;restore-with-bindings";
-  /** SDK-owned accounting uses compact JSON, independently of transport encoding. */
-  read_session?: PmReadOutputSessionReceipt;
+  /** SDK-owned charging conservatively includes its removed legacy restore template. */
+  read_session?: Omit<PmReadOutputSessionReceipt, "restore_reference_with">;
+  /** Safe generic template; concrete field restorations are carried by bindings. */
+  session_restore?: SuggestedCommand;
 }
 
 /** Reject exotic objects before reading untrusted keys or serializing values. */
@@ -140,10 +143,10 @@ export async function buildPhaseContext(input: PhaseContextRequest, pmRoot: stri
     ok: true, protocol: "pm-context-phase/v1", phase: request.phase, previous_phase: request.previous_phase ?? null,
     mandatory_fields: mandatory,
     changes: [...new Set([...previous, ...mandatory])].sort().map((name) => ({ field: name, change: !previous.includes(name) ? "added" : !mandatory.includes(name) ? "removed" : "retained", reason: !previous.includes(name) ? `Required by ${request.phase}` : !mandatory.includes(name) ? `Required by ${request.previous_phase}; optional in ${request.phase}` : `Required by both ${request.previous_phase} and ${request.phase}` })),
-    bindings: [], facts: [], omission_receipt: createOutputOmissionReceipt([]), bytes: 0, byte_budget: request.byte_budget!, format: request.format!, session_fact_scope: "item-field-value;restore-with-bindings",
+    bindings: [], facts: [], omission_receipt: { ...createOutputOmissionReceipt([]), omitted_field_groups: [] }, bytes: 0, byte_budget: request.byte_budget!, format: request.format!, session_fact_scope: "item-field-value;restore-with-bindings",
   };
   const read = createFreshnessReader(pmRoot, ".");
-  const omitted: Array<{ name: string; restore_with: string }> = [];
+  const omitted: Array<{ name: string } & SuggestedRestore> = [];
   let sourceBytes = 0;
   for (const item of request.items) {
     let source: Record<string, unknown>;
@@ -155,20 +158,21 @@ export async function buildPhaseContext(input: PhaseContextRequest, pmRoot: stri
       if (sourceBytes > 8388608) throw new Error();
       source = JSON.parse(serialized) as Record<string, unknown>;
     } catch { throw new PhaseContextError("SOURCE_UNAVAILABLE", `Restore readable SDK source ${item}, with finite JSON fields; narrow selection to at most 8388608 source bytes. No packet was issued.`); }
-    for (const name of Object.keys(source).sort()) if (!included.has(name)) omitted.push({ name: `${item}.${name}`, restore_with: `pm get ${item} --fields ${name} --output-budget unbounded` });
+    for (const name of Object.keys(source).sort()) if (!included.has(name)) omitted.push({ name: `${item}.${name}`, ...buildRestoreCommand(["pm", "get", item, "--fields", name, "--output-budget", "unbounded"]) });
     for (const name of [...included].sort()) {
       if (!Object.hasOwn(source, name)) throw new PhaseContextError("MISSING_FIELD", `Restore field ${name} on item ${item}, or revise the declared contract/include_fields. No mandatory field was dropped.`);
       const value_json = JSON.stringify(source[name]);
       // This is a read fact identity, not a mutation idempotency key. Include the
       // target coordinate so equal text on different items/fields never aliases.
       const id = `f-${createHash("sha256").update(JSON.stringify([item, name, value_json])).digest("hex")}`;
-      packet.bindings.push({ item, field: name, fact: id, mandatory: mandatory.includes(name), restore_with: `pm get ${item} --fields ${name} --output-budget unbounded` });
+      packet.bindings.push({ item, field: name, fact: id, mandatory: mandatory.includes(name), ...buildRestoreCommand(["pm", "get", item, "--fields", name, "--output-budget", "unbounded"]) });
       packet.facts.push({ id, value_json });
     }
   }
-  packet.omission_receipt = createOutputOmissionReceipt(omitted);
+  packet.omission_receipt = { ...createOutputOmissionReceipt(omitted), omitted_field_groups: omitted };
   let result = packet;
   if (request.session) {
+    result.session_restore = buildSuggestedCommand(["pm", "get", "<item-id>", "--brief"]);
     // The SDK owns reference construction and receipt accounting. Only facts are
     // rows: bindings and explanations must remain present even when facts reuse.
     const projected = applyReadOutputSessionReferences({ ...packet, row_contract: { command: "context-phase", row_kind: "collection", row_keys: ["facts"], fields: "unsupported" } }, request.session);
@@ -177,7 +181,13 @@ export async function buildPhaseContext(input: PhaseContextRequest, pmRoot: stri
   // Coupled fixed point: exact transport bytes include their own digits and the
   // SDK receipt; SDK accounting intentionally measures the compact JSON object.
   for (;;) {
-    if (request.session) result = attachReadOutputSessionReceipt({ ...result }, request.session) as unknown as PhaseContextPacket;
+    if (request.session) {
+      const accounted = attachReadOutputSessionReceipt({ ...result }, request.session) as unknown as PhaseContextPacket & { read_session: PmReadOutputSessionReceipt };
+      // The SDK's legacy display template is not executable POSIX text. Account
+      // it conservatively, but emit only our structured, quoted replacement.
+      const read_session = Object.fromEntries(Object.entries(accounted.read_session).filter(([key]) => key !== "restore_reference_with")) as unknown as NonNullable<PhaseContextPacket["read_session"]>;
+      result = { ...accounted, read_session };
+    }
     const bytes = Buffer.byteLength(encodePhaseContext(result));
     if (bytes > result.byte_budget || (result.read_session && result.read_session.spent_this_call_tokens > request.session!.token_budget - request.session!.spent_tokens)) throw new PhaseContextError("BUDGET_TOO_SMALL", "Increase byte_budget or the SDK session token budget, narrow items, or start a fresh session. Mandatory facts and complete receipts must all fit; no session state was advanced.");
     if (bytes === result.bytes) return result;

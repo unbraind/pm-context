@@ -1,13 +1,15 @@
+import { buildSuggestedCommand } from "./suggested-command.js";
 import { spawnSync } from "node:child_process";
 import { isAbsolute, join, posix, relative, win32 } from "node:path";
 import { readdir } from "node:fs/promises";
-import { getActiveExtensionRegistrations, readLocatedItem, readSettings, resolveItemTypeRegistry } from "@unbrained/pm-cli/sdk";
+import { PmCliError, getActiveExtensionRegistrations, readLocatedItem, readSettings, resolveItemTypeRegistry } from "@unbrained/pm-cli/sdk";
 /** Actionable usage failure from Git discovery or path validation. */
-export class FileFocusError extends Error {
+export class FileFocusError extends PmCliError {
     exitCode = 2;
-    code;
-    constructor(code, message, options) {
-        super(message, options);
+    constructor(code, message, options, retryArgv) {
+        const retry = retryArgv === undefined ? undefined : buildSuggestedCommand(retryArgv);
+        super(message, 2, { code, ...(retry ? { nextSteps: ["Use the structured retry after repairing the unreadable documents."], recovery: { suggested_retry: retry.command, suggested_retry_args: retry.argv } } : {}) });
+        this.cause = options?.cause;
         this.name = "CommandError";
         this.code = code;
     }
@@ -38,10 +40,6 @@ export function normalizeFocusPath(value, root) {
         return undefined;
     return path;
 }
-/** Quote one refresh argument without splitting spaces, commas or shell metacharacters. */
-function quote(value) {
-    return `'${value.replace(/'/g, "'\\''")}'`;
-}
 /** Check tracker containment using repository-relative paths on native and Windows roots. */
 export function isTrackerPath(path, pmRoot, repoRoot) {
     const tracker = normalizeFocusPath(pmRoot, repoRoot);
@@ -71,7 +69,7 @@ export function resolveFileFocus(options, args, cwd, pmRoot, sourceCwd = cwd) {
     if (!root)
         throw new FileFocusError("NOT_GIT_REPOSITORY", "File focus requires a Git working repository. Run from the repository containing the changed files.");
     const files = new Set();
-    let refresh = "";
+    const refresh_argv = [];
     if (changed) {
         const base = typeof options.changed === "string" ? options.changed : args[0] ?? git(root, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"])?.trim() ?? "main";
         const commit = git(root, ["rev-parse", "--verify", "--end-of-options", `${base}^{commit}`])?.trim();
@@ -92,16 +90,17 @@ export function resolveFileFocus(options, args, cwd, pmRoot, sourceCwd = cwd) {
                     files.add(path);
             }
         }
-        refresh += ` --changed ${quote(base)}`;
+        refresh_argv.push("--changed", base);
     }
     for (const path of explicit) {
         const normalized = normalizeFocusPath(path, root);
         if (normalized === undefined)
             throw new FileFocusError("INVALID_FILE_FOCUS", "Each --files path must be inside the Git repository. Use repository-relative paths.");
         files.add(normalized);
-        refresh += ` --files ${quote(normalized)}`;
+        refresh_argv.push("--files", normalized);
     }
-    return { root, files: [...files].sort(), refresh };
+    const refresh = ` ${buildSuggestedCommand(refresh_argv).command}`;
+    return { root, files: [...files].sort(), refresh, refresh_argv };
 }
 /** Match exact files and linked directory ancestors, retaining unique changed paths per item. */
 export function matchFileFocus(items, focus, links) {
@@ -121,12 +120,15 @@ export function rankFileFocus(items, matches) {
         || (status[String(a.status)] ?? 4) - (status[String(b.status)] ?? 4)
         || (a.priority ?? 2) - (b.priority ?? 2) || a.id.localeCompare(b.id));
 }
+/** Portable template used by both structured packets and the rendered linking hint. */
+export function fileLinkCommand() { return buildSuggestedCommand(["pm", "files", "<id>", "--add", "path=<path>"]); }
 /** Render the unlinked working set with a concrete tracker-linking hint. */
 export function renderFileFocus(value) {
     if (!value.unlinked_changed_files)
         return [];
     return ["", "unlinked_changed_files:", ...value.unlinked_changed_files.map((path) => `- ${JSON.stringify(path)}`),
-        "Link relevant paths with: pm files <id> --add path=<path>"];
+        `Link relevant paths with: ${fileLinkCommand().command}`,
+        `argv: ${JSON.stringify(fileLinkCommand().argv)}`];
 }
 /** Enumerate all registered item folders through the canonical SDK parser without creating metadata caches. */
 export async function readFileFocusItems(pmRoot) {
@@ -159,7 +161,7 @@ export async function readFileFocusItems(pmRoot) {
     }
     catch (error) {
         const detail = String(error);
-        throw new FileFocusError("TRACKER_READ_FAILED", `Cannot completely read tracker items at ${itemPath}: ${detail}. Run pm validate and resolve unreadable or duplicate documents before retrying file focus.`, { cause: error });
+        throw new FileFocusError("TRACKER_READ_FAILED", `Cannot completely read tracker items at ${itemPath}: ${detail}. Resolve unreadable or duplicate documents before retrying file focus.`, { cause: error }, ["pm", "validate"]);
     }
 }
 //# sourceMappingURL=file-focus.js.map

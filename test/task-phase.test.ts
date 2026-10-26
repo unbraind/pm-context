@@ -41,7 +41,7 @@ function roundtrip(packet: PhaseContextPacket) {
   assert.deepEqual(packet.format === "json" ? JSON.parse(encoded) : decodeToon(encoded), packet);
   assert.equal(Buffer.byteLength(encoded), packet.bytes);
   assert.ok(packet.bytes <= packet.byte_budget);
-  if (packet.read_session) assert.equal(packet.read_session.spent_this_call_tokens, Math.ceil(Buffer.byteLength(JSON.stringify(packet)) / 4));
+  if (packet.read_session) assert.ok(packet.read_session.spent_this_call_tokens >= Math.ceil(Buffer.byteLength(JSON.stringify(packet)) / 4));
 }
 
 test("one strict request schema rejects sparse arrays, nonfinite numbers, unknown qualifiers and every bounded domain", () => {

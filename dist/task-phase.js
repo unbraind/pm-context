@@ -1,3 +1,4 @@
+import { buildRestoreCommand, buildSuggestedCommand } from "./suggested-command.js";
 /** Mandatory field contracts over cache-free SDK reads and caller-carried SDK sessions. */
 import { createHash } from "node:crypto";
 import { encode } from "@toon-format/toon";
@@ -101,7 +102,7 @@ export async function buildPhaseContext(input, pmRoot) {
         ok: true, protocol: "pm-context-phase/v1", phase: request.phase, previous_phase: request.previous_phase ?? null,
         mandatory_fields: mandatory,
         changes: [...new Set([...previous, ...mandatory])].sort().map((name) => ({ field: name, change: !previous.includes(name) ? "added" : !mandatory.includes(name) ? "removed" : "retained", reason: !previous.includes(name) ? `Required by ${request.phase}` : !mandatory.includes(name) ? `Required by ${request.previous_phase}; optional in ${request.phase}` : `Required by both ${request.previous_phase} and ${request.phase}` })),
-        bindings: [], facts: [], omission_receipt: createOutputOmissionReceipt([]), bytes: 0, byte_budget: request.byte_budget, format: request.format, session_fact_scope: "item-field-value;restore-with-bindings",
+        bindings: [], facts: [], omission_receipt: { ...createOutputOmissionReceipt([]), omitted_field_groups: [] }, bytes: 0, byte_budget: request.byte_budget, format: request.format, session_fact_scope: "item-field-value;restore-with-bindings",
     };
     const read = createFreshnessReader(pmRoot, ".");
     const omitted = [];
@@ -123,7 +124,7 @@ export async function buildPhaseContext(input, pmRoot) {
         }
         for (const name of Object.keys(source).sort())
             if (!included.has(name))
-                omitted.push({ name: `${item}.${name}`, restore_with: `pm get ${item} --fields ${name} --output-budget unbounded` });
+                omitted.push({ name: `${item}.${name}`, ...buildRestoreCommand(["pm", "get", item, "--fields", name, "--output-budget", "unbounded"]) });
         for (const name of [...included].sort()) {
             if (!Object.hasOwn(source, name))
                 throw new PhaseContextError("MISSING_FIELD", `Restore field ${name} on item ${item}, or revise the declared contract/include_fields. No mandatory field was dropped.`);
@@ -131,13 +132,14 @@ export async function buildPhaseContext(input, pmRoot) {
             // This is a read fact identity, not a mutation idempotency key. Include the
             // target coordinate so equal text on different items/fields never aliases.
             const id = `f-${createHash("sha256").update(JSON.stringify([item, name, value_json])).digest("hex")}`;
-            packet.bindings.push({ item, field: name, fact: id, mandatory: mandatory.includes(name), restore_with: `pm get ${item} --fields ${name} --output-budget unbounded` });
+            packet.bindings.push({ item, field: name, fact: id, mandatory: mandatory.includes(name), ...buildRestoreCommand(["pm", "get", item, "--fields", name, "--output-budget", "unbounded"]) });
             packet.facts.push({ id, value_json });
         }
     }
-    packet.omission_receipt = createOutputOmissionReceipt(omitted);
+    packet.omission_receipt = { ...createOutputOmissionReceipt(omitted), omitted_field_groups: omitted };
     let result = packet;
     if (request.session) {
+        result.session_restore = buildSuggestedCommand(["pm", "get", "<item-id>", "--brief"]);
         // The SDK owns reference construction and receipt accounting. Only facts are
         // rows: bindings and explanations must remain present even when facts reuse.
         const projected = applyReadOutputSessionReferences({ ...packet, row_contract: { command: "context-phase", row_kind: "collection", row_keys: ["facts"], fields: "unsupported" } }, request.session);
@@ -146,8 +148,13 @@ export async function buildPhaseContext(input, pmRoot) {
     // Coupled fixed point: exact transport bytes include their own digits and the
     // SDK receipt; SDK accounting intentionally measures the compact JSON object.
     for (;;) {
-        if (request.session)
-            result = attachReadOutputSessionReceipt({ ...result }, request.session);
+        if (request.session) {
+            const accounted = attachReadOutputSessionReceipt({ ...result }, request.session);
+            // The SDK's legacy display template is not executable POSIX text. Account
+            // it conservatively, but emit only our structured, quoted replacement.
+            const read_session = Object.fromEntries(Object.entries(accounted.read_session).filter(([key]) => key !== "restore_reference_with"));
+            result = { ...accounted, read_session };
+        }
         const bytes = Buffer.byteLength(encodePhaseContext(result));
         if (bytes > result.byte_budget || (result.read_session && result.read_session.spent_this_call_tokens > request.session.token_budget - request.session.spent_tokens))
             throw new PhaseContextError("BUDGET_TOO_SMALL", "Increase byte_budget or the SDK session token budget, narrow items, or start a fresh session. Mandatory facts and complete receipts must all fit; no session state was advanced.");
