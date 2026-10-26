@@ -444,7 +444,10 @@ represent them exactly. Commands are bounded to 4,096 arguments and 262,144 JSON
 
 JSON and TOON phase packets pair `restore_with` with `restore_argv` for supported
 field projections, derived from SDK `listGetProjectionFields`, metadata-only
-`listListProjectionFields` and the current runtime field registry. Unsupported keys carry `restore_unavailable` with code
+`listListProjectionFields` and the current runtime field registry. The core-only
+get/list difference identifies reserved derived meanings before runtime fields
+are added. Registering a field named `notes_count`, `linked` or another derived
+selector never makes that selector restore the raw stored metadata value. Unsupported keys carry `restore_unavailable` with code
 `UNSUPPORTED_FIELD_PROJECTION` and a reason; neither command field is emitted.
 Restorations request JSON so empty collections remain visible. Pack `refresh_command`, `link_command`, delta receipt
 `commands`, and `session_restore` use `{command, argv}`. Handoffs pair
@@ -534,8 +537,10 @@ or changed fields arrive in full. Resolve references from earlier `facts` by id.
 restoration availability. Execute a present `bindings[].restore_argv` directly;
 otherwise inspect `restore_unavailable`. Mandatory values remain in the packet
 even when no native projection exists. The legacy SDK placeholder display is
-omitted; `session_restore` refreshes a concrete selected item with the supported
-`--depth brief --json` options. Concrete field references restore through bindings. SDK charging conservatively includes the removed legacy template;
+omitted; `session_restore` only probes the concrete selected item's identity with
+`--fields id --output-budget unbounded --json`. Broad depth/full reads can
+replace stored count fields with derived counts, so field recovery is described
+exclusively by each binding. Concrete field references restore through bindings. SDK charging conservatively includes the removed legacy template;
 `bytes` exactly measures the selected JSON or TOON transport. Both ceilings
 must fit. Refusals do not advance caller state.
 

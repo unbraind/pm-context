@@ -207,8 +207,9 @@ preserved normally when selected by an admitted phase contract.
 
 Commands request JSON because the pinned CLI's human TOON renderer omits empty
 metadata collections and cannot represent all raw metadata keys. Session
-refreshes now name a real selected item and use supported `--depth brief --json`
-options. File-linking and delta discovery use accepted `--help` commands until
+recovery now probes only the selected identity using
+`--fields id --output-budget unbounded --json`; broad depth reads are not offered
+as raw metadata recovery. File-linking and delta discovery use accepted `--help` commands until
 the caller selects the target; runnable argv never contains placeholder IDs.
 Static help examples remain illustrative examples. Generic argv builder callers
 remain responsible for command semantics and actual target existence.
@@ -266,3 +267,53 @@ build output, audit, package contents, changelog and attestation checks pass.
 This subsequent receipt commit changes tracker evidence and documentation only;
 the PR records the final pushed-head CI run too. A supplemental pinned-CLI
 execution check accepts a generated refresh with a leading-dash tag unchanged.
+
+## Registered-name collision correction
+
+General rule: a restoration must preserve the stored field meaning and value;
+selector acceptance and exit zero do not establish that property. The SDK allows
+runtime metadata registration under names such as `notes_count` and `linked`,
+but core get still interprets those selectors as counts or facets. Augmenting
+both get and list domains with runtime fields therefore cannot distinguish them.
+
+The package now derives the reserved namespace from the **core-only** SDK get
+and metadata-list contracts before adding runtime fields. Both mandatory bindings
+and omission receipts use the same exclusion and explain derived-name collisions
+without emitting either restoration command field. Stored values remain in
+mandatory facts unchanged. Generic session recovery also follows the rule: it
+probes only canonical identity, since even broad depth/full reads overwrite raw
+count metadata. All other command-producing SDK/CLI paths were searched; they
+use explicit selections or executable discovery/recovery commands and do not
+advertise native field restorations.
+
+`test/phase-restoration.test.ts` discovers all eight registerable top-level
+collision names from SDK contracts, registers every one with the SDK, and runs
+500 seeded state/replay models with whitespace/CRLF, quotes, operators and
+Unicode. Literal reference-model values are checked against state read back
+through SDK document reads; no handwritten normalization is used. All four
+phases and both encodings preserve selected values and omit invalid commands.
+The test then packs the real npm artifact and consumes it under Node and Bun,
+with pinned dependencies supplied offline, plus the installed CLI. All six
+consumer packets match the source SDK packet, and **78 actual emitted commands**
+restore the exact SDK field values outside Git. Single-field reads must return
+only identity and the selected field. Existing tests remain unchanged.
+
+Behavioral revert 1: remove only the reserved-derived namespace exclusion.
+The new test fails **1/1** on the unsafe raw `blockers` restoration. Behavioral
+revert 2: restore only generic broad-depth session recovery. The new test fails
+**1/1** on the overwrite-capable projection. Source bytes are restored exactly
+in `finally` after both probes. The focused adversarial test passes with both
+fixes, including all 500 models, eight collisions and packed consumers.
+
+The supplied auto-round-1 review contains one substantive blocker. Available
+GitHub reviews/inline comments and the queued review instruction contain no
+additional non-blocking finding to dismiss or leave open. Re-review remains
+separate from the release-gate evidence.
+
+Registered-collision correction full local gates: `npm run release:check` and
+`bun run release:check` each pass **428/428 tests**, zero failures or skips,
+sequentially with two workers and fresh Git identities. Native coverage covers
+16 sources at 100% lines/branches/functions; c8 reports 100%
+statements/functions/lines and 99.96% branches at unchanged thresholds. Typecheck,
+build, test typecheck, docstring and changelog checks pass; no separate lint
+script exists. Final exact-head CI evidence is reported in the PR.

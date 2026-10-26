@@ -92,11 +92,11 @@ export function encodePhaseContext(packet) {
         throw new PhaseContextError("INVALID_OUTPUT", "Regenerate the packet from current SDK reads; output must use json|toon, nonnegative safe counters and byte_budget 512-262144.");
     return `${packet.format === "json" ? JSON.stringify(packet) : encode(packet)}\n`;
 }
-/** Never advertise an executable selector that the host cannot parse as one field. */
-function restoreField(item, name, supported) {
+/** Emit recovery only for selectors that preserve the stored metadata meaning. */
+function restoreField(item, name, supported, derived) {
     return supported.has(name)
         ? buildRestoreCommand(["pm", "get", item, "--fields", name, "--output-budget", "unbounded", "--json"])
-        : { restore_unavailable: { code: "UNSUPPORTED_FIELD_PROJECTION", reason: "The pinned CLI has no supported single-field projection for this source key. Read it through the SDK or include it in a phase packet when the request schema accepts the key." } };
+        : { restore_unavailable: { code: "UNSUPPORTED_FIELD_PROJECTION", reason: derived.has(name) ? "The pinned CLI reserves this selector for derived output instead of the stored metadata value. Read this field through the SDK or retain its phase fact; no value-preserving CLI restoration is available." : "The pinned CLI has no supported single-field projection for this source key. Read it through the SDK or include it in a phase packet when the request schema accepts the key." } };
 }
 /** Build mandatory projections using SDK intent resolution, omission receipts and session reuse. */
 export async function buildPhaseContext(input, pmRoot) {
@@ -113,13 +113,18 @@ export async function buildPhaseContext(input, pmRoot) {
     };
     const read = createFreshnessReader(pmRoot, ".");
     let supported;
+    let derived;
     try {
         const settings = await read({ kind: "settings" });
         const runtimeKeys = resolveRuntimeFieldRegistry(settings.schema).definitions.map((definition) => definition.metadata_key);
-        // Row metadata selectors exclude get-only derived facets. Item aliases name
-        // canonical fields, never literal raw metadata keys containing a dot.
+        // Discover reserved output meanings before runtime fields can make a
+        // derived selector appear in both advertised domains. Registration cannot
+        // change what the core get command actually returns for those names.
+        const nativeMetadata = new Set(listListProjectionFields());
+        derived = new Set(listGetProjectionFields().filter((name) => !nativeMetadata.has(name)));
+        // Aliases select canonical fields, not raw metadata keys containing dots.
         const metadata = new Set(listListProjectionFields(runtimeKeys));
-        supported = new Set(listGetProjectionFields(runtimeKeys).filter((name) => field(name) && metadata.has(name)));
+        supported = new Set(listGetProjectionFields(runtimeKeys).filter((name) => field(name) && metadata.has(name) && !derived.has(name)));
     }
     catch {
         throw new PhaseContextError("SOURCE_UNAVAILABLE", "Restore readable SDK settings before deriving executable field projections.");
@@ -143,7 +148,7 @@ export async function buildPhaseContext(input, pmRoot) {
         }
         for (const name of Object.keys(source).sort())
             if (!included.has(name))
-                omitted.push({ name: `${item}.${name}`, ...restoreField(item, name, supported) });
+                omitted.push({ name: `${item}.${name}`, ...restoreField(item, name, supported, derived) });
         for (const name of [...included].sort()) {
             if (!Object.hasOwn(source, name))
                 throw new PhaseContextError("MISSING_FIELD", `Restore field ${name} on item ${item}, or revise the declared contract/include_fields. No mandatory field was dropped.`);
@@ -151,14 +156,14 @@ export async function buildPhaseContext(input, pmRoot) {
             // This is a read fact identity, not a mutation idempotency key. Include the
             // target coordinate so equal text on different items/fields never aliases.
             const id = `f-${createHash("sha256").update(JSON.stringify([item, name, value_json])).digest("hex")}`;
-            packet.bindings.push({ item, field: name, fact: id, mandatory: mandatory.includes(name), ...restoreField(item, name, supported) });
+            packet.bindings.push({ item, field: name, fact: id, mandatory: mandatory.includes(name), ...restoreField(item, name, supported, derived) });
             packet.facts.push({ id, value_json });
         }
     }
     packet.omission_receipt = { ...createOutputOmissionReceipt(omitted.map((group) => ({ name: group.name, restore_with: group.restore_with ?? "" }))), omitted_field_groups: omitted };
     let result = packet;
     if (request.session) {
-        result.session_restore = buildSuggestedCommand(["pm", "get", request.items[0], "--depth", "brief", "--json"]);
+        result.session_restore = buildSuggestedCommand(["pm", "get", request.items[0], "--fields", "id", "--output-budget", "unbounded", "--json"]);
         // The SDK owns reference construction and receipt accounting. Only facts are
         // rows: bindings and explanations must remain present even when facts reuse.
         const projected = applyReadOutputSessionReferences({ ...packet, row_contract: { command: "context-phase", row_kind: "collection", row_keys: ["facts"], fields: "unsupported" } }, request.session);

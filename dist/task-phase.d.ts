@@ -76,7 +76,7 @@ export interface PhaseContextPacket {
     session_fact_scope: "item-field-value;restore-with-bindings";
     /** SDK-owned charging conservatively includes its removed legacy restore template. */
     read_session?: Omit<PmReadOutputSessionReceipt, "restore_reference_with">;
-    /** Concrete item refresh; field restorations are carried by bindings. */
+    /** Concrete identity probe only; value restoration is exclusively described by bindings. */
     session_restore?: SuggestedCommand;
 }
 /** Validate untrusted input once before reading sources; never normalize tracker content. */
