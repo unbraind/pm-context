@@ -562,7 +562,7 @@ export async function buildSincePack(pmRoot: string, items: PmItem[], terminal: 
   }
   const pack: SincePack = {
     protocol: "pm-context-since/v1", cursor: `s1_${"0".repeat(64)}`, served_at: servedAt, restart_from: restartFrom, changes: [],
-    omission_receipt: { ...receipt, deferred_rows: rows.length, deferred_own_claims: rows.filter((row) => row.op === "own_claim").length, excerpt_omitted_chars: 0, remedy: "Resume with the cursor for deferred rows; use the structured commands for complete excerpts and patches.", commands: [buildSuggestedCommand(["pm", "comments", "<id>"]), buildSuggestedCommand(["pm", "history", "<id>", "--full"])] },
+    omission_receipt: { ...receipt, deferred_rows: rows.length, deferred_own_claims: rows.filter((row) => row.op === "own_claim").length, excerpt_omitted_chars: 0, remedy: "Resume with the cursor for deferred rows; use the structured commands for complete excerpts and patches.", commands: [buildSuggestedCommand(["pm", "comments", "--help"]), buildSuggestedCommand(["pm", "history", "--help"])] },
     budget: { ceiling: options.tokenBudget, token_upper_bound: 0, unit: "utf8-bytes" },
   };
   const included = packSinceRows(pack, rows);

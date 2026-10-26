@@ -15,18 +15,20 @@ agent authority and performs no lifecycle transition.
 
 SDK reuse: `composeContextIntentContracts`, `resolveContextIntentContract`,
 `createOutputOmissionReceipt`, `parseReadOutputSession`,
-`applyReadOutputSessionReferences`, `attachReadOutputSessionReceipt`, plus the
+`applyReadOutputSessionReferences`, `attachReadOutputSessionReceipt`,
+`listGetProjectionFields`, `listListProjectionFields` and
+`resolveRuntimeFieldRegistry`, plus the
 existing cache-free `createFreshnessReader` built on SDK settings, item location
 and document parsing. TOON uses the same codec as the host, declared as a direct
 production dependency. The pinned pm SDK remains 2026.10.23; the current CLI
-registry version was checked as 2026.10.25.
+registry version was checked as 2026.10.26.
 
 ## Reproduce
 
 ```sh
 npm run build
 npm run build:test
-node --test test/task-phase.test.ts test/renderer-ownership.test.ts
+node --test --test-concurrency=2 test/task-phase.test.ts test/renderer-ownership.test.ts
 npm run typecheck
 npm run docstring
 node test/task-phase-public.ts "$PUBLIC_TRACKER_SNAPSHOT"
@@ -60,10 +62,10 @@ The remaining switch refuses its body budget. Every source byte remains unchange
 
 | Encoding | Successful packets | Total UTF-8 bytes | Min | Max |
 | --- | ---: | ---: | ---: | ---: |
-| JSON | 329 | 1,801,950 | 3,305 | 10,741 |
-| TOON | 329 | 1,772,334 | 3,214 | 10,651 |
+| JSON | 329 | 1,904,622 | 3,481 | 11,237 |
+| TOON | 329 | 1,875,006 | 3,390 | 11,147 |
 
-Sizes include explanations, bindings, facts, omission receipts, command argv and final newline. These figures were rerun after adding safe command suggestions; the earlier product-head CI receipt below predates that additive wire-format change.
+Sizes include explanations, bindings, facts, omission receipts, command argv and final newline. These figures were rerun after deriving executable selectors from the SDK and requesting JSON restoration; the earlier product-head CI receipt below predates that additive wire-format change.
 They are transport measurements rather than tokenizer measurements.
 
 ## Behavioral guarantees
@@ -160,7 +162,8 @@ returns fresh structured host examples. Legacy shell-string overrides refuse.
 The core SDK supplies a legacy placeholder display without argv. The package
 omits that field and supplies `session_restore` with quoted display and argv;
 SDK charging conservatively includes its internal legacy template. Concrete
-field facts always restore through the binding's `restore_argv`.
+field facts restore through a present binding `restore_argv`; unavailable native
+projections carry a typed reason instead.
 
 `test/suggested-command.test.ts` checks 500 seeded random key/value commands,
 including spaces, quotes, operators, substitutions, backticks, control characters,
@@ -188,3 +191,64 @@ argv survives installed CLI JSON serialization. Machine error consumers request
 JSON or encode the SDK DTO as TOON; the SDK's default human-readable stderr is
 not a machine TOON document. The installed unreadable-tracker regression checks
 that wire recovery, and its DTO round-trip preserves the same argv.
+
+## Executable restoration review correction
+
+A second blocking review showed that shell-safe argv can still request an
+unsupported host projection. Restoration now derives its field domain from the
+pinned SDK `listGetProjectionFields` intersected with metadata-only
+`listListProjectionFields`, including configured runtime metadata via
+`resolveRuntimeFieldRegistry`. No package-owned projection list exists. Both
+bindings and omissions carry either `restore_with` plus `restore_argv`, or
+`restore_unavailable` with `UNSUPPORTED_FIELD_PROJECTION` and a reason. The
+fixed `a;printf X` key and an unregistered ordinary metadata key have no native
+selector and therefore emit neither command field. Their source values are
+preserved normally when selected by an admitted phase contract.
+
+Commands request JSON because the pinned CLI's human TOON renderer omits empty
+metadata collections and cannot represent all raw metadata keys. Session
+refreshes now name a real selected item and use supported `--depth brief --json`
+options. File-linking and delta discovery use accepted `--help` commands until
+the caller selects the target; runnable argv never contains placeholder IDs.
+Static help examples remain illustrative examples. Generic argv builder callers
+remain responsible for command semantics and actual target existence.
+
+The execution regression builds all four phases in JSON and TOON on a real
+non-Git SDK tracker, including empty collections, a registered runtime field,
+an unsupported mandatory field and the shell-metacharacter review fixture. It
+executes every emitted receipt command against the repository-pinned CLI without
+repairing flags or selectors, checks exit 0, and compares restored values with
+SDK-read native state. It also executes file/delta discovery commands: **115/115
+commands pass** with Git absent from PATH. Another **28/28** actual package
+refresh, delta discovery, recovery and static help example commands pass against
+the installed pinned CLI outside Git. The existing 500-sequence state model
+and 500-case real-shell quoting property remain in the gates.
+
+The package test runner and native coverage runner now both enforce
+`--test-concurrency=2`. Full npm and Bun gates run sequentially at unchanged
+thresholds. Final exact-head CI counts are recorded in the PR and tracker.
+
+Behavioral revert: bypass only `restoreField` selector validation, retaining the
+builder and test. The execution regression fails **1/1**, with the exact
+`a;printf X` restoration command exiting **2** and reporting
+`unknown_field_projection`. Source bytes are restored in `finally`. This proves
+the new regression detects invalid CLI projections independently of shell
+quoting. Raw `item.title`, `linked`, `notes_count` and comma-containing keys are
+also unavailable rather than aliases for different values. Unreadable SDK
+projection settings refuse with typed `SOURCE_UNAVAILABLE`.
+
+Projection settings also use the existing cache-free `createFreshnessReader`
+settings source. It rejects SDK warnings or unstable source bytes before
+selecting fields, rather than accepting convenience-reader defaults. The first
+full npm attempt passed all 427 tests but failed native branch coverage on the
+unreachable-with-defaults error branch. The settings-specific refusal regression
+now exercises the authoritative boundary. The corrected focused selection passes
+3/3; full gates are rerun without threshold changes.
+
+Corrected local full gates: `npm run release:check` and
+`bun run release:check` each pass **427/427 tests**, zero failures or skips.
+They run sequentially with at most two workers and fresh Git identities.
+Native coverage reports **16 sources at 100% lines/branches/functions**; c8
+reports **100% statements/functions/lines and 99.96% branches** at the unchanged
+99.9% threshold. The final public rerun reproduces the measurements above and
+preserves every source byte. Exact pushed-head CI URLs and counts are in the PR.

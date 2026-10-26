@@ -24,7 +24,7 @@ export declare function resolveFileFocus(options: Record<string, unknown>, args:
 export declare function matchFileFocus(items: PmItem[], focus: FileFocus, links: (value: unknown) => string[]): Map<string, string[]>;
 /** Rank focus by unique overlap, lifecycle status, priority, then deterministic id. */
 export declare function rankFileFocus(items: PmItem[], matches: Map<string, string[]>): PmItem[];
-/** Portable template used by both structured packets and the rendered linking hint. */
+/** Executable help for linking files when no target item has been chosen. */
 export declare function fileLinkCommand(): import("./suggested-command.ts").SuggestedCommand;
 /** Render the unlinked working set with a concrete tracker-linking hint. */
 export declare function renderFileFocus(value: {

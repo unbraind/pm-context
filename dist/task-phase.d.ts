@@ -24,13 +24,24 @@ export declare class PhaseContextError extends PmCliError {
     readonly remedy: string;
     constructor(code: PhaseContextError["code"], remedy: string);
 }
+/** A field is restorable only when the host declares a compatible selector. */
+export type PhaseFieldRestoration = (SuggestedRestore & {
+    restore_unavailable?: never;
+}) | {
+    restore_unavailable: {
+        code: "UNSUPPORTED_FIELD_PROJECTION";
+        reason: string;
+    };
+    restore_with?: never;
+    restore_argv?: never;
+};
 /** Coordinates survive SDK reference suppression so every mandatory value remains resolvable. */
-export interface PhaseFieldBinding extends SuggestedRestore {
+export type PhaseFieldBinding = PhaseFieldRestoration & {
     item: string;
     field: string;
     fact: string;
     mandatory: boolean;
-}
+};
 /** Exact authoritative SDK field value; JSON strings preserve nested native collections. */
 export interface PhaseFieldFact {
     id: string;
@@ -55,7 +66,7 @@ export interface PhaseContextPacket {
     omission_receipt: Omit<OutputOmissionReceipt, "omitted_field_groups"> & {
         omitted_field_groups: Array<{
             name: string;
-        } & SuggestedRestore>;
+        } & PhaseFieldRestoration>;
     };
     /** Exact complete encoded size including the trailing newline and this counter. */
     bytes: number;
@@ -65,7 +76,7 @@ export interface PhaseContextPacket {
     session_fact_scope: "item-field-value;restore-with-bindings";
     /** SDK-owned charging conservatively includes its removed legacy restore template. */
     read_session?: Omit<PmReadOutputSessionReceipt, "restore_reference_with">;
-    /** Safe generic template; concrete field restorations are carried by bindings. */
+    /** Concrete item refresh; field restorations are carried by bindings. */
     session_restore?: SuggestedCommand;
 }
 /** Validate untrusted input once before reading sources; never normalize tracker content. */

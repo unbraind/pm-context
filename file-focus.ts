@@ -125,14 +125,14 @@ export function rankFileFocus(items: PmItem[], matches: Map<string, string[]>): 
     || (a.priority ?? 2) - (b.priority ?? 2) || a.id.localeCompare(b.id));
 }
 
-/** Portable template used by both structured packets and the rendered linking hint. */
-export function fileLinkCommand() { return buildSuggestedCommand(["pm", "files", "<id>", "--add", "path=<path>"]); }
+/** Executable help for linking files when no target item has been chosen. */
+export function fileLinkCommand() { return buildSuggestedCommand(["pm", "files", "--help"]); }
 
 /** Render the unlinked working set with a concrete tracker-linking hint. */
 export function renderFileFocus(value: { unlinked_changed_files?: string[] }): string[] {
   if (!value.unlinked_changed_files) return [];
   return ["", "unlinked_changed_files:", ...value.unlinked_changed_files.map((path) => `- ${JSON.stringify(path)}`),
-    `Link relevant paths with: ${fileLinkCommand().command}`,
+    `Choose a target item and consult file-linking help: ${fileLinkCommand().command}`,
     `argv: ${JSON.stringify(fileLinkCommand().argv)}`];
 }
 

@@ -5,11 +5,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { encode } from "@toon-format/toon";
-import { create, init, isPmCliExpectedError, readLocatedItem, readSettings, serializeItemDocument } from "@unbrained/pm-cli/sdk";
+import { create, init, isPmCliExpectedError, readLocatedItem, readSettings, schemaAddField, serializeItemDocument } from "@unbrained/pm-cli/sdk";
 import { createExtensionTestHarness, decodeToon } from "@unbrained/pm-cli/sdk/testing";
-import extension, { buildAgentHandoff, buildContextPack, buildPhaseContext, buildSuggestedAgentCommandArgv, buildSuggestedCommand, commandExamples, encodePhaseContext, quotePosixArgument } from "../index.ts";
+import extension, { buildAgentHandoff, buildContextPack, buildPhaseContext, buildSuggestedAgentCommandArgv, buildSuggestedCommand, commandExamples, encodePhaseContext, quotePosixArgument, readPmItems, TASK_PHASES } from "../index.ts";
 import type { SuggestedCommand, SuggestedAgentCommandInput } from "../index.ts";
-import { SinceError } from "../since.ts";
+import { SinceError, buildSincePack } from "../since.ts";
 import { FileFocusError, fileLinkCommand } from "../file-focus.ts";
 
 /** Ask a real POSIX shell to split the display, then print each argument with NUL framing. */
@@ -29,7 +29,7 @@ function commands(value: unknown): SuggestedCommand[] {
   const row = value as Record<string, unknown>;
   const result: SuggestedCommand[] = [];
   for (const [display, args] of [["command", "argv"], ["restore_with", "restore_argv"], ["suggestedCommand", "suggestedArgv"], ["suggested_retry", "suggested_retry_args"]]) {
-    if (typeof row[display] === "string") { assert.ok(Array.isArray(row[args]), `missing ${args}`); result.push({ command: row[display] as string, argv: row[args] as string[] }); }
+    if (typeof row[display] === "string" && (display !== "command" || row[display].startsWith("pm "))) { assert.ok(Array.isArray(row[args]), `missing ${args}`); result.push({ command: row[display] as string, argv: row[args] as string[] }); }
   }
   return [...result, ...Object.values(row).flatMap(commands)];
 }
@@ -64,33 +64,59 @@ test("one POSIX renderer round-trips 500 seeded arbitrary keys and values withou
   assert.throws(() => buildSuggestedCommand(["pm", "get", "\ud800"]), /well-formed Unicode/);
 });
 
-test("fixed review key and admitted native metadata emit safe restore argv in JSON and TOON on a non-git tracker", async (t) => {
+test("fixed review key refuses unsupported restoration; every emitted phase receipt executes with the pinned CLI outside Git", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "command-packet-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const client = { cwd: root, pmRoot: join(root, "tracker"), noExtensions: true };
   await init("safe", { defaults: true, agentGuidance: "skip", author: "fixture" }, client);
-  const { item } = await create({ title: "Command safety", author: "fixture" }, client);
+  await schemaAddField("custom_signal", { type: "string", commands: ["create", "update"], author: "fixture" }, client);
+  const { item } = await create({ title: "Command safety", description: "Investigate", body: "Implement", acceptanceCriteria: "Review", author: "fixture" }, client);
   const path = join(client.pmRoot, "tasks", `${item.id}.toon`);
   const { document } = await readLocatedItem({ id: item.id, type: "Task", itemPath: path, item_format: "toon" }, { schema: (await readSettings(client.pmRoot)).schema });
-  const keys = ["a;printf X", "a;printf hit > shell-side-effect", "spaces key", "'quoted'", '"double"', "$()|&<>`", "line\nbreak", "tab\tkey", "-leading", "é📚", ""];
+  const keys = ["a;printf X", "a;printf hit > shell-side-effect", "spaces key", "'quoted'", '"double"', "$()|&<>`", "line\nbreak", "tab\tkey", "-leading", "é📚", "", "item.title", "linked", "notes_count", "title,body"];
+  Object.assign(document.metadata, { custom_signal: "registered native value", unknown_native: "unregistered native value" });
   for (const key of keys) Object.assign(document.metadata, { [key]: "literal\r\nvalue ' ;|&$()<>`" });
   writeFileSync(path, serializeItemDocument(document, { format: "toon" }));
   const admitted = (await readLocatedItem({ id: item.id, type: "Task", itemPath: path, item_format: "toon" }, { schema: (await readSettings(client.pmRoot)).schema })).document.metadata;
   assert.ok(Object.hasOwn(admitted, "a;printf X"));
   const before = readFileSync(path);
-  for (const format of ["json", "toon"] as const) {
-    const packet = await buildPhaseContext({ phase: "review", items: [item.id], contracts: { investigation: ["title"], implementation: ["title"], review: ["title"], handoff: ["title"] }, format, byte_budget: 50000, session: { version: 1, id: "safe", token_budget: 50000, spent_tokens: 0, seen_item_ids: [] } }, client.pmRoot);
+  const packageRoot = resolve(import.meta.dirname, "..");
+  const noGit = join(root, "no-executables"); mkdirSync(noGit);
+  const environment = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PM_"))), HOME: root, PM_PATH: client.pmRoot, PM_AUTHOR: "fixture", PATH: noGit, GIT_CEILING_DIRECTORIES: tmpdir() };
+  let executed = 0;
+  for (const phase of TASK_PHASES) for (const format of ["json", "toon"] as const) {
+    const packet = await buildPhaseContext({ phase, items: [item.id], contracts: { investigation: ["title", "description"], implementation: ["title", "body"], review: ["title", "acceptance_criteria"], handoff: ["title", "status", "unknown_native"] }, format, byte_budget: 50000, session: { version: 1, id: "safe", token_budget: 50000, spent_tokens: 0, seen_item_ids: [] } }, client.pmRoot);
     const encoded = encodePhaseContext(packet); const decoded = format === "json" ? JSON.parse(encoded) : decodeToon(encoded);
     assert.deepEqual(decoded, packet);
-    for (const key of keys.filter((key) => Object.hasOwn(admitted, key))) {
-      const row = packet.omission_receipt.omitted_field_groups.find((group) => group.name === `${item.id}.${key}`)!;
-      assert.deepEqual(row.restore_argv, ["pm", "get", item.id, "--fields", key, "--output-budget", "unbounded"]);
+    const suggestions = commands(decoded).sort((a, b) => Number(b.argv.includes("a;printf X")) - Number(a.argv.includes("a;printf X"))); assert.ok(suggestions.length > 0);
+    for (const command of suggestions) {
+      shellRoundtrip(command, root);
+      // Execute the exact emitted argv after replacing only the executable with
+      // the repository-pinned entrypoint. No flag repairs or selector rewrites.
+      const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: 15000 });
+      assert.equal(result.status, 0, `${JSON.stringify(command.argv)}: ${result.stderr}`);
+      const restored = (command.argv.includes("--json") ? JSON.parse(result.stdout) : decodeToon(result.stdout)) as { item: Record<string, unknown> };
+      const index = command.argv.indexOf("--fields");
+      const field = index < 0 ? "title" : command.argv[index + 1]!;
+      assert.ok(Object.hasOwn(restored.item, field), `restored field missing: ${field}; output=${result.stdout}`);
+      assert.deepEqual(restored.item[field], field === "body" ? document.body : admitted[field]);
+      executed++;
     }
-    const review = packet.omission_receipt.omitted_field_groups.find((group) => group.name === `${item.id}.a;printf X`)!;
-    shellRoundtrip({ command: review.restore_with, argv: review.restore_argv }, root);
-    const suggestions = commands(decoded); assert.ok(suggestions.length >= keys.length);
-    for (const command of suggestions) shellRoundtrip(command, root);
+    for (const key of [...keys.filter((key) => Object.hasOwn(admitted, key)), "unknown_native"]) {
+      const row = packet.omission_receipt.omitted_field_groups.find((group) => group.name === `${item.id}.${key}`) ?? packet.bindings.find((binding) => binding.field === key)!;
+      assert.ok(row);
+      assert.equal(Object.hasOwn(row, "restore_argv"), false, `unsupported projection ${JSON.stringify(key)}`);
+      assert.equal(Object.hasOwn(row, "restore_with"), false);
+      assert.equal(row.restore_unavailable?.code, "UNSUPPORTED_FIELD_PROJECTION");
+      assert.match(row.restore_unavailable!.reason, /pinned CLI/);
+    }
+    assert.ok(suggestions.some(({ argv }) => argv.includes("custom_signal")), "registered runtime fields remain restorable");
     assert.equal("restore_reference_with" in packet.read_session!, false, "unsafe SDK legacy template stays out of the package wire format");
   }
+  for (const command of [fileLinkCommand(), buildSuggestedCommand(["pm", "comments", "--help"]), buildSuggestedCommand(["pm", "history", "--help"])]) {
+    const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: 15000 });
+    assert.equal(result.status, 0, result.stderr); executed++;
+  }
+  t.diagnostic(`${executed} exact emitted commands accepted by the pinned CLI outside Git`);
   assert.deepEqual(readFileSync(path), before);
 });
 
@@ -133,4 +159,40 @@ test("handoff ids, selectors, free-form override refusal, registered examples an
     const hints = commands(decoded); assert.equal(hints.length, 1);
     assert.deepEqual(hints[0]!.argv, ["pm", "validate"]); shellRoundtrip(hints[0]!, root);
   }
+});
+
+test("runtime refreshes, discovery, recovery and static help examples execute through the installed pinned CLI", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "command-execution-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const client = { cwd: root, pmRoot: join(root, "tracker"), noExtensions: true };
+  await init("pm", { defaults: true, agentGuidance: "skip", author: "fixture" }, client);
+  const items = [];
+  for (const id of ["pm-1234", "pm-5678"]) items.push((await create({ id, title: `Example ${id}`, author: "fixture" }, client)).item);
+  assert.deepEqual(items.map((item) => item.id), ["pm-1234", "pm-5678"]);
+  const packageRoot = resolve(import.meta.dirname, "..");
+  const installed = join(client.pmRoot, "extensions", "pm-context"); mkdirSync(installed, { recursive: true });
+  cpSync(join(packageRoot, "manifest.json"), join(installed, "manifest.json"));
+  cpSync(join(packageRoot, "dist"), join(installed, "dist"), { recursive: true });
+  symlinkSync(join(packageRoot, "node_modules"), join(installed, "node_modules"), "dir");
+  const noGit = join(root, "no-executables"); mkdirSync(noGit);
+  const environment = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PM_"))), HOME: root, PM_PATH: client.pmRoot, PM_AUTHOR: "fixture", PATH: noGit, GIT_CEILING_DIRECTORIES: tmpdir() };
+  const pack = buildContextPack(items);
+  const delta = await buildSincePack(client.pmRoot, await readPmItems(client.pmRoot), new Set(), { author: "fixture", tokenBudget: 100000, from: "2000-01-01T00:00:00Z" });
+  const recovery = [new SinceError("HISTORY_EXPIRED", "Reorient", ["pm", "context", "--for", "handoff"]), new FileFocusError("TRACKER_READ_FAILED", "Repair", undefined, ["pm", "validate"])];
+  const pending = [...Object.values(commandExamples()).flat(), ...commands(buildAgentHandoff(pack)), ...commands(delta), ...recovery.flatMap((error) => commands(error.context)), fileLinkCommand()];
+  let executed = 0;
+  for (const command of pending) {
+    shellRoundtrip(command, root);
+    const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: 15000 });
+    assert.equal(result.status, 0, `${JSON.stringify(command.argv)}: ${result.stderr}`); executed++;
+    if (command.argv.includes("--json") || command.argv.includes("json")) {
+      const output: unknown = JSON.parse(result.stdout);
+      // Exercise commands produced by the actual CLI response, including refresh
+      // argv, rather than constructing a matching invocation in the test.
+      for (const suggestion of commands(output)) {
+        const restored = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...suggestion.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: 15000 });
+        assert.equal(restored.status, 0, `${JSON.stringify(suggestion.argv)}: ${restored.stderr}`); executed++;
+      }
+    }
+  }
+  t.diagnostic(`${executed} package command suggestions accepted outside Git`);
 });

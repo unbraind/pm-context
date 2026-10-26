@@ -442,8 +442,11 @@ single-quoted, with embedded apostrophes escaped as `'\''`. Empty arguments are
 preserved; NUL bytes and malformed Unicode refuse because UTF-8 argv cannot
 represent them exactly. Commands are bounded to 4,096 arguments and 262,144 JSON bytes.
 
-JSON and TOON phase packets pair `restore_with` with `restore_argv` on every
-binding and omission. Pack `refresh_command`, `link_command`, delta receipt
+JSON and TOON phase packets pair `restore_with` with `restore_argv` for supported
+field projections, derived from SDK `listGetProjectionFields`, metadata-only
+`listListProjectionFields` and the current runtime field registry. Unsupported keys carry `restore_unavailable` with code
+`UNSUPPORTED_FIELD_PROJECTION` and a reason; neither command field is emitted.
+Restorations request JSON so empty collections remain visible. Pack `refresh_command`, `link_command`, delta receipt
 `commands`, and `session_restore` use `{command, argv}`. Handoffs pair
 `suggestedCommand` with `suggestedArgv`. Typed refusal recovery pairs SDK
 `suggested_retry` with `suggested_retry_args`. Execute the array without a shell;
@@ -453,19 +456,21 @@ the string is a POSIX display, not an independent source of arguments.
 import { buildSuggestedCommand, commandExamples } from "pm-context";
 
 const suggestion = buildSuggestedCommand([
-  "pm", "get", "project-task", "--fields", "a;printf X",
+  "pm", "get", "project-task", "--fields", "title",
 ]);
-// suggestion.command: pm get project-task --fields 'a;printf X'
-// suggestion.argv: ["pm", "get", "project-task", "--fields", "a;printf X"]
+// suggestion.command: pm get project-task --fields title
+// suggestion.argv: ["pm", "get", "project-task", "--fields", "title"]
 const examples = commandExamples(); // fresh {command, argv} examples for help
 ```
 
 Direct SDK handoff overrides now use `suggestedArgv`; free-form
 `suggestedCommand` overrides refuse instead of guessing shell syntax. File-focus
 refreshes append `refresh_argv`, never display fragments. Static host help
-examples use the same structured builder. Suggestions and templates are not
-executed by this package. Replace template placeholders in argv, then rebuild
-the display; never substitute data into the rendered shell string.
+examples use the same structured builder. Suggestions are not executed by this package. File-linking and delta help
+commands use executable `--help` calls until the caller chooses a target. Static
+help examples use illustrative item IDs; replace those IDs in argv and rebuild
+the display. The generic builder guarantees argv fidelity, not that arbitrary
+caller-supplied arguments are valid for a CLI command.
 
 ## Task-phase context contracts
 
@@ -526,10 +531,11 @@ fact id binds the item, field and exact current SDK value. Shared unchanged
 fields reuse the SDK's `session:<session-id>:<fact-id>` references; newly required
 or changed fields arrive in full. Resolve references from earlier `facts` by id.
 `bindings` always retain item/field coordinates, the mandatory marker and native
-restoration command. Execute `bindings[].restore_argv` directly. The legacy SDK
-placeholder display is omitted from the receipt; `session_restore` carries its
-quoted generic template and argv. Concrete field references restore through
-bindings. SDK charging conservatively includes the removed legacy template;
+restoration availability. Execute a present `bindings[].restore_argv` directly;
+otherwise inspect `restore_unavailable`. Mandatory values remain in the packet
+even when no native projection exists. The legacy SDK placeholder display is
+omitted; `session_restore` refreshes a concrete selected item with the supported
+`--depth brief --json` options. Concrete field references restore through bindings. SDK charging conservatively includes the removed legacy template;
 `bytes` exactly measures the selected JSON or TOON transport. Both ceilings
 must fit. Refusals do not advance caller state.
 

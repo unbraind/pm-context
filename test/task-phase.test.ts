@@ -90,7 +90,7 @@ test("four real SDK phase fixtures preserve every mandatory field or refuse, wit
     }
     assert.equal(packet.bindings.some((row) => row.field === "tags"), false);
     const omitted = packet.omission_receipt.omitted_field_groups.find((row) => row.name === `${item.id}.tags`)!;
-    assert.equal(omitted.restore_with, `pm get ${item.id} --fields tags --output-budget unbounded`);
+    assert.equal(omitted.restore_with, `pm get ${item.id} --fields tags --output-budget unbounded --json`);
     const restored = await buildPhaseContext({ ...input, include_fields: ["tags"] }, client.pmRoot);
     assert.ok(restored.bindings.some((row) => row.field === "tags" && !row.mandatory));
     const missing = { ...input, contracts: { ...input.contracts, [phase]: ["missing_native_field"] } };
@@ -144,6 +144,17 @@ test("deep source data and aggregate source limits refuse before producing a pac
   }
   const contracts = Object.fromEntries(TASK_PHASES.map((phase) => [phase, ["title"]])) as Record<TaskPhase, string[]>;
   await assert.rejects(buildPhaseContext({ items: ids, phase: "review", contracts, byte_budget: 262144 }, client.pmRoot), code("SOURCE_UNAVAILABLE"));
+});
+
+test("unreadable projection registry refuses instead of inventing restoration selectors", async (t) => {
+  const { root, client, item } = await tracker(); t.after(() => rmSync(root, { recursive: true, force: true }));
+  writeFileSync(join(client.pmRoot, "settings.json"), "{");
+  await assert.rejects(buildPhaseContext(request(item.id), client.pmRoot), (error: unknown) => {
+    assert.ok(code("SOURCE_UNAVAILABLE")(error));
+    assert.ok(error instanceof Error && "remedy" in error);
+    assert.match(String(error.remedy), /readable SDK settings/);
+    return true;
+  });
 });
 
 test("independent concurrent readers preserve foreign records and all configured status roles", async (t) => {

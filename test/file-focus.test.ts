@@ -202,7 +202,7 @@ test("changed uses committed branch edits, index, worktree and untracked paths w
       assert.match(output, /matched_files: src\/one.ts/);
       assert.match(output, /unlinked_changed_files:/);
       assert.match(output, /unlinked.ts/);
-      assert.match(output, /pm files '<id>' --add/);
+      assert.match(output, /pm files --help/);
       if (format !== "markdown" && !explain) assert.match(output, /--changed main/);
     }
   }
