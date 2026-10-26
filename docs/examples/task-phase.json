@@ -1,0 +1,12 @@
+{
+  "phase": "investigation",
+  "items": ["project-task"],
+  "contracts": {
+    "investigation": ["title", "description"],
+    "implementation": ["title", "body"],
+    "review": ["title", "acceptance_criteria", "tests"],
+    "handoff": ["title", "status", "body"]
+  },
+  "format": "toon",
+  "byte_budget": 16000
+}

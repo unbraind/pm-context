@@ -431,6 +431,84 @@ model proposals remain unchecked. The command performs no edits or model calls.
 The SDK exports `checkContextWitnesses`, packet parsing and encoding, and typed
 `WitnessError` refusals. See the [packet example and SDK contract](docs/witnesses.md).
 
+## Task-phase context contracts
+
+`context-phase` binds mandatory top-level tracker fields to **investigation**,
+**implementation**, **review** and **handoff**. It returns every selected field
+losslessly or refuses the entire request with a typed code and remedy. Selecting
+a phase grants no authority, changes no status and executes no linked tests.
+
+```sh
+pm context-phase --packet docs/examples/task-phase.json --format toon
+pm context-phase --packet docs/examples/task-phase.json --phase review --previous-phase investigation --format json
+```
+
+Replace the example item id with a real tracker id. All four contracts are
+required; each has 1–32 unique field names and applies to every selected item.
+Mandatory means **present**, so explicit null, empty strings and empty arrays
+are retained. Missing fields, unavailable sources, invalid values and inadequate
+budgets refuse with exit 2 and `next_steps`. Nothing is truncated to fit. A
+request selects 1–32 unique items, optionally restores 0–32 `include_fields`, and
+sets `byte_budget` to an integer from 512 through 262144 (default 16000). Both
+encodings include an exact `bytes` measurement of the complete UTF-8 output,
+including the newline. Unknown keys, sparse arrays, nonfinite numbers, excessive
+nesting and requests over 262144 bytes are rejected at the shared boundary.
+
+The packet explains each added, removed and retained requirement relative to
+`previous_phase` **in the same supplied contracts**. This is a requirement diff.
+It does not attest that tracker contents are unchanged since an earlier packet.
+Optional fields stay out unless selected. SDK omission receipts identify every
+omitted item/field with an exact `pm get` restoration command, including
+heterogeneous item schemas. `--include-fields docs,tests` restores these fields
+inside a packet when both are present on every selected item.
+
+```ts
+import { buildPhaseContext, encodePhaseContext } from "pm-context";
+import type { PhaseContextRequest } from "pm-context";
+
+const request: PhaseContextRequest = {
+  phase: "investigation",
+  items: ["project-task"],
+  contracts: {
+    investigation: ["title", "description"],
+    implementation: ["title", "body"],
+    review: ["title", "acceptance_criteria", "tests"],
+    handoff: ["title", "status", "body"],
+  },
+  session: { version: 1, id: "task-session", token_budget: 50000,
+    spent_tokens: 0, seen_item_ids: [] },
+};
+const initial = await buildPhaseContext(request, trackerRoot);
+const review = await buildPhaseContext({ ...request, phase: "review",
+  previous_phase: "investigation", session: initial.read_session!.next_state,
+}, trackerRoot);
+const output = encodePhaseContext(review);
+```
+
+Carry the SDK `read_session.next_state` in the next request's `session`. Each
+fact id binds the item, field and exact current SDK value. Shared unchanged
+fields reuse the SDK's `session:<session-id>:<fact-id>` references; newly required
+or changed fields arrive in full. Resolve references from earlier `facts` by id.
+`bindings` always retain item/field coordinates, the mandatory marker and native
+restoration command. The SDK receipt's generic item restoration template does
+not apply to these field fact ids: use `bindings[].restore_with`. Session
+accounting measures the complete compact JSON object using the SDK estimator;
+`bytes` separately measures the selected JSON or TOON transport. Both ceilings
+must fit. Refusals do not advance caller state.
+
+Every call rereads the authoritative SDK document; replaying old requests or
+sessions cannot restore old tracker values. Sessions are caller-carried and
+immutable: serialize calls within a budget group. Independent callers can read
+concurrently, but a session is not a cross-process shared budget or a durable
+checkpoint. There is no import/sync writer or journaled mutation plan. The packet
+is a per-item observation rather than a transaction-wide snapshot. Item fields,
+linked metadata and history stay untouched; artifacts are not opened. The source
+reader is shared with `context-freshness` and deliberately avoids SDK cache writes.
+
+See [validation and measured public data](docs/task-phase-validation.md).
+
+`context-phase` also works in a plain tracker with no Git executable available.
+
 ## Without git
 
 Next-evidence acquisition plans, criterion evidence packs, item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a

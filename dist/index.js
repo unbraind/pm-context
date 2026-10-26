@@ -1,3 +1,5 @@
+import { buildPhaseContext, encodePhaseContext, readPhaseContextJson, PhaseContextError } from "./task-phase.js";
+export { buildPhaseContext, encodePhaseContext, parsePhaseContextRequest, readPhaseContextJson, PhaseContextError, TASK_PHASES } from "./task-phase.js";
 import { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.js";
 export { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.js";
 import { packCriterionEvidence, encodeEvidencePack, readEvidencePacket, EvidencePackingError } from "./evidence-packing.js";
@@ -1073,6 +1075,41 @@ async function measureContextOutput(ctx, pack, output, format, command, compress
     }
 }
 function setupCommands(api) {
+    api.registerCommand({
+        name: "context-phase",
+        description: "Preserve mandatory task-phase fields or refuse; explain changes and reuse SDK session facts.",
+        flags: [
+            { long: "--packet", value_name: "file", description: "JSON request with four phase contracts and selected item ids", type: "string" },
+            { long: "--phase", value_name: "phase", description: "Override phase: investigation, implementation, review or handoff", type: "string" },
+            { long: "--previous-phase", value_name: "phase", description: "Compare requirements against this phase in the same contract", type: "string" },
+            { long: "--include-fields", value_name: "fields", description: "Restore comma-separated optional top-level fields", type: "string" },
+            { long: "--byte-budget", value_name: "n", description: "Complete transport byte ceiling, 512-262144 (default 16000)", type: "string" },
+            { long: "--format", value_name: "format", description: "toon (default) or json", type: "string" },
+        ],
+        async run(ctx) {
+            const path = stringOption(ctx.options, "packet");
+            if (!path || ctx.args.length)
+                throw new PhaseContextError("INVALID_REQUEST", "Supply --packet JSON without positional arguments.");
+            const input = readPhaseContextJson(path);
+            if (input === null || typeof input !== "object" || Array.isArray(input))
+                throw new PhaseContextError("INVALID_REQUEST", "Supply a JSON object with phase, contracts and items.");
+            const overrides = {};
+            for (const [option, camel, key] of [["phase", "phase", "phase"], ["previous-phase", "previousPhase", "previous_phase"], ["format", "format", "format"]]) {
+                const value = stringOption(ctx.options, option, camel);
+                if (value !== undefined)
+                    overrides[key] = value;
+            }
+            const fields = stringOption(ctx.options, "include-fields", "includeFields");
+            if (fields !== undefined)
+                overrides.include_fields = fields.split(",");
+            const budget = stringOption(ctx.options, "byte-budget", "byteBudget");
+            if (budget !== undefined)
+                overrides.byte_budget = Number(budget);
+            if (ctx.global.json && overrides.format === undefined)
+                overrides.format = "json";
+            return renderedCommandResult(encodePhaseContext(await buildPhaseContext({ ...input, ...overrides }, ctx.pm_root)));
+        },
+    });
     const contextPackDefaultLimit = 25;
     const contextHandoffDefaultLimit = 12;
     const defaultRecentLimit = 5;
@@ -1553,7 +1590,7 @@ export default {
         setupCommands(api);
         if (typeof api.registerRenderer === "function") {
             const rendererOwnership = {
-                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-next-evidence"],
+                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-next-evidence", "context-phase"],
                 resultDiscriminator: isRenderedCommandResult,
             };
             api.registerRenderer("toon", renderCommandResult, rendererOwnership);
