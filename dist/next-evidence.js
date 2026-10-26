@@ -47,7 +47,7 @@ export function parseNextEvidencePacket(value) {
         sources.set(row.source, row.revision);
     }
     const packet = value;
-    return { contract_revision: packet.contract_revision, missing: [...packet.missing].sort(), tool_call_tokens: packet.tool_call_tokens, reads: packet.reads.map((row) => ({ id: row.id, source: row.source, revision: row.revision, covers: [...row.covers].sort(), estimated_tokens: row.estimated_tokens, estimated_tool_calls: row.estimated_tool_calls })).sort((a, b) => compare(a.id, b.id)) };
+    return { contract_revision: packet.contract_revision, missing: [...packet.missing].sort(), tool_call_tokens: packet.tool_call_tokens, reads: packet.reads.map((row) => ({ id: row.id, source: row.source, revision: row.revision, covers: [...row.covers].sort(), estimated_tokens: row.estimated_tokens + 0, estimated_tool_calls: row.estimated_tool_calls + 0 })).sort((a, b) => compare(a.id, b.id)) };
 }
 /** Use code-unit ordering, independent of locale. */
 function compare(a, b) { return Number(a > b) - Number(a < b); }
@@ -59,6 +59,28 @@ export function readNextEvidenceJson(path) {
     catch {
         throw new NextEvidenceError("INPUT_UNAVAILABLE", "Supply a stable readable regular UTF-8 JSON file no larger than 262144 bytes.");
     }
+}
+/** Reject unrepresentable estimates and canonicalize signed zero before exposing numbers. */
+function outputInteger(value, minimum, maximum) {
+    if (!integer(value, minimum, maximum))
+        throw new NextEvidenceError("INVALID_PLAN", "Regenerate the plan with finite integer estimates in the documented ranges.");
+    return value + 0;
+}
+/** Apply numeric protocol bounds to every SDK and transport plan output without mutating it. */
+function normalizePlanNumbers(plan) {
+    return {
+        ...plan,
+        reads_executed: outputInteger(plan.reads_executed, 0, 0),
+        steps: plan.steps.map((step) => ({ ...step,
+            estimated_tokens: outputInteger(step.estimated_tokens, 0, 1000000),
+            estimated_tool_calls: outputInteger(step.estimated_tool_calls, 0, 1000),
+            cost: outputInteger(step.cost, 1, 1001000000),
+        })),
+        estimated_tokens: outputInteger(plan.estimated_tokens, 0, 64000000),
+        estimated_tool_calls: outputInteger(plan.estimated_tool_calls, 0, 64000),
+        cost: outputInteger(plan.cost, 0, 64064000000),
+        tool_call_tokens: outputInteger(plan.tool_call_tokens, 1, 1000000),
+    };
 }
 /** Compute the exact minimum-cost cover, then rank its reads by newly added coverage per cost. */
 export function planNextEvidence(input) {
@@ -91,12 +113,12 @@ export function planNextEvidence(input) {
         steps.push({ read: row.id, source: row.source, revision: row.revision, adds, estimated_tokens: row.estimated_tokens, estimated_tool_calls: row.estimated_tool_calls, cost: cost(row) });
     }
     const uncovered = packet.missing.filter((entry) => !covered.has(entry));
-    return {
+    return normalizePlanNumbers({
         protocol: "pm-context-next-evidence/v1", contract: createHash("sha256").update(JSON.stringify(packet)).digest("hex"),
         basis: "caller-declared-coverage;not-observed-evidence", optimality: "exact-minimum-cost-cover-of-coverable-criteria", ranking: "marginal-criteria-per-token-equivalent;read-id-ties", reads_executed: 0,
         missing: packet.missing, uncovered, steps, estimated_tokens: steps.reduce((sum, row) => sum + row.estimated_tokens, 0), estimated_tool_calls: steps.reduce((sum, row) => sum + row.estimated_tool_calls, 0), cost: selected.cost, tool_call_tokens: packet.tool_call_tokens,
         remedy: uncovered.length ? "Declare available reads for uncovered criteria, or retain these explicit gaps. Replan after any contract revision." : "Review the plan before separately acquiring evidence; revalidate against current caller-declared source revisions before use.",
-    };
+    });
 }
 /** Verify both the current source contract and the complete persisted plan; never execute a read. */
 export function validateNextEvidencePlan(plan, input) {
@@ -111,6 +133,7 @@ export function validateNextEvidencePlan(plan, input) {
 }
 /** Encode compact JSON or lossless TOON tables without source content or executable read instructions. */
 export function encodeNextEvidencePlan(plan, format = "toon") {
+    plan = normalizePlanNumbers(plan);
     if (format === "json")
         return `${JSON.stringify(plan)}\n`;
     if (format !== "toon")
