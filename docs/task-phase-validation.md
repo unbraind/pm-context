@@ -152,7 +152,7 @@ Blocking review of PR 181 found unquoted omitted metadata keys in shell restore
 commands. `buildSuggestedCommand` now validates/copies argv before rendering;
 `quotePosixArgument` is the only POSIX display quoting function. It leaves plain
 safe tokens readable, quotes all other arguments with single quotes, escapes
-embedded apostrophes and refuses NUL bytes. Phase bindings/omissions, handoff
+embedded apostrophes and refuses NUL bytes or malformed Unicode. Phase bindings/omissions, handoff
 refreshes, file-focus flags/link guides, delta recovery and registered examples
 all use this path. JSON/TOON outputs retain executable arrays. `commandExamples`
 returns fresh structured host examples. Legacy shell-string overrides refuse.
@@ -182,3 +182,9 @@ lost the trailing output-budget arguments. Exact source bytes were restored;
 all three command tests pass with the builder. Targeted renderer coverage is
 100% statements/branches/functions/lines. The PR records the correction's final
 npm and Bun CI run separately from the earlier product-head receipt above.
+
+File-focus failures retain the SDK expected-error marker so structured recovery
+argv survives installed CLI JSON serialization. Machine error consumers request
+JSON or encode the SDK DTO as TOON; the SDK's default human-readable stderr is
+not a machine TOON document. The installed unreadable-tracker regression checks
+that wire recovery, and its DTO round-trip preserves the same argv.

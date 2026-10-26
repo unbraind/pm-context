@@ -22,7 +22,6 @@ export class FileFocusError extends PmCliError {
     const retry = retryArgv === undefined ? undefined : buildSuggestedCommand(retryArgv);
     super(message, 2, { code, ...(retry ? { nextSteps: ["Use the structured retry after repairing the unreadable documents."], recovery: { suggested_retry: retry.command, suggested_retry_args: retry.argv } } : {}) });
     this.cause = options?.cause;
-    this.name = "CommandError";
     this.code = code;
   }
 }

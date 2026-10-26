@@ -437,8 +437,8 @@ Every generated command starts as argv and uses `buildSuggestedCommand` with one
 `quotePosixArgument` renderer. Plain tokens such as `title` remain readable;
 spaces, quotes, operators, substitutions, backticks and control characters are
 single-quoted, with embedded apostrophes escaped as `'\''`. Empty arguments are
-preserved; NUL bytes refuse because an operating system cannot represent them in
-argv. Commands are bounded to 4,096 arguments and 262,144 JSON bytes.
+preserved; NUL bytes and malformed Unicode refuse because UTF-8 argv cannot
+represent them exactly. Commands are bounded to 4,096 arguments and 262,144 JSON bytes.
 
 JSON and TOON phase packets pair `restore_with` with `restore_argv` on every
 binding and omission. Pack `refresh_command`, `link_command`, delta receipt

@@ -2,8 +2,8 @@
 import { PmCliError } from "@unbrained/pm-cli/sdk";
 /** Preserve a single argument exactly, including empty strings and embedded single quotes. */
 export function quotePosixArgument(value) {
-    if (value.includes("\0"))
-        throw new PmCliError("Command arguments cannot contain NUL bytes.", 2, { code: "INVALID_COMMAND_ARGUMENT", nextSteps: ["Remove NUL bytes; operating systems cannot represent them in argv."] });
+    if (value.includes("\0") || Buffer.from(value, "utf8").toString("utf8") !== value)
+        throw new PmCliError("Command arguments must be well-formed Unicode without NUL bytes.", 2, { code: "INVALID_COMMAND_ARGUMENT", nextSteps: ["Remove NUL bytes or malformed Unicode so UTF-8 argv preserves every argument exactly."] });
     return /^[A-Za-z0-9_./:=,+-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
 }
 /** Copy and validate a dense bounded argv before rendering; never parse or execute shell text. */
