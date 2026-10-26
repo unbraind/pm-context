@@ -86,7 +86,15 @@ and refuses revisions that changed before revalidation.
 Input is bounded to 262144 UTF-8 bytes, 12 unique missing IDs and 64 unique reads;
 exact dynamic programming uses at most 4096 coverage states. Nothing is silently
 truncated. Tokens are integers 0–1000000, calls 0–1000, and tool overhead
-1–1000000; each read must have positive tokens or calls. IDs use 1–128 ASCII
+1–1000000; each read must have positive tokens or calls. All packet and plan
+outputs use finite safe integers and canonical positive zero, including SDK
+objects, JSON and TOON. Step cost is 1–1001000000. Plan totals are bounded by
+the 64-read catalog: tokens 0–64000000, calls 0–64000 and cost
+0–64064000000; `reads_executed` is always 0. Encoders reject numeric values
+outside these ranges rather than emitting JSON null or silently truncating them.
+Signed zero in input estimates is equivalent to zero and does not alter the
+contract digest. JSON stringify/parse preserves every emitted number by
+`Object.is`, so an unchanged saved plan passes `--check`. IDs use 1–128 ASCII
 letters/digits/underscore/dot/colon/hyphen starting with a letter/digit. Revision
 strings are 1–256 characters and nonblank. Unknown qualifiers and unknown or
 duplicate criterion references refuse, including unsupported execution commands,
@@ -105,7 +113,10 @@ Refusals use `PmCliError`, exit 2, a typed `code`, `remedy` and host `next_steps
 
 Validation includes a seeded exhaustive-subset reference model over 500 random
 operation sequences with replayed older inputs, CRLF and whitespace variants,
-revision changes, reorderings and JSON/TOON round trips. Every operation reads native
+revision changes, reorderings and JSON/TOON round trips. The numeric property
+suite also exercises 500 generated plans with signed zeros,
+boundary estimates, empty catalogs and full catalogs through JSON/TOON and
+source/built command `--check` handlers. Every operation reads native
 state back through the SDK and compares it with its SDK-derived reference,
 including relationships and all native fields. Planner calls never normalize,
 import or write native items. Installed CLI checks run in a plain tracker with
