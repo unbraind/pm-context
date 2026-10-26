@@ -16,6 +16,8 @@ import { FileFocusError, fileLinkCommand } from "../file-focus.ts";
 function shellRoundtrip(value: SuggestedCommand, root: string) {
   const result = spawnSync("/bin/sh", ["-c", `/bin/sh -c 'for a; do printf "%s\\0" "$a"; done' sh ${value.command}`], { cwd: root, encoding: "utf8", timeout: 3000 });
   assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, "", "the quoting probe must emit no diagnostic or extra command output");
+  assert.ok(result.stdout.endsWith("\0"), "the complete output must be NUL-framed; reject trailing injected output");
   assert.deepEqual(result.stdout.split("\0").slice(0, -1), value.argv, value.command);
   assert.equal(existsSync(join(root, "shell-side-effect")), false);
 }
