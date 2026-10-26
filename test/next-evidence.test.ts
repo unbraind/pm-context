@@ -9,7 +9,7 @@ import { decodePmTableRows } from "@unbrained/pm-cli/sdk";
 import { init, isPmCliExpectedError, PmClient } from "@unbrained/pm-cli/sdk";
 import { createExtensionTestHarness, decodeToon } from "@unbrained/pm-cli/sdk/testing";
 import extension, { createFreshnessReader, encodeNextEvidencePlan, parseNextEvidencePacket, planNextEvidence, readNextEvidenceJson, validateNextEvidencePlan } from "../index.ts";
-import type { NextEvidencePacket } from "../index.ts";
+import type { NextEvidencePacket, NextEvidencePlan } from "../index.ts";
 import builtExtension from "../dist/index.js";
 
 /** Three overlapping alternatives expose the difference between greedy ranking and exact cover. */
@@ -84,6 +84,80 @@ function decodePlanToon(encoded: string) {
   const { steps, steps_encoding, ...summary } = decodeToon(encoded) as Record<string, unknown>;
   return { ...summary, steps: decodePmTableRows({ rows: steps, encoding: steps_encoding } as Parameters<typeof decodePmTableRows>[0]) };
 }
+
+/** Compare all numeric leaves using the same signed-zero distinction as saved-plan validation. */
+function assertJsonNumbers(value: unknown, decoded: unknown): void {
+  if (typeof value === "number") {
+    assert.ok(Number.isSafeInteger(value) && value >= 0 && !Object.is(value, -0));
+    assert.ok(Object.is(value, decoded), `numeric round trip changed ${value}`);
+  } else if (value !== null && typeof value === "object") {
+    for (const [key, child] of Object.entries(value)) assertJsonNumbers(child, (decoded as Record<string, unknown>)[key]);
+  }
+}
+
+test("500 random plans retain Object.is-equal numeric outputs and pass command --check after JSON round trips", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "next-evidence-numbers-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const pmRoot = join(root, ".agents", "pm");
+  await init("numbers", { defaults: true, author: "fixture-agent", agentGuidance: "skip" }, { cwd: root, pmRoot });
+  const harnesses = await Promise.all([extension, builtExtension].map((module) => createExtensionTestHarness(module, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] })));
+  for (const harness of harnesses) t.after(() => harness.deactivate());
+  let seed = 0x872653a1;
+  const random = (n: number) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return Math.floor(seed / 4294967296 * n); };
+  const estimate = (maximum: number) => [-0, 0, maximum, random(maximum + 1)][random(4)]!;
+  const file = join(root, "packet.json"); const saved = join(root, "plan.json");
+  for (let sequence = 0; sequence < 500; sequence++) {
+    const input: NextEvidencePacket = {
+      contract_revision: `numbers-${sequence}`, tool_call_tokens: sequence % 2 ? 1000000 : 1,
+      missing: Array.from({ length: sequence < 3 ? 12 : random(7) }, (_, index) => `C${index}`), reads: [],
+    };
+    input.reads = Array.from({ length: sequence === 2 ? 64 : random(10) }, (_, index) => {
+      const tokens = estimate(1000000); const calls = estimate(1000);
+      return { id: `R${index}`, source: `S${index}`, revision: "r1", covers: input.missing.filter(() => random(2) === 0), estimated_tokens: tokens, estimated_tool_calls: tokens + calls === 0 ? 1 : calls };
+    });
+    // Guarantee both signed-zero estimate fields are selected in distinct generated cases.
+    if (sequence < 2) input.reads = [{ id: "only", source: "tracker", revision: "r1", covers: input.missing, estimated_tokens: sequence ? 1 : -0, estimated_tool_calls: sequence ? -0 : 1 }];
+    const before = structuredClone(input);
+    const canonical = parseNextEvidencePacket(input); const plan = planNextEvidence(input);
+    const decoded = JSON.parse(JSON.stringify(plan)) as NextEvidencePlan;
+    assertJsonNumbers(canonical, JSON.parse(JSON.stringify(canonical)));
+    assertJsonNumbers(plan, decoded);
+    assert.deepEqual(input, before);
+    assert.deepEqual(validateNextEvidencePlan(decoded, input), plan);
+    assert.deepEqual(planNextEvidence(JSON.parse(JSON.stringify(input))), plan);
+    for (const format of ["json", "toon"] as const) assert.deepEqual(format === "json" ? JSON.parse(encodeNextEvidencePlan(plan, format)) : decodePlanToon(encodeNextEvidencePlan(plan, format)), plan);
+    // Preserve lexical -0 in the packet so command validation exercises the original defect.
+    writeFileSync(file, JSON.stringify(input, (_key, value: unknown) => Object.is(value, -0) ? "negative-zero" : value).replace(/"negative-zero"/g, "-0"));
+    writeFileSync(saved, JSON.stringify(decoded));
+    for (const harness of harnesses) {
+      const result = await harness.runCommand({ command: "context-next-evidence", pmRoot, options: { packet: file, check: saved, format: "json" }, global: {} });
+      assert.equal(result.errorMessage, undefined);
+      assert.deepEqual(JSON.parse((result.result as { output: string }).output), plan);
+    }
+  }
+});
+
+test("every numeric plan field is canonical at both transport boundaries and rejects unrepresentable estimates", () => {
+  const base = planNextEvidence(packet());
+  const fields = [
+    ["reads_executed", 0, 0], ["estimated_tokens", 0, 64000000], ["estimated_tool_calls", 0, 64000],
+    ["cost", 0, 64064000000], ["tool_call_tokens", 1, 1000000],
+  ] as const;
+  const stepFields = [["estimated_tokens", 0, 1000000], ["estimated_tool_calls", 0, 1000], ["cost", 1, 1001000000]] as const;
+  for (const format of ["json", "toon"] as const) {
+    const decode = (plan: NextEvidencePlan) => format === "json" ? JSON.parse(encodeNextEvidencePlan(plan, format)) : decodePlanToon(encodeNextEvidencePlan(plan, format));
+    for (const [key, minimum, maximum] of fields) {
+      for (const value of [NaN, Infinity, -Infinity, 0.5, minimum - 1, maximum + 1]) assert.throws(() => encodeNextEvidencePlan({ ...base, [key]: value }, format), code("INVALID_PLAN"));
+      for (const value of [minimum, maximum]) assert.equal(decode({ ...base, [key]: value })[key], value);
+      if (minimum === 0) assert.ok(Object.is(decode({ ...base, [key]: -0 })[key], 0));
+    }
+    for (const [key, minimum, maximum] of stepFields) {
+      const withValue = (value: number) => ({ ...base, steps: [{ ...base.steps[0]!, [key]: value }] });
+      for (const value of [NaN, Infinity, -Infinity, 0.5, minimum - 1, maximum + 1]) assert.throws(() => encodeNextEvidencePlan(withValue(value), format), code("INVALID_PLAN"));
+      for (const value of [minimum, maximum]) assert.equal(decode(withValue(value)).steps[0][key], value);
+      if (minimum === 0) assert.ok(Object.is(decode(withValue(-0)).steps[0][key], 0));
+    }
+  }
+});
 
 /** Exhaustive subset model independent of the production dynamic-programming optimizer. */
 function reference(input: NextEvidencePacket) {
@@ -165,6 +239,15 @@ test("installed CLI and SDK work without Git, write nothing, and revalidate save
     for (const options of [{}, { packet: path, format: "bad" }]) await assert.rejects(harness.runCommand({ command: "context-next-evidence", pmRoot, options, global: {} }), code("INVALID_ARGUMENT"));
     await assert.rejects(harness.runCommand({ command: "context-next-evidence", pmRoot, args: ["extra"], options: { packet: path }, global: {} }), code("INVALID_ARGUMENT"));
   }
+  for (const tokens of [true, false]) {
+    const signed = { ...input, reads: [{ ...input.reads[0]!, covers: input.missing, estimated_tokens: tokens ? -0 : 1, estimated_tool_calls: tokens ? 1 : -0 }] };
+    writeFileSync(path, JSON.stringify(signed, (_key, value: unknown) => Object.is(value, -0) ? "negative-zero" : value).replace(/"negative-zero"/g, "-0"));
+    const generated = run(["--packet", path, "--json"]); assert.equal(generated.status, 0, generated.stderr);
+    writeFileSync(saved, generated.stdout);
+    const rechecked = run(["--packet", path, "--check", saved, "--json"]); assert.equal(rechecked.status, 0, rechecked.stderr);
+    assert.deepEqual(JSON.parse(rechecked.stdout), planNextEvidence(signed));
+  }
+  writeFileSync(saved, encodeNextEvidencePlan(planNextEvidence(input), "json"));
   input.contract_revision = "v2"; writeFileSync(path, JSON.stringify(input)); const stale = run(["--packet", path, "--check", saved, "--json"]); assert.equal(stale.status, 2); assert.equal(JSON.parse(stale.stderr).code, "STALE_PLAN");
   assert.equal(fingerprint(pmRoot), before);
 });

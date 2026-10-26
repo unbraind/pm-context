@@ -355,3 +355,26 @@ test("corrupt receipt snapshots are counted, excluded and cannot accept usage", 
   mkdirSync(path);
   assert.equal(reportContextReceipts(f.pmRoot, { limit: 20 }).malformed_receipts, 1);
 });
+
+
+test("receipt estimates stay nonnegative and JSON-stable when rendering removes input whitespace", async (t) => {
+  const f = await fixture(t);
+  const compact = '{"items":[]}';
+  const identity = { author: "fixture-agent", command: "context-pack" };
+  const associations = { item_ids: [], files: [] };
+  const baseline = await serveContextReceipt(f.pmRoot, compact, "json", associations, identity);
+  // This padding made the old rounded delta -0; more padding made it negative.
+  for (const padding of [baseline.output.length - compact.length, 16384]) {
+    const { output, receipt } = await serveContextReceipt(f.pmRoot, compact + " ".repeat(padding), "json", associations, identity);
+    assert.ok(Object.is(receipt.protocol_tokens, 0));
+    const decoded = JSON.parse(output).context_receipt as ContextReceipt;
+    assert.ok(Object.is(receipt.protocol_tokens, decoded.protocol_tokens));
+    assert.deepEqual(decoded, receipt);
+    const report = reportContextReceipts(f.pmRoot, { receipt_id: receipt.receipt_id, limit: 20 });
+    assert.equal(report.malformed_receipts, 0);
+    assert.equal(report.retained_receipts, 1);
+    for (const value of [report.totals.protocol_tokens, report.totals.estimated_served_tokens, report.totals.unused_context_tokens]) {
+      assert.ok(Number.isSafeInteger(value) && value >= 0 && !Object.is(value, -0));
+    }
+  }
+});
