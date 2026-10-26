@@ -252,3 +252,17 @@ Native coverage reports **16 sources at 100% lines/branches/functions**; c8
 reports **100% statements/functions/lines and 99.96% branches** at the unchanged
 99.9% threshold. The final public rerun reproduces the measurements above and
 preserves every source byte. Exact pushed-head CI URLs and counts are in the PR.
+
+## Executable-selector CI receipt
+
+Product head `51f2be3d8d6612d09370a1e8f5aa27d8a8ce72a6` passes
+[CI run 40392580183](https://github.com/unbraind/pm-context/actions/runs/40392580183).
+Node 22 and 26 each pass both npm and Bun full release gates: **427/427 tests per
+gate**, zero failures or skips, **1,708 aggregate passes**. Raw job logs confirm
+native coverage of 16 sources at 100% lines/branches/functions and c8 coverage of
+100% statements/functions/lines plus 99.96% branches. Fresh health, committed
+build output, audit, package contents, changelog and attestation checks pass.
+[CodeQL](https://github.com/unbraind/pm-context/actions/runs/40392580111) passes.
+This subsequent receipt commit changes tracker evidence and documentation only;
+the PR records the final pushed-head CI run too. A supplemental pinned-CLI
+execution check accepts a generated refresh with a leading-dash tag unchanged.
