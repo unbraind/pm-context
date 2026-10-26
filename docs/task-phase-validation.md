@@ -132,3 +132,16 @@ The full unchanged-threshold npm and Bun release gates run in CI, rather than
 on the saturated shared host. Their exact-head results and run URL are reported
 in the pull request. Local strict health sees an existing host-global pm-github
 extension/version mismatch; the fresh CI checkout determines release-gate health.
+
+## Full CI receipt
+
+[Run 40262690108](https://github.com/unbraind/pm-context/actions/runs/40262690108)
+validates product head `3508a58851cba2709055a1d169f4fbeaac26f715`.
+Both `npm run release:check` and `bun run release:check` pass on Node 22 and 26:
+**419/419 tests per gate, no failures or skips** (1,676 aggregate passes).
+Native coverage covers 15 sources at 100% lines, branches and functions. c8
+reports 100% statements/functions/lines and 99.95% branches at the unchanged
+99.9% branch threshold; `task-phase.ts` measures 100% in all four dimensions.
+Fresh tracker health, committed-output verification, dependency audit, package
+dry run, changelog and publication-attestation checks pass. CodeQL also passes.
+The final pull request reports the subsequent evidence-only head's CI run too.
