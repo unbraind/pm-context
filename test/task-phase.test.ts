@@ -224,6 +224,13 @@ test("installed CLI and compiled SDK work with Git absent and expose typed priva
     for (const global of [{}, { json: true }]) {
       const out = await harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: { packet: path }, global }); assert.equal(out.errorMessage, undefined);
     }
+    for (const options of [
+      { packet: path, phase: "implementation", "previous-phase": "investigation", "include-fields": "description", "byte-budget": "16000", format: "toon" },
+      { packet: path, phase: "implementation", previousPhase: "investigation", includeFields: "description", byteBudget: "16000", format: "json" },
+    ]) {
+      const out = await harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options, global: { json: true } });
+      assert.equal(out.errorMessage, undefined);
+    }
     await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: {}, global: {} }), code("INVALID_REQUEST"));
   }
   assert.equal(fingerprint(client.pmRoot), before);
