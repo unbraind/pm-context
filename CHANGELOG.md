@@ -61,9 +61,9 @@
 
 ## 2026.10.21 - 2026-10-21
 
-### Fixed
+### Closed
 
-- Daily Release workflow is failing ([pm-context-github-356cb2a080ed-81](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-81.toon))
+- Closed: Daily Release workflow is failing ([pm-context-github-356cb2a080ed-81](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-81.toon))
 
 ## 2026.10.14 - 2026-10-14
 
@@ -135,8 +135,11 @@
 
 - Remove the unused changelog verifier test import ([pm-context-91b3](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-91b3.toon))
 - Keep CodeQL actions versioned and updated as one unit ([pm-context-zwf1](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-zwf1.toon))
-- Pin pm-changelog 2026.8.30 before the next release ([pm-context-4w80](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-4w80.toon))
 - Rebase the changelog date verifier onto the current release workflow ([pm-context-o76d](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-o76d.toon))
+
+### Closed
+
+- Closed: Pin pm-changelog 2026.8.30 before the next release ([pm-context-4w80](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-4w80.toon))
 
 ## 2026.8.29 - 2026-08-29
 
@@ -152,13 +155,13 @@
 
 - changelog scripts read the pm workspace with default budgets instead of canonical complete reads ([pm-context-8th2](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-8th2.toon))
 
-### Security
-
-- The identity gate deadlocks the one remediation its own failure message prescribes ([pm-context-nfxp](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nfxp.toon))
-
 ### Other
 
 - Alert on daily release failure and require merge drivers in CI ([pm-context-qu0a](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-qu0a.toon))
+
+### Closed
+
+- Closed: The identity gate deadlocks the one remediation its own failure message prescribes ([pm-context-nfxp](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nfxp.toon))
 
 ## 2026.8.16 - 2026-08-16
 
@@ -182,12 +185,15 @@
 ### Fixed
 
 - Release workflow publishes npm before advancing protected main (GH006 desync) ([pm-context-b7ub](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-b7ub.toon))
-- Release changelog generate and check derived the section name from two different sources ([pm-context-cilu](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-cilu.toon))
 
 ### Other
 
 - Restore the 2026.8.9 release on main to match npm ([pm-context-1fqt](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-1fqt.toon))
 - Adopt pm CLI 2026.8.7 and protect extension assets during multi-agent merges ([pm-context-5njx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-5njx.toon))
+
+### Closed
+
+- Closed: Release changelog generate and check derived the section name from two different sources ([pm-context-cilu](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-cilu.toon))
 
 ## 2026.8.7 - 2026-08-07
 
@@ -244,10 +250,6 @@
 
 - Adopt sdk/query context engine and drop spawnSync shell-outs ([pm-context-lk82](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-lk82.toon))
 
-### Fixed
-
-- context-usage redeclared host-owned --author global, failing registration on pm-cli 2026.7.27 ([pm-context-s8q4](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-s8q4.toon))
-
 ### Removed
 
 - Adopt pm-cli 2026.7.26 typed authoring contracts and remove the any-cast defineExtension shim ([pm-context-q67i](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-q67i.toon))
@@ -255,6 +257,10 @@
 ### Other
 
 - Exclude generated dist output from DeepScan static analysis ([pm-context-01lr](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-01lr.toon))
+
+### Closed
+
+- Closed: context-usage redeclared host-owned --author global, failing registration on pm-cli 2026.7.27 ([pm-context-s8q4](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-s8q4.toon))
 
 ## 2026.7.26 - 2026-07-26
 
@@ -270,13 +276,13 @@
 
 ## 2026.7.23 - 2026-07-23
 
-### Fixed
-
-- Recommend pm merge reconcile (2026.7.22) over raw history-repair in Multi-agent merge safety docs ([pm-context-164t](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-164t.toon))
-
 ### Other
 
 - Adopt pm field-aware merge driver for multi-agent branch-merge safety ([pm-context-4apx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-4apx.toon))
+
+### Closed
+
+- Closed: Recommend pm merge reconcile (2026.7.22) over raw history-repair in Multi-agent merge safety docs ([pm-context-164t](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-164t.toon))
 
 ## 2026.7.14 - 2026-07-14
 
