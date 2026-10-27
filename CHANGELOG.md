@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Keep mandatory task-phase context fields and explain phase switches ([pm-context-task-phase-contracts](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-task-phase-contracts.toon))
+
+### Other
+
+- Stop Hound from linting generated dist/ output ([pm-context-hound-generated-dist](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-hound-generated-dist.toon))
+
 ## 2026.10.26 - 2026-10-26
 
 ### Added
