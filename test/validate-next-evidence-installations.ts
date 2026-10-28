@@ -20,13 +20,13 @@ const root = mkdtempSync(join(tmpdir(), "acquisition-installations-"));
 const globalConfig = join(root, "empty-global-config"); writeFileSync(globalConfig, "");
 // Only environment names are inspected. Never read credential configuration.
 const clean = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^PM_|TOKEN|SECRET|PASSWORD|CREDENTIAL|API.?KEY|NPM_MEDIA_SERVER/i.test(key)));
-const childEnv = { ...clean, NPM_CONFIG_USERCONFIG: devNull, NPM_CONFIG_GLOBALCONFIG: globalConfig, GIT_CEILING_DIRECTORIES: tmpdir(), BUN_INSTALL_GLOBAL_DIR: join(root, "bun-global"), BUN_INSTALL_BIN: join(root, "bun-bin") };
+const childEnv = { ...clean, NPM_CONFIG_USERCONFIG: devNull, NPM_CONFIG_GLOBALCONFIG: globalConfig, NPM_CONFIG_IGNORE_SCRIPTS: "true", GIT_CEILING_DIRECTORIES: tmpdir(), BUN_INSTALL_GLOBAL_DIR: join(root, "bun-global"), BUN_INSTALL_BIN: join(root, "bun-bin") };
 
 /** Run sequentially with bounded output and no inherited registry credentials. */
-function run(executable: string, args: string[], cwd: string, pmRoot?: string): string {
+function run(executable: string, args: string[], cwd: string, pmRoot?: string, expectedStatus = 0): string {
   const result = spawnSync(executable, args, { cwd, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, timeout: 240000, env: { ...childEnv, ...(pmRoot ? { PM_PATH: pmRoot, PM_AUTHOR: "fixture-agent" } : {}) } });
-  assert.equal(result.status, 0, `${executable.split(/[\\/]/).at(-1)} failed: ${(result.stderr + result.stdout).replaceAll(root, "<scratch>")}`);
-  return result.stdout;
+  assert.equal(result.status, expectedStatus, `${executable.split(/[\\/]/).at(-1)} failed: ${(result.stderr + result.stdout).replaceAll(root, "<scratch>")}`);
+  return expectedStatus === 0 ? result.stdout : result.stderr;
 }
 
 try {
@@ -55,7 +55,8 @@ try {
     const workspace = join(root, launcher.mode); mkdirSync(workspace, { recursive: true });
     const pmRoot = join(workspace, ".agents/pm");
     await init("acquisition", { defaults: true, author: "fixture-agent", agentGuidance: "skip" }, { cwd: workspace, pmRoot });
-    const invoke = (args: string[]) => run(launcher.executable, [...launcher.args, ...args], workspace, pmRoot);
+    const invoke = (args: string[], expectedStatus = 0) => run(launcher.executable, [...launcher.args, ...args], workspace, pmRoot, expectedStatus);
+    assert.equal(invoke(["--version"]).trim(), manifest.devDependencies["@unbrained/pm-cli"]);
     invoke(["package", "install", artifact, "--project"]);
     const packet = join(workspace, "packet.json"); writeFileSync(packet, JSON.stringify(fixture.packet));
     const saved = join(workspace, "plan.json");
@@ -64,8 +65,9 @@ try {
     assert.deepEqual(JSON.parse(invoke(["context-next-evidence", "--packet", packet, "--check", saved, "--json"])), fixture.plan);
     const { steps, steps_encoding, ...summary } = decodeToon(invoke(["context-next-evidence", "--packet", packet, "--format", "toon"])) as Record<string, unknown>;
     assert.deepEqual({ ...summary, steps: decodePmTableRows({ rows: steps, encoding: steps_encoding } as Parameters<typeof decodePmTableRows>[0]) }, fixture.plan);
+    assert.equal(JSON.parse(invoke(["context-next-evidence", "--packet", packet, "--check", " \r\n ", "--json"], 2)).code, "INVALID_ARGUMENT");
     assert.equal(digest(), artifactSha256);
-    results.push({ mode: launcher.mode, assertions: 4 });
+    results.push({ mode: launcher.mode, assertions: 6 });
   }
-  console.log(JSON.stringify({ artifact_sha256: artifactSha256, host, launchers: results, assertions: 24, artifact_unchanged: true }, null, 2));
+  console.log(JSON.stringify({ artifact_sha256: artifactSha256, host, launchers: results, assertions: 36, artifact_unchanged: true }, null, 2));
 } finally { rmSync(root, { recursive: true, force: true }); }

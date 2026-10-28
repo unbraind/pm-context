@@ -71,6 +71,9 @@ TOON is for compact agent display. In TOON, `adds` is a JSON-encoded cell; parse
 that cell as JSON, or restore rows with the core SDK `decodePmTableRows`
 and the emitted `steps_encoding` metadata. Encoding uses the corresponding SDK
 `encodePmTableRows` helper. Top-level missing/uncovered arrays are native TOON arrays.
+Explicit blank or non-string `--check` and `--format` values refuse with
+`INVALID_ARGUMENT` before packet access; an unusable check never falls back to
+generating an unchecked plan. Omitted options retain their documented defaults.
 
 The caller must supply current revisions before use; validation does not discover
 remote changes. Plans are observations of a declared immutable contract, not
@@ -119,7 +122,7 @@ Refusals use `PmCliError`, exit 2, a typed `code`, `remedy` and host `next_steps
 | --- | --- |
 | `INVALID_PACKET` | Correct bounded unique declarations, costs, revisions and known coverage IDs; remove unsupported qualifiers. |
 | `INPUT_UNAVAILABLE` | Supply a stable readable regular UTF-8 JSON input no larger than 262144 bytes. |
-| `INVALID_ARGUMENT` | Supply `--packet`, JSON/TOON format, and no positional arguments. |
+| `INVALID_ARGUMENT` | Supply `--packet`, a nonblank `--check` path when checking, JSON/TOON format, and no positional arguments. |
 | `STALE_PLAN` | Replan against current contracts, revisions, coverage and costs. |
 | `INVALID_PLAN` | Supply an unmodified JSON plan generated from the current packet. |
 

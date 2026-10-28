@@ -99,12 +99,23 @@ test/next-evidence.test.ts` fails with a missing refusal (1 failed), then passes
 after restoring the fixed parser and rebuilding (1 passed). The package worktree
 is never mutated by this proof.
 
+The command guard regression uses a real plain tracker and source/compiled
+command harnesses. Supplied empty or non-string check/format flags must refuse
+before a deliberately absent packet can be opened; omitted and valid options
+still work. Reverting only the command handler to the preceding implementation
+in a disposable copy, rebuilding, then running
+`node --test --test-concurrency=2 --test-name-pattern="supplied unusable"
+test/next-evidence.test.ts` fails (1 failed); restoring and rebuilding passes
+(1 passed).
+
 `test/validate-next-evidence-installations.ts` accepts a captured npm tarball and
-checks JSON, saved-plan revalidation and SDK-decoded TOON through npm global,
+checks host versions, JSON, saved-plan revalidation, SDK-decoded TOON and
+unusable-check refusal through npm global,
 Bun global, npx, bunx, npm project-local and Bun project-local hosts. Global
-directories are isolated, the host version is the repository pin, lifecycle
-scripts are disabled for the explicit npm/Bun installs, and inherited credential variables are
-excluded. It verifies the same artifact SHA-256 after each launcher and removes
+directories are isolated, the host version is the repository pin, npm lifecycle
+scripts are disabled (including cached launches), explicit Bun installs disable
+scripts, and inherited credential variables are excluded. It verifies the same
+artifact SHA-256 after each launcher and removes
 only its own scratch directories. Run it separately from unit tests because it
 performs public registry installs:
 
@@ -112,8 +123,11 @@ performs public registry installs:
 node test/validate-next-evidence-installations.ts <captured-package.tgz>
 ```
 
-Measured result: **6/6 launchers**, **24/24 assertions**, using host
-`2026.10.25` and one unchanged archive containing **49 entries**, **132924 packed
-bytes** and **577320 unpacked bytes**. Artifact SHA-256:
-`bd0cc81102dd6cb248d7ac29a1972e5d7d63a974d3a4c974d81c87782045ad9e`.
+Measured result: **6/6 launchers**, **36/36 assertions**, using host
+`2026.10.25` and one unchanged archive containing **49 entries**, **133017 packed
+bytes** and **577676 unpacked bytes**. Artifact SHA-256:
+`d07a1702317758f0b4530af62f5ad6615cb18ac8ca8cf360c3a8e19e02bfd54a`.
 The archive is a local validation artifact and is not committed or published.
+
+The final complete focused linked run passed **13/13 tests**, zero failures or
+skips, with **100% lines, branches and functions** for `next-evidence.ts`.

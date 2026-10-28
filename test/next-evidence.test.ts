@@ -158,6 +158,26 @@ test("500 seeded boundary mutations refuse sparse and extreme packets without ch
   }
 });
 
+test("supplied unusable CLI guards refuse before packet access instead of silently disabling checking", async (t) => {
+  const root = mkdtempSync(join(tmpdir(), "next-evidence-guards-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const pmRoot = join(root, ".agents/pm");
+  await init("guards", { defaults: true, author: "fixture-agent", agentGuidance: "skip" }, { cwd: root, pmRoot });
+  const path = join(root, "packet.json"); const saved = join(root, "plan.json"); const input = packet();
+  writeFileSync(path, JSON.stringify(input)); writeFileSync(saved, JSON.stringify(planNextEvidence(input)));
+  for (const module of [extension, builtExtension]) {
+    const harness = await createExtensionTestHarness(module, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] }); t.after(() => harness.deactivate());
+    for (const field of ["check", "format"]) {
+      for (const value of ["", " \r\n ", false, 0, null]) {
+        await assert.rejects(harness.runCommand({ command: "context-next-evidence", pmRoot, options: { packet: join(root, "absent.json"), [field]: value }, global: {} }), code("INVALID_ARGUMENT"));
+      }
+    }
+    for (const options of [{ packet: path }, { packet: path, check: saved }, { packet: path, check: ` ${saved} `, format: " json " }, { packet: path, format: "toon" }]) {
+      const result = await harness.runCommand({ command: "context-next-evidence", pmRoot, options, global: {} });
+      assert.equal(result.errorMessage, undefined);
+    }
+  }
+});
+
 test("saved JSON plans bind every source contract and estimate; malformed or modified plans refuse", () => {
   const input = packet(); const plan = planNextEvidence(input);
   assert.deepEqual(validateNextEvidencePlan(JSON.parse(encodeNextEvidencePlan(plan, "json")), input), plan);
