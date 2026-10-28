@@ -46,12 +46,12 @@ is a declaration, never proof of semantic sufficiency or completed acceptance.
 
 ```ts
 import {
-  parseNextEvidencePacket, readNextEvidenceJson, planNextEvidence,
+  readNextEvidenceJson, planNextEvidence,
   validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError,
 } from 'pm-context';
 
 try {
-  const packet = parseNextEvidencePacket(readNextEvidenceJson('acquisition.json'));
+  const packet = readNextEvidenceJson('acquisition.json');
   const plan = planNextEvidence(packet);
   process.stdout.write(encodeNextEvidencePlan(plan, 'json'));
   validateNextEvidencePlan(plan, packet); // revalidate with CURRENT caller revisions
@@ -71,6 +71,9 @@ TOON is for compact agent display. In TOON, `adds` is a JSON-encoded cell; parse
 that cell as JSON, or restore rows with the core SDK `decodePmTableRows`
 and the emitted `steps_encoding` metadata. Encoding uses the corresponding SDK
 `encodePmTableRows` helper. Top-level missing/uncovered arrays are native TOON arrays.
+Explicit blank or non-string `--check` and `--format` values refuse with
+`INVALID_ARGUMENT` before packet access; an unusable check never falls back to
+generating an unchecked plan. Omitted options retain their documented defaults.
 
 The caller must supply current revisions before use; validation does not discover
 remote changes. Plans are observations of a declared immutable contract, not
@@ -83,9 +86,21 @@ a peer SDK update at all five snapshot/planning/serialization/validation/return
 boundaries on one plain tracker, preserves peer success and foreign records,
 and refuses revisions that changed before revalidation.
 
-Input is bounded to 262144 UTF-8 bytes, 12 unique missing IDs and 64 unique reads;
+Input files are bounded to 262144 UTF-8 bytes, 12 unique missing IDs and 64 unique reads;
 exact dynamic programming uses at most 4096 coverage states. Nothing is silently
-truncated. Tokens are integers 0–1000000, calls 0–1000, and tool overhead
+truncated. `missing`, `reads` and every `covers` array must be dense, including
+SDK inputs: holes and inherited array elements refuse with `INVALID_PACKET`.
+Array bounds are checked before traversal, cloning or serialization, so even
+maximum-length sparse arrays cannot trigger unbounded serialization work.
+The canonical packet contains only bounded primitive fields and fits below the
+file byte ceiling, including maximally escaped revisions. Caller `toJSON` hooks
+are never invoked. Both `planNextEvidence(unknown)` and
+`validateNextEvidencePlan(plan, unknown)` use the same strict packet parser;
+the CLI passes raw JSON directly to that boundary. `parseNextEvidencePacket`
+remains available when a caller needs a canonical packet separately. Released
+v1 packet hashes and saved plans remain compatible.
+
+Tokens are integers 0–1000000, calls 0–1000, and tool overhead
 1–1000000; each read must have positive tokens or calls. All packet and plan
 outputs use finite safe integers and canonical positive zero, including SDK
 objects, JSON and TOON. Step cost is 1–1001000000. Plan totals are bounded by
@@ -107,7 +122,7 @@ Refusals use `PmCliError`, exit 2, a typed `code`, `remedy` and host `next_steps
 | --- | --- |
 | `INVALID_PACKET` | Correct bounded unique declarations, costs, revisions and known coverage IDs; remove unsupported qualifiers. |
 | `INPUT_UNAVAILABLE` | Supply a stable readable regular UTF-8 JSON input no larger than 262144 bytes. |
-| `INVALID_ARGUMENT` | Supply `--packet`, JSON/TOON format, and no positional arguments. |
+| `INVALID_ARGUMENT` | Supply `--packet`, a nonblank `--check` path when checking, JSON/TOON format, and no positional arguments. |
 | `STALE_PLAN` | Replan against current contracts, revisions, coverage and costs. |
 | `INVALID_PLAN` | Supply an unmodified JSON plan generated from the current packet. |
 
@@ -121,3 +136,6 @@ state back through the SDK and compares it with its SDK-derived reference,
 including relationships and all native fields. Planner calls never normalize,
 import or write native items. Installed CLI checks run in a plain tracker with
 Git absent from PATH and a Git discovery ceiling.
+An additional 500 seeded boundary mutations cover sparse arrays and extreme
+numbers through source and compiled SDK entry points. A fixture produced by
+the released version preserves its original plan byte values and digest.

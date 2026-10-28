@@ -596,3 +596,7 @@ Use `--format json > plan.json` to save a plan, then
 revalidate it. Revised criterion/source contracts, coverage or estimates require
 replanning. This command also works without Git and leaves tracker state intact.
 See the [packet example, typed SDK, limits and remedies](docs/next-evidence.md).
+SDK and CLI packets share one strict validation boundary. All arrays must be
+dense and within the documented bounds; sparse arrays refuse with
+`INVALID_PACKET` before planning or serialization. Valid v1 packets and saved
+plans retain their existing contract hashes.

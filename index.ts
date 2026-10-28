@@ -6,7 +6,7 @@ import { buildPhaseContext, encodePhaseContext, readPhaseContextJson, PhaseConte
 import type { PhaseContextRequest } from "./task-phase.ts";
 export { buildPhaseContext, encodePhaseContext, parsePhaseContextRequest, readPhaseContextJson, PhaseContextError, TASK_PHASES } from "./task-phase.ts";
 export type { TaskPhase, PhaseContextRequest, PhaseContextPacket, PhaseFieldBinding, PhaseFieldRestoration, PhaseFieldFact, PhaseFieldChange } from "./task-phase.ts";
-import { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
+import { planNextEvidence, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
 export { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.ts";
 export type { EvidenceRead, NextEvidencePacket, NextEvidenceStep, NextEvidencePlan } from "./next-evidence.ts";
 import { packCriterionEvidence, encodeEvidencePack, readEvidencePacket, EvidencePackingError } from "./evidence-packing.ts";
@@ -1582,10 +1582,11 @@ function setupCommands(api: ExtensionApi): void {
     ],
     async run(ctx: CommandHandlerContext) {
       const path = stringOption(ctx.options, "packet");
-      const format = stringOption(ctx.options, "format") ?? (ctx.global.json ? "json" : "toon");
-      if (!path || (format !== "json" && format !== "toon") || ctx.args.length) throw new NextEvidenceError("INVALID_ARGUMENT", "Supply --packet JSON and --format json or toon, without positional arguments.");
-      const packet = parseNextEvidencePacket(readNextEvidenceJson(path));
       const check = stringOption(ctx.options, "check");
+      const declaredFormat = stringOption(ctx.options, "format");
+      const format = declaredFormat ?? (ctx.global.json ? "json" : "toon");
+      if (!path || (ctx.options.check !== undefined && !check) || (ctx.options.format !== undefined && !declaredFormat) || (format !== "json" && format !== "toon") || ctx.args.length) throw new NextEvidenceError("INVALID_ARGUMENT", "Supply --packet JSON, a nonblank --check path when checking, and --format json or toon, without positional arguments.");
+      const packet = readNextEvidenceJson(path);
       const plan = check ? validateNextEvidencePlan(readNextEvidenceJson(check), packet) : planNextEvidence(packet);
       return renderedCommandResult(encodeNextEvidencePlan(plan, format));
     },

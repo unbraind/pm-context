@@ -20,26 +20,31 @@ function keys(value, allowed) { return Object.keys(value).every((key) => allowed
 /** Public identifiers cannot be paths, commands or ambiguous whitespace aliases. */
 function id(value) { return typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/.test(value); }
 /** Revision labels remain exact, including meaningful whitespace. */
-function revision(value) { return typeof value === "string" && value.trim().length > 0 && value.length <= 256; }
+function revision(value) { return typeof value === "string" && value.length <= 256 && value.trim().length > 0; }
 /** Bound cost arithmetic below Number's safe-integer ceiling. */
 function integer(value, minimum, maximum) { return Number.isSafeInteger(value) && Number(value) >= minimum && Number(value) <= maximum; }
+/** Bound array traversal before allocation and reject holes, including inherited elements. */
+function denseArray(value, maximum) {
+    if (!Array.isArray(value) || value.length > maximum)
+        return false;
+    for (let index = 0; index < value.length; index++)
+        if (!Object.hasOwn(value, index))
+            return false;
+    return true;
+}
 /** Strict parsing bounds exact optimization to 12 criteria and 64 reads, with no truncation. */
 export function parseNextEvidencePacket(value) {
-    const fail = () => new NextEvidenceError("INVALID_PACKET", "Supply contract_revision, 0-12 unique missing IDs, 0-64 unique reads {id,source,revision,covers,estimated_tokens,estimated_tool_calls}, and tool_call_tokens (1-1000000). Costs are integers: tokens 0-1000000, calls 0-1000, at least one positive. Covers must reference missing IDs; remove unknown qualifiers. Split larger contracts explicitly.");
-    let size;
-    try {
-        size = Buffer.byteLength(JSON.stringify(value) ?? "");
-    }
-    catch {
-        throw fail();
-    }
-    if (size > 262144 || !object(value) || !keys(value, ["contract_revision", "missing", "reads", "tool_call_tokens"]) || !revision(value.contract_revision) || !integer(value.tool_call_tokens, 1, 1000000) || !Array.isArray(value.missing) || value.missing.length > 12 || value.missing.some((entry) => !id(entry)) || new Set(value.missing).size !== value.missing.length || !Array.isArray(value.reads) || value.reads.length > 64)
+    const fail = () => new NextEvidenceError("INVALID_PACKET", "Supply contract_revision, 0-12 unique missing IDs, 0-64 unique reads {id,source,revision,covers,estimated_tokens,estimated_tool_calls}, and tool_call_tokens (1-1000000). Arrays must be dense. Costs are integers: tokens 0-1000000, calls 0-1000, at least one positive. Covers must reference missing IDs; remove unknown qualifiers. Split larger contracts explicitly.");
+    // Validate shape before serializing: JSON.stringify traverses even enormous sparse
+    // arrays and invokes caller toJSON hooks. The bounded primitive fields below
+    // produce a canonical packet smaller than the file reader's 262144-byte ceiling.
+    if (!object(value) || !keys(value, ["contract_revision", "missing", "reads", "tool_call_tokens"]) || !revision(value.contract_revision) || !integer(value.tool_call_tokens, 1, 1000000) || !denseArray(value.missing, 12) || value.missing.some((entry) => !id(entry)) || new Set(value.missing).size !== value.missing.length || !denseArray(value.reads, 64))
         throw fail();
     const missing = value.missing;
     const seen = new Set();
     const sources = new Map();
     for (const row of value.reads) {
-        if (!object(row) || !keys(row, ["id", "source", "revision", "covers", "estimated_tokens", "estimated_tool_calls"]) || !id(row.id) || seen.has(row.id) || !id(row.source) || !revision(row.revision) || !Array.isArray(row.covers) || row.covers.some((entry) => !missing.includes(entry)) || new Set(row.covers).size !== row.covers.length || !integer(row.estimated_tokens, 0, 1000000) || !integer(row.estimated_tool_calls, 0, 1000) || row.estimated_tokens + row.estimated_tool_calls === 0)
+        if (!object(row) || !keys(row, ["id", "source", "revision", "covers", "estimated_tokens", "estimated_tool_calls"]) || !id(row.id) || seen.has(row.id) || !id(row.source) || !revision(row.revision) || !denseArray(row.covers, 12) || row.covers.some((entry) => !missing.includes(entry)) || new Set(row.covers).size !== row.covers.length || !integer(row.estimated_tokens, 0, 1000000) || !integer(row.estimated_tool_calls, 0, 1000) || row.estimated_tokens + row.estimated_tool_calls === 0)
             throw fail();
         if (sources.has(row.source) && sources.get(row.source) !== row.revision)
             throw fail();

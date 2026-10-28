@@ -1,0 +1,82 @@
+{
+  "producer": "pm-context@2026.10.28;main:0a8e1db",
+  "packet": {
+    "contract_revision": " released-v1\r\n ",
+    "missing": [
+      "B",
+      "A",
+      "C"
+    ],
+    "tool_call_tokens": 10,
+    "reads": [
+      {
+        "id": "ab",
+        "source": "tracker",
+        "revision": " source-r1\r\n ",
+        "covers": [
+          "B",
+          "A"
+        ],
+        "estimated_tokens": 20,
+        "estimated_tool_calls": 1
+      },
+      {
+        "id": "bc",
+        "source": "tracker",
+        "revision": " source-r1\r\n ",
+        "covers": [
+          "C",
+          "B"
+        ],
+        "estimated_tokens": 20,
+        "estimated_tool_calls": 1
+      },
+      {
+        "id": "all",
+        "source": "tracker",
+        "revision": " source-r1\r\n ",
+        "covers": [
+          "C",
+          "B",
+          "A"
+        ],
+        "estimated_tokens": 45,
+        "estimated_tool_calls": 1
+      }
+    ]
+  },
+  "plan": {
+    "protocol": "pm-context-next-evidence/v1",
+    "contract": "a9f662fa978aacab5e7a9029929821b3551d1e497377c8b610a672f09a8144aa",
+    "basis": "caller-declared-coverage;not-observed-evidence",
+    "optimality": "exact-minimum-cost-cover-of-coverable-criteria",
+    "ranking": "marginal-criteria-per-token-equivalent;read-id-ties",
+    "reads_executed": 0,
+    "missing": [
+      "A",
+      "B",
+      "C"
+    ],
+    "uncovered": [],
+    "steps": [
+      {
+        "read": "all",
+        "source": "tracker",
+        "revision": " source-r1\r\n ",
+        "adds": [
+          "A",
+          "B",
+          "C"
+        ],
+        "estimated_tokens": 45,
+        "estimated_tool_calls": 1,
+        "cost": 55
+      }
+    ],
+    "estimated_tokens": 45,
+    "estimated_tool_calls": 1,
+    "cost": 55,
+    "tool_call_tokens": 10,
+    "remedy": "Review the plan before separately acquiring evidence; revalidate against current caller-declared source revisions before use."
+  }
+}
