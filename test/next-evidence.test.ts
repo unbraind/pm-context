@@ -11,6 +11,7 @@ import { createExtensionTestHarness, decodeToon } from "@unbrained/pm-cli/sdk/te
 import extension, { createFreshnessReader, encodeNextEvidencePlan, parseNextEvidencePacket, planNextEvidence, readNextEvidenceJson, validateNextEvidencePlan } from "../index.ts";
 import type { NextEvidencePacket, NextEvidencePlan } from "../index.ts";
 import builtExtension from "../dist/index.js";
+import * as builtPlanner from "../dist/next-evidence.js";
 
 /** Three overlapping alternatives expose the difference between greedy ranking and exact cover. */
 function packet(): NextEvidencePacket {
@@ -66,6 +67,95 @@ test("strict bounded declarations refuse malformed inputs without truncation or 
   assert.equal(parseNextEvidencePacket(exact).contract_revision, exact.contract_revision);
   assert.equal(parseNextEvidencePacket(exact).reads[0]!.revision, exact.reads[0]!.revision);
   assert.deepEqual(parseNextEvidencePacket(exact).reads[0]!.covers, ["A", "B"]);
+});
+
+test("dense packet schema rejects holes at every location through source and compiled SDK boundaries", () => {
+  const input = packet();
+  const inherited = new Array<string>(1);
+  Object.setPrototypeOf(inherited, Object.assign(Object.create(Array.prototype) as object, { 0: "A" }));
+  for (const planner of [{ parseNextEvidencePacket, planNextEvidence, validateNextEvidencePlan }, builtPlanner]) {
+    const saved = planner.planNextEvidence(input);
+    for (const invalid of [
+      { ...input, missing: new Array(1) },
+      { ...input, missing: ["A", , "C"] },
+      { ...input, missing: inherited },
+      { ...input, reads: new Array(1) },
+      { ...input, reads: [input.reads[0], , input.reads[2]] },
+      { ...input, reads: [{ ...input.reads[0], covers: new Array(1) }] },
+      { ...input, reads: [{ ...input.reads[0], covers: ["A", , "C"] }] },
+      { ...input, reads: [{ ...input.reads[0], covers: inherited }] },
+    ]) {
+      assert.throws(() => planner.parseNextEvidencePacket(invalid), code("INVALID_PACKET"));
+      assert.throws(() => planner.planNextEvidence(invalid), code("INVALID_PACKET"));
+      assert.throws(() => planner.validateNextEvidencePlan(saved, invalid), code("INVALID_PACKET"));
+    }
+  }
+});
+
+test("bounded schema precedes serialization and never invokes caller serialization hooks", () => {
+  let serializations = 0;
+  const hook = <T extends object>(value: T): T => Object.defineProperty(value, "toJSON", { configurable: true, value: () => { serializations++; return {}; } });
+  const input = packet();
+  for (const planner of [{ parseNextEvidencePacket, planNextEvidence }, builtPlanner]) {
+    for (const invalid of [
+      { ...input, missing: new Array(4294967295) },
+      { ...input, reads: new Array(4294967295) },
+      { ...input, reads: [{ ...input.reads[0], covers: new Array(4294967295) }] },
+    ]) {
+      // Hooks keep behavioral-revert runs safe: the old implementation serializes
+      // an empty object instead of traversing an unbounded sparse array.
+      assert.throws(() => planner.parseNextEvidencePacket(hook(invalid)), code("INVALID_PACKET"));
+      assert.throws(() => planner.planNextEvidence(hook(invalid)), code("INVALID_PACKET"));
+    }
+    const valid = packet();
+    hook(valid); hook(valid.missing); hook(valid.reads);
+    for (const row of valid.reads) { hook(row); hook(row.covers); }
+    assert.deepEqual(planner.planNextEvidence(valid), planNextEvidence(packet()));
+  }
+  assert.equal(serializations, 0);
+});
+
+test("released v1 contracts and largest escaped revisions remain compatible and round trip", () => {
+  const fixture = JSON.parse(readFileSync(new URL("fixtures/next-evidence-v1.json", import.meta.url), "utf8")) as { packet: NextEvidencePacket; plan: NextEvidencePlan };
+  const maximum: NextEvidencePacket = {
+    contract_revision: "\u0000".repeat(256), tool_call_tokens: 1000000,
+    missing: Array.from({ length: 12 }, (_, index) => `C${index}`.padEnd(128, "x")),
+    reads: [],
+  };
+  maximum.reads = Array.from({ length: 64 }, (_, index) => ({ id: `R${index}`.padEnd(128, "x"), source: `S${index}`.padEnd(128, "x"), revision: maximum.contract_revision, covers: maximum.missing, estimated_tokens: 1000000, estimated_tool_calls: 1000 }));
+  assert.ok(Buffer.byteLength(JSON.stringify(maximum)) < 262144);
+  for (const planner of [{ planNextEvidence, validateNextEvidencePlan, encodeNextEvidencePlan }, builtPlanner]) {
+    assert.deepEqual(planner.planNextEvidence(fixture.packet), fixture.plan);
+    assert.deepEqual(planner.validateNextEvidencePlan(fixture.plan, fixture.packet), fixture.plan);
+    for (const input of [fixture.packet, maximum, { ...packet(), missing: ["constructor"], reads: [{ ...packet().reads[0]!, id: "constructor", source: "constructor", covers: ["constructor"] }] }]) {
+      const plan = planner.planNextEvidence(input);
+      assert.deepEqual(planner.validateNextEvidencePlan(JSON.parse(planner.encodeNextEvidencePlan(plan, "json")), input), plan);
+      assert.deepEqual(decodePlanToon(planner.encodeNextEvidencePlan(plan, "toon")), plan);
+    }
+  }
+});
+
+test("500 seeded boundary mutations refuse sparse and extreme packets without changing their valid source plans", () => {
+  let seed = 0x48cd1028;
+  const random = (maximum: number) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % maximum; };
+  for (let sequence = 0; sequence < 500; sequence++) {
+    const input = packet(); const saved = planNextEvidence(input);
+    const invalid = structuredClone(input);
+    const location = sequence % 4;
+    if (location === 0) delete invalid.missing[random(invalid.missing.length)];
+    if (location === 1) delete invalid.reads[random(invalid.reads.length)];
+    if (location === 2) delete invalid.reads[0]!.covers[random(invalid.reads[0]!.covers.length)];
+    if (location === 3) {
+      const field = random(2) ? "estimated_tokens" : "estimated_tool_calls";
+      invalid.reads[0]![field] = [NaN, Infinity, -Infinity, Number.MAX_VALUE, Number.MIN_VALUE, -1][random(6)]!;
+    }
+    for (const planner of [{ parseNextEvidencePacket, planNextEvidence, validateNextEvidencePlan }, builtPlanner]) {
+      assert.throws(() => planner.parseNextEvidencePacket(invalid), code("INVALID_PACKET"));
+      assert.throws(() => planner.planNextEvidence(invalid), code("INVALID_PACKET"));
+      assert.throws(() => planner.validateNextEvidencePlan(saved, invalid), code("INVALID_PACKET"));
+      assert.deepEqual(planner.validateNextEvidencePlan(saved, input), saved);
+    }
+  }
 });
 
 test("saved JSON plans bind every source contract and estimate; malformed or modified plans refuse", () => {

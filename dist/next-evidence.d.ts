@@ -56,9 +56,9 @@ export declare function parseNextEvidencePacket(value: unknown): NextEvidencePac
 /** Reuse the package's bounded stable-file reader, preserving typed path-free refusals. */
 export declare function readNextEvidenceJson(path: string): unknown;
 /** Compute the exact minimum-cost cover, then rank its reads by newly added coverage per cost. */
-export declare function planNextEvidence(input: NextEvidencePacket): NextEvidencePlan;
+export declare function planNextEvidence(input: unknown): NextEvidencePlan;
 /** Verify both the current source contract and the complete persisted plan; never execute a read. */
-export declare function validateNextEvidencePlan(plan: unknown, input: NextEvidencePacket): NextEvidencePlan;
+export declare function validateNextEvidencePlan(plan: unknown, input: unknown): NextEvidencePlan;
 /** Encode compact JSON or lossless TOON tables without source content or executable read instructions. */
 export declare function encodeNextEvidencePlan(plan: NextEvidencePlan, format?: "json" | "toon"): string;
 //# sourceMappingURL=next-evidence.d.ts.map

@@ -1,7 +1,7 @@
 # Next-evidence validation
 
 Public source: `unbraind/pm-context` main commit
-`ff1b9e90fd0043f6aa778cea4f03598e453b2610`.
+`0a8e1db` (2026.10.28).
 
 `test/validate-next-evidence-data.ts` runs against a disposable public tracker
 snapshot in a plain directory outside Git. It uses SDK `listAllComplete` and
@@ -16,7 +16,7 @@ non-git directory, then run:
 node test/validate-next-evidence-data.ts <public-tracker-snapshot>
 ```
 
-The snapshot contains **91 items**, with **31** having both explicit acceptance
+The snapshot contains **97 items**, with **36** having both explicit acceptance
 criteria and linked tests. The benchmark producer selects six of those items and
 declares seven missing criteria: six linked-test reads plus one deliberately
 unavailable independent-review criterion. These are benchmark declarations, not
@@ -72,3 +72,48 @@ Behavioral revert proof, with rebuilds before each run:
 
 Both behaviors were restored and rebuilt before verification. Full npm/Bun
 release evidence is supplied by CI, at the repository's unchanged thresholds.
+
+The refreshed overlap check found the feature already delivered by PR 176 and
+the numeric round-trip repair by PR 183. This change preserves that v1 planner
+and fixes its remaining sparse-array boundary defect. Core SDK
+`packContextCandidates` selects projections of existing ranked candidates under
+a budget; it does not solve the caller-declared missing-criterion acquisition
+cover. SDK complete-list certification and TOON table codecs remain reused.
+No new tracker mutation, status interpretation, execution, import/export/sync,
+journal or shared mutable state is introduced.
+
+The additional boundary corpus tests holes and inherited elements in every
+array, maximum-length sparse arrays, serialization hooks, 500 seeded invalid
+mutations (seed `0x48cd1028`), maximally escaped bounded packets, and a synthetic
+fixture produced by the released implementation at the source commit above.
+Source and compiled SDK producers preserve JSON/TOON round trips; invalid input
+fails with a typed remedy before optimization. Numeric outputs continue to use
+the existing finite safe-integer gate, with exact integer cross-products for
+coverage/cost ranking. Native state is read back through the SDK in the existing
+500-sequence model and peer-interleaving tests.
+
+The boundary behavioral revert replaces only `parseNextEvidencePacket` with its
+main implementation in a disposable package copy, rebuilding before each run.
+`node --test --test-concurrency=2 --test-name-pattern="dense packet schema"
+test/next-evidence.test.ts` fails with a missing refusal (1 failed), then passes
+after restoring the fixed parser and rebuilding (1 passed). The package worktree
+is never mutated by this proof.
+
+`test/validate-next-evidence-installations.ts` accepts a captured npm tarball and
+checks JSON, saved-plan revalidation and SDK-decoded TOON through npm global,
+Bun global, npx, bunx, npm project-local and Bun project-local hosts. Global
+directories are isolated, the host version is the repository pin, lifecycle
+scripts are disabled for the explicit npm/Bun installs, and inherited credential variables are
+excluded. It verifies the same artifact SHA-256 after each launcher and removes
+only its own scratch directories. Run it separately from unit tests because it
+performs public registry installs:
+
+```sh
+node test/validate-next-evidence-installations.ts <captured-package.tgz>
+```
+
+Measured result: **6/6 launchers**, **24/24 assertions**, using host
+`2026.10.25` and one unchanged archive containing **49 entries**, **132924 packed
+bytes** and **577320 unpacked bytes**. Artifact SHA-256:
+`bd0cc81102dd6cb248d7ac29a1972e5d7d63a974d3a4c974d81c87782045ad9e`.
+The archive is a local validation artifact and is not committed or published.

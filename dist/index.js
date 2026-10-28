@@ -2,7 +2,7 @@ import { buildSuggestedCommand } from "./suggested-command.js";
 export { buildSuggestedCommand, buildRestoreCommand, quotePosixArgument } from "./suggested-command.js";
 import { buildPhaseContext, encodePhaseContext, readPhaseContextJson, PhaseContextError } from "./task-phase.js";
 export { buildPhaseContext, encodePhaseContext, parsePhaseContextRequest, readPhaseContextJson, PhaseContextError, TASK_PHASES } from "./task-phase.js";
-import { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.js";
+import { planNextEvidence, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.js";
 export { planNextEvidence, parseNextEvidencePacket, readNextEvidenceJson, validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError } from "./next-evidence.js";
 import { packCriterionEvidence, encodeEvidencePack, readEvidencePacket, EvidencePackingError } from "./evidence-packing.js";
 export { packCriterionEvidence, encodeEvidencePack, parseEvidencePacket, readEvidencePacket, EvidencePackingError } from "./evidence-packing.js";
@@ -1314,7 +1314,7 @@ function setupCommands(api) {
             const format = stringOption(ctx.options, "format") ?? (ctx.global.json ? "json" : "toon");
             if (!path || (format !== "json" && format !== "toon") || ctx.args.length)
                 throw new NextEvidenceError("INVALID_ARGUMENT", "Supply --packet JSON and --format json or toon, without positional arguments.");
-            const packet = parseNextEvidencePacket(readNextEvidenceJson(path));
+            const packet = readNextEvidenceJson(path);
             const check = stringOption(ctx.options, "check");
             const plan = check ? validateNextEvidencePlan(readNextEvidenceJson(check), packet) : planNextEvidence(packet);
             return renderedCommandResult(encodeNextEvidencePlan(plan, format));

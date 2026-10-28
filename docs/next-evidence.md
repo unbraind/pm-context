@@ -46,12 +46,12 @@ is a declaration, never proof of semantic sufficiency or completed acceptance.
 
 ```ts
 import {
-  parseNextEvidencePacket, readNextEvidenceJson, planNextEvidence,
+  readNextEvidenceJson, planNextEvidence,
   validateNextEvidencePlan, encodeNextEvidencePlan, NextEvidenceError,
 } from 'pm-context';
 
 try {
-  const packet = parseNextEvidencePacket(readNextEvidenceJson('acquisition.json'));
+  const packet = readNextEvidenceJson('acquisition.json');
   const plan = planNextEvidence(packet);
   process.stdout.write(encodeNextEvidencePlan(plan, 'json'));
   validateNextEvidencePlan(plan, packet); // revalidate with CURRENT caller revisions
@@ -83,9 +83,21 @@ a peer SDK update at all five snapshot/planning/serialization/validation/return
 boundaries on one plain tracker, preserves peer success and foreign records,
 and refuses revisions that changed before revalidation.
 
-Input is bounded to 262144 UTF-8 bytes, 12 unique missing IDs and 64 unique reads;
+Input files are bounded to 262144 UTF-8 bytes, 12 unique missing IDs and 64 unique reads;
 exact dynamic programming uses at most 4096 coverage states. Nothing is silently
-truncated. Tokens are integers 0–1000000, calls 0–1000, and tool overhead
+truncated. `missing`, `reads` and every `covers` array must be dense, including
+SDK inputs: holes and inherited array elements refuse with `INVALID_PACKET`.
+Array bounds are checked before traversal, cloning or serialization, so even
+maximum-length sparse arrays cannot trigger unbounded serialization work.
+The canonical packet contains only bounded primitive fields and fits below the
+file byte ceiling, including maximally escaped revisions. Caller `toJSON` hooks
+are never invoked. Both `planNextEvidence(unknown)` and
+`validateNextEvidencePlan(plan, unknown)` use the same strict packet parser;
+the CLI passes raw JSON directly to that boundary. `parseNextEvidencePacket`
+remains available when a caller needs a canonical packet separately. Released
+v1 packet hashes and saved plans remain compatible.
+
+Tokens are integers 0–1000000, calls 0–1000, and tool overhead
 1–1000000; each read must have positive tokens or calls. All packet and plan
 outputs use finite safe integers and canonical positive zero, including SDK
 objects, JSON and TOON. Step cost is 1–1001000000. Plan totals are bounded by
@@ -121,3 +133,6 @@ state back through the SDK and compares it with its SDK-derived reference,
 including relationships and all native fields. Planner calls never normalize,
 import or write native items. Installed CLI checks run in a plain tracker with
 Git absent from PATH and a Git discovery ceiling.
+An additional 500 seeded boundary mutations cover sparse arrays and extreme
+numbers through source and compiled SDK entry points. A fixture produced by
+the released version preserves its original plan byte values and digest.
