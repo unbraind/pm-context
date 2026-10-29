@@ -6,11 +6,12 @@ status: in_progress
 priority: 2
 tags: []
 created_at: "2026-10-29T18:07:50.165Z"
-updated_at: "2026-10-29T18:14:31.669Z"
+updated_at: "2026-10-29T18:26:34.454Z"
 author: codex-agent
-comments[2]{created_at,author,text}:
+comments[3]{created_at,author,text}:
   "2026-10-29T18:12:00.283Z",codex,"Verified merged delivery PRs 195 and 196 and their exact-head passing CI receipts. Both owning items were still in_progress with no release field. As explicitly authorized for recovery, append-only pinned CLI updates close those delivered items and pin release 2026.10.29. npm run changelog:full now generates the exact 2026.10.29 - 2026-10-29 section with both entries; version and workflows are unchanged. Revert proof: origin/main lacks the requested heading; the same generator command after metadata repair emits it. Recovery item remains in progress for orchestrator verification; no merge or dispatch."
   "2026-10-29T18:13:41.473Z",codex-agent,"Linked npm run changelog:check passed 1/1 command. Prior source/dist and release gates were green on delivered PRs; the recovery branch will require fresh exact-head npm and Bun full release gates at unchanged thresholds in CI. Generated notes contain exactly the two recovered delivery entries; all earlier release sections are retained. Test-result tracking is disabled, so this append-only comment retains the receipt."
+  "2026-10-29T18:26:34.431Z",codex-agent,"Recovery limitation discovered by source inspection: release.yml selects original prepared SHA 3848c433 and checks it out in Verify merged release before Restore prepared release notes reads CHANGELOG.md. This PR repairs main only; dispatch of the unchanged workflow will still read the old missing-section commit. Follow-up pm-context-resume-recovery-sha records the selector defect. No claim that the notes-only PR alone restores publication; no workflow changed or dispatched."
 files[1]{path,scope}:
   CHANGELOG.md,project
 tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:

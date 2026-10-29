@@ -1,0 +1,11 @@
+id: pm-context-resume-recovery-sha
+title: Resume must consume a verified same-version changelog recovery
+description: "The release decision selects the oldest untagged Release pm-context v commit and records its immutable SHA. Verify merged release checks out that SHA before Restore prepared release notes reads CHANGELOG.md. A later notes-only repair on main cannot repair the historical commit, so dispatch still refuses. Define and verify an explicitly authorized same-version recovery revision without weakening artifact, metadata, ancestry or gate checks. No dispatch or workflow mutation is part of the notes repair."
+type: Issue
+status: open
+priority: 2
+tags: []
+created_at: "2026-10-29T18:26:13.491Z"
+updated_at: "2026-10-29T18:26:13.491Z"
+author: codex-agent
+body: ""
