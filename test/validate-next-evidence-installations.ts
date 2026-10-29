@@ -1,8 +1,9 @@
+import { removeBunFixture } from "./bun-fixture.ts";
 /** Exercise one captured package artifact through isolated npm/Bun host installations. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { devNull, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { init } from "@unbrained/pm-cli/sdk";
@@ -70,4 +71,4 @@ try {
     results.push({ mode: launcher.mode, assertions: 6 });
   }
   console.log(JSON.stringify({ artifact_sha256: artifactSha256, host, launchers: results, assertions: 36, artifact_unchanged: true }, null, 2));
-} finally { rmSync(root, { recursive: true, force: true }); }
+} finally { await removeBunFixture(root); }

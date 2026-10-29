@@ -49,7 +49,9 @@ export interface EvidencePack {
 /** Bound both input work and output transport; the ceiling measures UTF-8 bytes, not tokens. */
 export interface EvidencePackOptions { byteBudget?: number; format?: "json" | "toon" }
 /** Treat records distinctly from arrays and null during untrusted JSON validation. */
-function object(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === "object" && !Array.isArray(value); }
+function object(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype; }
+/** Arrays from SDK callers must obey the same dense JSON domain as parsed files. */
+function dense(value: unknown): value is unknown[] { return Array.isArray(value) && Object.keys(value).length === value.length && Object.keys(value).every((key, i) => key === String(i)); }
 /** Coordinates are public identifiers rather than filesystem paths. */
 function identifier(value: unknown): value is string { return typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,127}$/.test(value); }
 /** Refuse unknown qualifiers rather than silently changing the declared coverage contract. */
@@ -57,20 +59,21 @@ function keys(value: Record<string, unknown>, allowed: string[]): boolean { retu
 /** Validate and normalize declarations before any source read or budget selection. */
 export function parseEvidencePacket(value: unknown): EvidencePacket {
   const fail = () => new EvidencePackingError("INVALID_PACKET", "Supply 1-128 unique criteria with id, text (1-1024 characters), and evidence bindings {item,field}; use at most 512 distinct bindings in total. Remove unknown qualifiers and duplicate bindings.");
-  let size: number;
-  try { size = Buffer.byteLength(JSON.stringify(value) ?? ""); } catch { throw fail(); }
-  if (size > 262144 || !object(value) || !keys(value, ["criteria"]) || !Array.isArray(value.criteria) || value.criteria.length < 1 || value.criteria.length > 128) throw fail();
+  if (!object(value) || !keys(value, ["criteria"]) || !Array.isArray(value.criteria) || value.criteria.length < 1 || value.criteria.length > 128 || !dense(value.criteria)) throw fail();
   const ids = new Set<string>(); let count = 0;
   for (const row of value.criteria) {
-    if (!object(row) || !keys(row, ["id", "text", "evidence"]) || !identifier(row.id) || ids.has(row.id) || typeof row.text !== "string" || !row.text.trim() || row.text.length > 1024 || !Array.isArray(row.evidence)) throw fail();
+    if (!object(row) || !keys(row, ["id", "text", "evidence"]) || !identifier(row.id) || ids.has(row.id) || typeof row.text !== "string" || !row.text.trim() || row.text.length > 1024 || !Array.isArray(row.evidence) || row.evidence.length > 512 - count || !dense(row.evidence)) throw fail();
     ids.add(row.id);
     const bindings = new Set<string>();
     for (const binding of row.evidence) {
       if (!object(binding) || !keys(binding, ["item", "field"]) || !identifier(binding.item) || !identifier(binding.field) || bindings.has(JSON.stringify([binding.item, binding.field]))) throw fail();
       bindings.add(JSON.stringify([binding.item, binding.field]));
-      if (++count > 512) throw fail();
+      count++;
     }
   }
+  // Shape and work ceilings precede serialization, including enormous sparse
+  // SDK arrays that JSON.stringify would otherwise expand into billions of nulls.
+  if (Buffer.byteLength(JSON.stringify(value)) > 262144) throw fail();
   const packet = value as unknown as EvidencePacket;
   return { criteria: packet.criteria.map((row) => ({ id: row.id, text: row.text, evidence: row.evidence.map((binding) => ({ item: binding.item, field: binding.field })).sort((a, b) => compare(JSON.stringify(a), JSON.stringify(b))) })).sort((a, b) => compare(a.id, b.id)) };
 }

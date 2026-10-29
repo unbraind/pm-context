@@ -1,4 +1,6 @@
 import { buildSuggestedCommand } from "./suggested-command.js";
+import { createSharedEvidenceReader, packSharedEvidence, encodeSharedEvidence, SharedEvidenceError } from "./shared-evidence.js";
+export { createSharedEvidenceReader, packSharedEvidence, encodeSharedEvidence, parseSharedEvidenceRequest, SharedEvidenceError } from "./shared-evidence.js";
 export { buildSuggestedCommand, buildRestoreCommand, quotePosixArgument } from "./suggested-command.js";
 import { buildPhaseContext, encodePhaseContext, readPhaseContextJson, PhaseContextError } from "./task-phase.js";
 export { buildPhaseContext, encodePhaseContext, parsePhaseContextRequest, readPhaseContextJson, PhaseContextError, TASK_PHASES } from "./task-phase.js";
@@ -1322,6 +1324,27 @@ function setupCommands(api) {
         },
     });
     api.registerCommand({
+        name: "context-evidence-shared",
+        description: "Pack revision-bound evidence once with every criterion and item citation retained.",
+        flags: [
+            { long: "--packet", value_name: "file", description: "JSON criteria and optional byte_budget, format and representation", type: "string" },
+            { long: "--format", value_name: "format", description: "toon or json; overrides the request transport", type: "string" },
+        ],
+        async run(ctx) {
+            const path = stringOption(ctx.options, "packet");
+            if (!path || ctx.args.length)
+                throw new SharedEvidenceError("INVALID_REQUEST", "Supply --packet JSON without positional arguments; put format, byte_budget and representation in the request.");
+            const input = readFreshnessJson(path);
+            if (input === null || typeof input !== "object" || Array.isArray(input))
+                throw new SharedEvidenceError("INVALID_REQUEST", "Supply a JSON object with criteria and optional transport controls.");
+            const declared = ctx.options.format;
+            const overrides = declared !== undefined ? { format: declared } : ctx.global.json ? { format: "json" } : {};
+            const request = { ...input, ...overrides };
+            const pack = await packSharedEvidence(request, createSharedEvidenceReader(ctx.pm_root));
+            return renderedCommandResult(encodeSharedEvidence(pack, request.format ?? "toon"));
+        },
+    });
+    api.registerCommand({
         name: "context-evidence",
         description: "Pack explicit criterion evidence with exact coverage lost at a byte budget.",
         flags: [
@@ -1608,7 +1631,7 @@ export default {
         setupCommands(api);
         if (typeof api.registerRenderer === "function") {
             const rendererOwnership = {
-                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-next-evidence", "context-phase"],
+                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-evidence-shared", "context-next-evidence", "context-phase"],
                 resultDiscriminator: isRenderedCommandResult,
             };
             api.registerRenderer("toon", renderCommandResult, rendererOwnership);

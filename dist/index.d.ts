@@ -1,3 +1,5 @@
+export { createSharedEvidenceReader, packSharedEvidence, encodeSharedEvidence, parseSharedEvidenceRequest, SharedEvidenceError } from "./shared-evidence.ts";
+export type { SharedEvidenceRequest, SharedEvidenceReader, RevisionedEvidence, SharedEvidenceFragment, SharedEvidenceBinding, ExpandedSharedEvidence, SharedEvidencePack } from "./shared-evidence.ts";
 import type { SuggestedCommand } from "./suggested-command.ts";
 export { buildSuggestedCommand, buildRestoreCommand, quotePosixArgument } from "./suggested-command.ts";
 export type { SuggestedCommand, SuggestedRestore } from "./suggested-command.ts";
