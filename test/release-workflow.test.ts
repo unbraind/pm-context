@@ -111,6 +111,38 @@ test("resume notes are extracted from the prepared version and absent notes fail
   }
 });
 
+test("resume notes fall back to the same-version section of merged main when the prepared commit lacks it", () => {
+  const root = mkdtempSync(resolve(tmpdir(), "pm-context-release-recovery-"));
+  try {
+    const document = parse(workflow) as { jobs: { release: { steps: Array<{ name?: string; run?: string }> } } };
+    const script = document.jobs.release.steps.find((step) => step.name === "Restore prepared release notes")?.run;
+    assert.ok(script);
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "fixture@example.invalid"); git("config", "user.name", "fixture");
+    // The prepared release commit was cut without a section for its version.
+    writeFileSync(resolve(root, "CHANGELOG.md"), "# Changelog\n\n## 2026.9.26 - 2026-09-26\nOld fix\n");
+    git("add", "CHANGELOG.md"); git("commit", "-q", "-m", "Release pm-context v2026.9.27");
+    const prepared = git("rev-parse", "HEAD");
+    // A later notes-only repair on main adds it; the workflow then checks out the prepared commit detached.
+    writeFileSync(resolve(root, "CHANGELOG.md"), "# Changelog\n\n## 2026.9.27 - 2026-09-27\nRecovered fix\n\n## 2026.9.26 - 2026-09-26\nOld fix\n");
+    git("commit", "-q", "-am", "docs: add the 2026.9.27 section");
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    git("checkout", "-q", "--detach", prepared);
+    const recovered = spawnSync("bash", ["-e", "-c", script], { cwd: root, encoding: "utf8", env: { ...process.env, NPM_VERSION: "2026.9.27" } });
+    assert.equal(recovered.status, 0, recovered.stdout + recovered.stderr);
+    assert.equal(readFileSync(resolve(root, "RELEASE_NOTES.md"), "utf8"), "## 2026.9.27 - 2026-09-27\nRecovered fix\n\n");
+    assert.match(recovered.stdout, /come from the merged changelog on main/);
+    // Main never borrows another version's section: a version absent everywhere still fails closed.
+    const absent = spawnSync("bash", ["-e", "-c", script], { cwd: root, encoding: "utf8", env: { ...process.env, NPM_VERSION: "2026.9.28" } });
+    assert.equal(absent.status, 1);
+    assert.match(absent.stdout, /has no changelog section, on its commit or on main/);
+    assert.equal(readFileSync(resolve(root, "RELEASE_NOTES.md"), "utf8"), "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a prepared version cannot flow through metadata generation or another release PR", () => {
   for (const step of ["Update release version", "Generate changelog and release notes", "Run release checks", "Commit release files", "Merge release metadata through protected PR"]) {
     assert.match(executable(stepSource(step)), /^ *if: .*steps\.decide\.outputs\.resume != 'true'/m);

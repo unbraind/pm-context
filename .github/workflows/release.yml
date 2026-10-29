@@ -719,12 +719,27 @@ jobs:
           NPM_VERSION: ${{ steps.decide.outputs.npm_version }}
         run: |
           set -euo pipefail
-          awk -v version="$NPM_VERSION" '
-            /^## / { if (found) exit; if (index($0, "## " version " - ") == 1) found = 1 }
-            found { print }
-          ' CHANGELOG.md > RELEASE_NOTES.md
+          extract_notes() {
+            awk -v version="$NPM_VERSION" '
+              /^## / { if (found) exit; if (index($0, "## " version " - ") == 1) found = 1 }
+              found { print }
+            ' "$1"
+          }
+          extract_notes CHANGELOG.md > RELEASE_NOTES.md
           if [[ ! -s RELEASE_NOTES.md ]]; then
-            echo "::error::The prepared release ${NPM_VERSION} has no changelog section; refusing to create empty release notes."
+            # A notes-only repair merged after the prepared commit cannot change that commit, so read the same-version
+            # section from main, which "Verify merged release" proved descends from it (2026-10-29: pm-context v2026.10.29
+            # stayed unpublishable after its changelog repair merged).
+            merged_changelog="$(mktemp)"
+            git show origin/main:CHANGELOG.md > "$merged_changelog" 2>/dev/null || : > "$merged_changelog"
+            extract_notes "$merged_changelog" > RELEASE_NOTES.md
+            rm -f "$merged_changelog"
+            if [[ -s RELEASE_NOTES.md ]]; then
+              echo "::notice::Release notes for ${NPM_VERSION} come from the merged changelog on main; the prepared commit has no section for it."
+            fi
+          fi
+          if [[ ! -s RELEASE_NOTES.md ]]; then
+            echo "::error::The prepared release ${NPM_VERSION} has no changelog section, on its commit or on main; refusing to create empty release notes."
             exit 1
           fi
 
