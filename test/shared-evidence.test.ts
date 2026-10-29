@@ -11,6 +11,7 @@ import { runWithActiveExtensions } from "@unbrained/pm-cli/sdk/runtime";
 import extension, { createFreshnessReader, createSharedEvidenceReader, encodeSharedEvidence, packCriterionEvidence, packSharedEvidence, parseSharedEvidenceRequest } from "../index.ts";
 import type { SharedEvidencePack, SharedEvidenceRequest } from "../index.ts";
 import builtExtension from "../dist/index.js";
+import { assertSharedReferenceClosure } from "./shared-reference-closure.ts";
 
 /** Typed refusal assertions also require the host remedy contract. */
 function code(expected: string) { return (error: unknown) => isPmCliExpectedError(error) && error.code === expected && error.exitCode === 2 && "remedy" in error && typeof error.remedy === "string" && error.remedy.length > 0; }
@@ -43,6 +44,7 @@ function expanded(pack: SharedEvidencePack) {
 function roundtrip(pack: SharedEvidencePack, format: "json" | "toon") {
   const output = encodeSharedEvidence(pack, format);
   assert.deepEqual(format === "json" ? JSON.parse(output) : decodeToon(output), pack);
+  assertSharedReferenceClosure(pack);
   assert.ok(Buffer.byteLength(output) <= pack.byte_upper_bound && pack.byte_upper_bound <= pack.byte_budget);
 }
 

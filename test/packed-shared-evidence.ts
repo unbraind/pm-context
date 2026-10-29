@@ -9,6 +9,9 @@ import { createRequire } from "node:module";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { create, init } from "@unbrained/pm-cli/sdk";
 import { packSharedEvidence, encodeSharedEvidence } from "../index.ts";
+import { decodeToon } from "@unbrained/pm-cli/sdk/testing";
+import type { SharedEvidencePack } from "../index.ts";
+import { assertSharedReferenceClosure } from "./shared-reference-closure.ts";
 
 const artifact = resolve(process.argv[2]!); const version = process.argv[3] ?? "2026.10.28";
 assert.match(version, /^\d{4}\.\d{1,2}\.\d{1,2}$/);
@@ -77,6 +80,23 @@ try {
         writeFileSync(consume, `import {readFileSync} from 'node:fs'; import {packSharedEvidence,createSharedEvidenceReader,encodeSharedEvidence} from './dist/index.js'; const input=JSON.parse(readFileSync(process.argv[2],'utf8')); process.stdout.write(encodeSharedEvidence(await packSharedEvidence(input,createSharedEvidenceReader(process.argv[3])),input.format));`);
         for (const runtime of [process.execPath, "bun"]) assert.equal(run(runtime, [consume, packet, client.pmRoot]), exact);
         results.push(`${mode.name}-sdk-node-${format}`, `${mode.name}-sdk-bun-${format}`);
+      }
+    }
+    for (const format of ["json", "toon"] as const) for (const representation of ["factored", "expanded"] as const) {
+      writeFileSync(packet, JSON.stringify({ ...input, byte_budget: 262144, format, representation }));
+      const decode = (value: string) => (format === "json" ? JSON.parse(value) : decodeToon(value)) as SharedEvidencePack;
+      const output = run(mode.command, [...mode.args, "context-evidence-shared", "--packet", packet, "--format", format], mode.cwd, { PM_PATH: client.pmRoot, PM_AUTHOR: "fixture" });
+      const pack = decode(output); assertSharedReferenceClosure(pack);
+      assert.equal(pack.representation, representation); assert.equal(pack.fragments.length, 1);
+      assert.equal((representation === "expanded" ? pack.evidence : pack.bindings).length, 20);
+      results.push(`${mode.name}-references-${representation}-${format}`);
+      if (!["npx", "bunx"].includes(mode.name)) {
+        const consume = join(mode.directory, "consume.mjs");
+        writeFileSync(consume, `import {readFileSync} from 'node:fs'; import {packSharedEvidence,createSharedEvidenceReader,encodeSharedEvidence} from './dist/index.js'; const input=JSON.parse(readFileSync(process.argv[2],'utf8')); process.stdout.write(encodeSharedEvidence(await packSharedEvidence(input,createSharedEvidenceReader(process.argv[3])),input.format));`);
+        for (const runtime of [process.execPath, "bun"]) {
+          const sdk = decode(run(runtime, [consume, packet, client.pmRoot])); assertSharedReferenceClosure(sdk); assert.deepEqual(sdk, pack);
+          results.push(`${mode.name}-references-sdk-${runtime === "bun" ? "bun" : "node"}-${representation}-${format}`);
+        }
       }
     }
     writeFileSync(packet, JSON.stringify(input));

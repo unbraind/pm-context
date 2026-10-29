@@ -7,10 +7,10 @@ status: in_progress
 priority: 2
 tags[3]: evidence,"gh:unbraind/pm-context#196",shared-fragment
 created_at: "2026-10-29T00:12:11.032Z"
-updated_at: "2026-10-29T04:26:38.192Z"
+updated_at: "2026-10-29T06:08:48.889Z"
 author: codex-agent
 acceptance_criteria: Twenty bindings to one fragment retain twenty traceable bindings and one text copy; Distinct revisions never collapse; Equivalent expanded and factored packets cover the same criteria
-comments[20]{created_at,author,text}:
+comments[24]{created_at,author,text}:
   "2026-10-29T00:12:33.147Z",codex-agent,"Overlap recheck: existing evidence-packing.ts packs explicit criterion/item/field bindings but repeats value_json per criterion. Core read-output sessions use id/ref references across calls; task-phase.ts already consumes that host convention. pm-memory consolidation persists durable knowledge; pm-evidence resolves source citations. This feature is read-only within-packet factoring, preserving every binding and revision identity with no new store, import, sync, journal, status interpretation or tracker mutation path. Reuse SDK authoritative reads, history snapshots and host id/ref convention; retain legacy expanded v1 output. No transaction isolation is claimed."
   "2026-10-29T00:17:25.224Z",codex-agent,"Implementation: additive context-evidence-shared command and typed packSharedEvidence SDK. Both expanded and factored representations use one producer/selector. Exact revision plus JSON bytes identify fragments; every binding retains criterion, item, field and packet context_ref. Native reader cross-checks SDK item state and history; ABA text restoration changes the revision. Whole-criterion byte costs are measured through the same output path and recomputed after each SDK-selected admission. Existing expanded v1 remains unchanged except dense-array boundary validation. Targeted validation in progress; 500 seeded state sequences include current/old request replays, native fields, relationships, custom active statuses and ambient focus."
   "2026-10-29T00:27:35.725Z",codex-agent,"Read-only public validation: committed tracker c9f2994caf0b682def7a7fe6cf67beabbc89c978, 98 items, actual 1448-byte description on pm-context-m6cr, 20 declared benchmark obligations. JSON expanded 38523 -> factored 8995 bytes (29528 saved); TOON 36072 -> 7036 (29036 saved). Both retain 20 bindings, 1 fragment, identical full coverage; expanded fits only 3 criteria at the factored ceiling. Complete file inventory and byte fingerprint unchanged on the permission-read-only non-git copy. Targeted source coverage shared-evidence.ts is 100/100/100/100. SDK interleaving injection covers all four observation boundaries and documents the remaining post-read window. Full release gates delegated to npm+Bun CI at unchanged thresholds."
@@ -31,7 +31,11 @@ comments[20]{created_at,author,text}:
   "2026-10-29T04:18:04.440Z",codex-agent,"Cleanup diagnosis refined by CI 40815280262: bounded synchronous retries still fail because Node 22 internal/fs/rimraf _rmdirSync enumerates children once, then retries rmdir without rescanning children created after that enumeration. The native asynchronous remover retries the full removal and rescans. All four Bun-owned roots now share removeBunFixture using fs/promises.rm with the same bounded retry policy; test hooks return its Promise and standalone finally blocks await it. Added an adversarial subprocess test that intercepts only directory-removal syscall entry to create a real late file after enumeration; the actual filesystem returns ENOTEMPTY and asynchronous cleanup must remove the late file. No SDK mocks, packet assertion changes or timeout changes. Node 22 adversarial check passes 1/1; behavioral revert and focused integration checks follow. Prior failed receipts and the insufficient synchronous retry attempt remain append-only."
   "2026-10-29T04:20:02.961Z",codex-agent,"Deterministic cleanup revert proof in a disposable non-git copy: replace only removeBunFixture with the prior synchronous remover and the adversarial late-write test fails with actual ENOTEMPTY on Node 22. Restore the asynchronous implementation in finally, and the identical test passes 1/1. The reviewed worktree was never reverted. The test injects a real filesystem mutation at the removal boundary and forwards actual syscalls; it does not stub the SDK or fabricate an error."
   "2026-10-29T04:26:33.093Z",codex-agent,"Asynchronous cleanup validation complete: linked Node 22 command node --test --test-concurrency=2 test/bun-fixture.test.ts test/zero-budget.test.ts passes 1/1 command and 3/3 tests (zero failures). Latest static-import adversarial test independently passes 1/1 on Node 22 and 1/1 on Node 26; its synchronous behavioral revert fails with real ENOTEMPTY, and restoration passes. npm run build:test, npm run typecheck and npm run docstring pass; all original packet assertions/timeouts remain. The full CI suite now has 442 tests, adding the deterministic filesystem interleaving test. All four Bun-launching installation/SDK fixtures await the shared native asynchronous remover. No shipped file changed; the existing 53-file artifact and 30/30 packed-consumer receipt remain valid. Releasing this author claim before final CI verification; the feature stays in progress for orchestrator review. Fresh npm/Bun CI will verify the complete matrix at the new head."
-files[13]{path,scope}:
+  "2026-10-29T05:14:42.574Z",codex-agent,"Review round 2 rule: every emitted packet-local reference must resolve uniquely within its advertised scope, and projections must retain referenced targets. Whole-package audit found shared-evidence bindings/evidence referencing fragments; task-phase bindings retain facts while host session references are constructed by the SDK; context-receipts creates sections before facts and validates section/fact links on read. Legacy evidence, witness and freshness coordinates identify native/external sources rather than the packet fragment namespace. Only shared expanded projection discards its target table. Preserve the same canonical fragment registry in both modes; expanded rows retain inline copies for compatibility, with the additional registry bytes included in exact selection costs. Add encoder closure validation plus seeded source/built, JSON/TOON, CLI, packed-consumer and non-git checks. No additional non-blocking review finding was supplied or exposed in PR inline comments/reviews."
+  "2026-10-29T05:36:44.070Z",codex-agent,"Round-two behavioral revert proof in a disposable non-git copy: original projection and encoder make the seeded wire resolver fail on an unresolved expanded reference. Correcting projection but reverting only output validation makes the malformed-reference corpus fail because corrupted packets are accepted. Restoring the current source and rebuilding dist in finally passes both regression tests, 2/2 across source and compiled SDKs. The reviewed worktree was never reverted. Initial archive setup needed a Python-version-compatible extraction call before any mutation test ran; no audit or prior receipt was removed. Direct focused carry-forward suite passes 6/6, including exact-fit budgets and the Bun filesystem race."
+  "2026-10-29T05:36:54.068Z",codex-agent,"Refreshed read-only public measurement at the same c9f2994caf0b682def7a7fe6cf67beabbc89c978 snapshot: 98 items, actual 1448-byte description, 20 declared benchmark obligations, unchanged full source inventory and fingerprint. Reference-complete shared expanded JSON is 40156 bytes versus factored 8995 (31161 saved); TOON 37697 versus 7036 (30661 saved). Legacy v1 baseline remains 33601 JSON / 32056 TOON. Shared expanded contains twenty inline values plus one canonical registry copy; factored contains one copy and all twenty bindings. At the factored ceiling expanded retains two linked criteria. All full-mode criteria agree. Documentation reports both baselines explicitly."
+  "2026-10-29T06:08:45.133Z",codex-agent,"Round-two local validation complete: direct focused carry-forward suite 6/6; linked reference-closure command 1/1, 3/3 tests with a 600-second wrapper limit; 500 seeded reference graphs across source/compiled SDKs and both representations/transports; independent closure checks added to the existing 500-sequence native SDK state model. Two disposable behavioral reversions fail as required (original expanded projection loses targets; original encoder accepts corrupted references), and restoration/rebuild passes 2/2. Typecheck, test typecheck, docstring gate and whitespace validation pass. Packed host 2026.10.28 acceptance passes 74/74 journeys across all five install modes, both JSON/TOON representations and installed Node/Bun SDKs. Captured artifact SHA-256 4ba7f59edf5134535ecb3eb2678e89bba77a774f513d53f1056006f620057d4b has 53 shipped files, all byte-matched to the validated worktree. Read-only public measurements reproduced with closure assertions and unchanged inventory/fingerprint. No existing assertion or threshold was weakened. Full npm/Bun gates, now 445 tests per gate, will run in CI under the unchanged two-worker scripts per the shared-host resource rule. Releasing only this author claim before final verification; item remains in progress for the orchestrator."
+files[15]{path,scope}:
   evidence-packing.ts,project
   index.ts,project
   shared-evidence.ts,project
@@ -43,9 +47,11 @@ files[13]{path,scope}:
   test/phase-restoration.test.ts,project
   test/renderer-ownership.test.ts,project
   test/shared-evidence.test.ts,project
+  test/shared-reference-closure.test.ts,project
+  test/shared-reference-closure.ts,project
   test/validate-next-evidence-installations.ts,project
   test/zero-budget.test.ts,project
-tests[4]:
+tests[5]:
   - command: node --test --test-concurrency=2 test/shared-evidence.test.ts
     scope: project
     timeout_seconds: 600
@@ -77,6 +83,14 @@ tests[4]:
     provenance:
       author: codex-agent
       created_at: "2026-10-29T04:20:06.104Z"
+      source_kind: local_mutation
+      source_ref: feat/shared-fragment-evidence-factoring
+  - command: node --test --test-concurrency=2 test/shared-reference-closure.test.ts
+    scope: project
+    timeout_seconds: 600
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-29T05:37:11.154Z"
       source_kind: local_mutation
       source_ref: feat/shared-fragment-evidence-factoring
 docs[3]{path,scope}:

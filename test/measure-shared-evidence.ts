@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createFreshnessReader, createSharedEvidenceReader, encodeSharedEvidence, packCriterionEvidence, encodeEvidencePack, packSharedEvidence } from "../index.ts";
 import { readFileFocusItems } from "../file-focus.ts";
+import { assertSharedReferenceClosure } from "./shared-reference-closure.ts";
 
 /** Traverse only the supplied copy, rejecting links before permission changes. */
 function paths(root: string, prefix = ""): string[] {
@@ -40,10 +41,12 @@ try {
     const read = createSharedEvidenceReader(pmRoot);
     const full = await packSharedEvidence({ criteria, byte_budget: 262144, format, representation: "expanded" }, read);
     const factored = await packSharedEvidence({ criteria, byte_budget: 262144, format }, read);
+    assertSharedReferenceClosure(full); assertSharedReferenceClosure(factored);
     const legacy = await packCriterionEvidence({ criteria }, createFreshnessReader(pmRoot, root), { byteBudget: 262144, format });
     assert.deepEqual(factored.criteria, full.criteria); assert.deepEqual(factored.criteria, legacy.criteria);
     assert.equal(factored.bindings.length, 20); assert.equal(factored.fragments.length, 1);
     const constrained = await packSharedEvidence({ criteria, byte_budget: factored.byte_upper_bound, format, representation: "expanded" }, read);
+    assertSharedReferenceClosure(constrained);
     const expandedBytes = Buffer.byteLength(encodeSharedEvidence(full, format)); const factoredBytes = Buffer.byteLength(encodeSharedEvidence(factored, format));
     results.push({ format, criteria: criteria.length, bindings: factored.bindings.length, fragments: factored.fragments.length, expanded_bytes: expandedBytes, factored_bytes: factoredBytes, saved_bytes: expandedBytes - factoredBytes, legacy_v1_bytes: Buffer.byteLength(encodeEvidencePack(legacy, format)), expanded_linked_at_factored_budget: constrained.criteria.filter((row) => row.state === "linked").length });
   }

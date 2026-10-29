@@ -1,9 +1,11 @@
 # pm-context
 
-`pm context-evidence-shared --packet criteria.json` stores repeated evidence once
-inside a packet while retaining every criterion/item/field citation. Fragments
+By default, `pm context-evidence-shared --packet criteria.json` stores repeated
+evidence once inside a packet while retaining every criterion/item/field citation. Fragments
 bind exact values and authoritative revisions; restored text at a later revision
 remains distinct. JSON and TOON include complete coverage and byte receipts.
+Both representations retain the packet-local registry, so expanded rows also
+have resolvable references while keeping their independent inline values.
 The typed SDK exposes `packSharedEvidence`, `createSharedEvidenceReader` and
 `encodeSharedEvidence`. See the [request example and SDK usage](docs/shared-evidence.md).
 

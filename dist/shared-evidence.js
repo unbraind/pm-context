@@ -67,11 +67,38 @@ export function createSharedEvidenceReader(pmRoot) {
         return { revision: hash([first.id, before.raw, first]), value: first[binding.field] };
     };
 }
-/** Validate all emitted counters and JSON numbers before encoding either transport. */
+/** Require unique packet anchors and complete, consistent references after every projection. */
+function referencesResolve(pack) {
+    if (pack.reference_scope !== "packet:fragments:<id>" || !dense(pack.fragments) || !dense(pack.bindings) || !dense(pack.evidence))
+        return false;
+    const criteria = new Set();
+    for (const row of pack.criteria) {
+        if (typeof row.id !== "string" || criteria.has(row.id))
+            return false;
+        criteria.add(row.id);
+    }
+    const fragments = new Map();
+    for (const row of pack.fragments) {
+        if (!record(row) || typeof row.id !== "string" || typeof row.revision !== "string" || typeof row.value_json !== "string" || fragments.has(row.id))
+            return false;
+        fragments.set(row.id, row);
+    }
+    const used = new Set();
+    for (const row of [...pack.bindings, ...pack.evidence]) {
+        if (!record(row) || !criteria.has(row.criterion) || !fragments.has(row.id) || row.context_ref !== `packet:fragments:${row.id}`)
+            return false;
+        used.add(row.id);
+    }
+    return pack.evidence.every((row) => row.revision === fragments.get(row.id).revision && row.value_json === fragments.get(row.id).value_json) && used.size === fragments.size;
+}
+/** Validate reference closure, emitted counters and JSON numbers before either transport. */
 export function encodeSharedEvidence(pack, format) {
+    const fail = () => new SharedEvidenceError("INVALID_OUTPUT", "Regenerate a finite bounded packet with unique criteria/fragments and complete matching packet-local references using packSharedEvidence; encode it in the same json|toon format.");
+    if (!record(pack) || !json(pack, { nodes: 100000 }) || !dense(pack.criteria) || !pack.criteria.every(record) || !referencesResolve(pack))
+        throw fail();
     const counts = [pack.source_fields_read, pack.byte_budget, pack.byte_upper_bound, ...pack.criteria.flatMap((row) => [row.required, row.packed])];
-    if (!json(pack, { nodes: 100000 }) || !counts.every((value) => Number.isSafeInteger(value) && value >= 0 && value <= 262144) || pack.byte_budget < 512 || pack.byte_upper_bound > pack.byte_budget || pack.source_fields_read > 512 || pack.criteria.some((row) => row.required > 512 || row.packed > row.required) || !["json", "toon"].includes(format))
-        throw new SharedEvidenceError("INVALID_OUTPUT", "Regenerate a finite bounded packet using packSharedEvidence and encode it in the same json|toon format.");
+    if (!counts.every((value) => Number.isSafeInteger(value) && value >= 0 && value <= 262144) || pack.byte_budget < 512 || pack.byte_upper_bound > pack.byte_budget || pack.source_fields_read > 512 || pack.criteria.some((row) => row.required > 512 || row.packed > row.required) || !["json", "toon"].includes(format))
+        throw fail();
     return `${format === "json" ? JSON.stringify(pack) : encode(pack)}\n`;
 }
 /** Project selected groups through the same path for sizing and final output. */
@@ -82,7 +109,7 @@ function project(pack, selected, rows) {
         ...pack,
         criteria: pack.criteria.map((row) => selected.has(row.id) ? { ...row, state: "linked", packed: row.required } : row),
         bindings: pack.representation === "factored" ? included.map(({ criterion, item, field, id, context_ref }) => ({ criterion, item, field, id, context_ref })) : [],
-        fragments: pack.representation === "factored" ? [...fragments.values()].sort((a, b) => a.id < b.id ? -1 : 1) : [],
+        fragments: [...fragments.values()].sort((a, b) => a.id < b.id ? -1 : 1),
         evidence: pack.representation === "expanded" ? included : [],
     };
 }

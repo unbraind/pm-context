@@ -36,7 +36,11 @@ pm context-evidence-shared --packet criteria.json --format json
 ```
 
 Set `representation` to `expanded` to emit independent `evidence` rows with
-the same coordinates, fragment identities, revisions and exact values. At a
+the same coordinates, fragment identities, revisions and exact values. Both
+modes retain the canonical `fragments` registry: every `context_ref`, including
+those on expanded rows, resolves to exactly one target. Expanded values also
+remain inline, so this compatibility mode repeats text in addition to its
+registry copy. All registry bytes count toward the byte ceiling. At a
 sufficient budget, either representation covers exactly the same criteria.
 At the same smaller budget, factoring can admit more whole criteria. The
 existing `context-evidence` v1 command and SDK output retain their format.
@@ -110,7 +114,9 @@ with `undefined` use native JSON omission. Strings retain exact whitespace and
 line endings. Aggregate serialized source values are limited to 8388608 bytes;
 native history snapshots above that size refuse after SDK acquisition. The SDK
 owns history-read allocation. Producer output counters are checked for finite
-safe integers and documented ranges before returning.
+safe integers and documented ranges before returning. Encoding also rejects
+missing or duplicate targets, unknown criterion references, mismatched expanded
+values/revisions, and unreferenced fragments with typed `INVALID_OUTPUT`.
 
 | Refusal | Remedy |
 | --- | --- |

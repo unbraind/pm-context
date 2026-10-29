@@ -1,5 +1,14 @@
 # Shared evidence validation
 
+Every emitted `context_ref` resolves uniquely in the advertised packet registry,
+including expanded output. `test/shared-reference-closure.test.ts` exercises 500
+seeded graphs through source/compiled SDKs, both representations, JSON/TOON and
+constrained budgets. Its independent wire-level resolver verifies target identity,
+revision/value agreement, and citation coordinates. A malformed-output corpus
+requires typed refusals for missing, ambiguous and cross-wired targets; valid
+producer packets round-trip. Native SDK and installed Node/Bun CLI checks run
+without Git. The existing 500-sequence native state model uses the same oracle.
+
 Exact-fit budgets are successful terminal states: once the complete receipt
 consumes the byte ceiling, no positive-capacity SDK selector is invoked.
 `test/zero-budget.test.ts` generates 500 exact/adjacent boundary cases across
@@ -25,15 +34,18 @@ The scenario declares twenty benchmark obligations citing the actual 1,448-byte
 claim that recorded prose satisfies twenty native acceptance criteria. No
 public tracker data was changed or synthesized.
 
-| Transport | Expanded bytes | Factored bytes | Saved bytes | Bindings | Text copies |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| JSON | 38,523 | 8,995 | 29,528 | 20 | 1 |
-| TOON | 36,072 | 7,036 | 29,036 | 20 | 1 |
+| Transport | Legacy v1 expanded bytes | Shared expanded bytes | Factored bytes | Factored bindings / fragments |
+| --- | ---: | ---: | ---: | ---: |
+| JSON | 33,601 | 40,156 | 8,995 | 20 / 1 |
+| TOON | 32,056 | 37,697 | 7,036 | 20 / 1 |
 
 All twenty criteria were linked in both full representations. At the factored
-packet's byte budget, expanded output retained three linked criteria; the rest
-had explicit budget omissions. The legacy v1 packet measured 33,601 JSON bytes
-and 32,056 TOON bytes. All figures include the final newline and every receipt;
+packet's byte budget, expanded output retained two linked criteria; the rest
+had explicit budget omissions. Shared expanded output retains twenty inline
+copies plus one canonical registry copy so its references resolve; factored
+output retains one copy. Factoring saves 31,161 JSON bytes and 30,661 TOON bytes
+against shared expanded output, or 24,606 and 25,020 bytes against legacy v1.
+All figures include the final newline, registry and every receipt;
 they are transport bytes, not tokenizer counts or model-performance claims.
 
 Reproduce with a committed public export containing `.agents/pm`:

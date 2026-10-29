@@ -30,7 +30,7 @@ export interface ExpandedSharedEvidence extends SharedEvidenceBinding {
     revision: string;
     value_json: string;
 }
-/** Both representations share a single producer and whole-criterion budget selection. */
+/** Both representations retain the referenced registry and share whole-criterion selection. */
 export interface SharedEvidencePack {
     protocol: "pm-context-shared-evidence/v1";
     representation: "factored" | "expanded";
@@ -58,7 +58,7 @@ export declare class SharedEvidenceError extends PmCliError {
 export declare function parseSharedEvidenceRequest(value: unknown): Required<SharedEvidenceRequest>;
 /** Read SDK item state and history twice; interleaving refuses instead of mixing revisions. */
 export declare function createSharedEvidenceReader(pmRoot: string): SharedEvidenceReader;
-/** Validate all emitted counters and JSON numbers before encoding either transport. */
+/** Validate reference closure, emitted counters and JSON numbers before either transport. */
 export declare function encodeSharedEvidence(pack: SharedEvidencePack, format: "json" | "toon"): string;
 /** Factor exact revision/value pairs; preserve whole criterion groups under the byte ceiling. */
 export declare function packSharedEvidence(input: SharedEvidenceRequest, read: SharedEvidenceReader): Promise<SharedEvidencePack>;
