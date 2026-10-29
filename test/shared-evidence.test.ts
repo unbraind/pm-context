@@ -127,7 +127,11 @@ test("finite JSON source and output fuzz refuses lossy values and preserves prev
   const bad: unknown[] = [null, [], {}, { ...source, extra: true }, { ...source, revision: 1 }, { ...source, revision: " " }, { ...source, revision: "x".repeat(257) }];
   for (const value of [undefined, NaN, Infinity, -Infinity, 1n, Symbol(), () => 1, new Date(), new Array(1), cyclic, deep, Array.from({ length: 100001 }, () => 1), "x".repeat(8388609)]) bad.push({ ...source, value });
   for (const value of bad) await assert.rejects(packSharedEvidence(request(), async () => value as typeof source), code("SOURCE_UNAVAILABLE"));
-  for (const value of [null, true, false, 0, Number.MIN_VALUE, Number.MAX_VALUE, -1.5, "  body\r\n", [], {}, { nested: [1, "x", null], optional: undefined }, { constructor: "valid", ["__proto__"]: "valid" }]) {
+  const prototypeKeys = JSON.parse('{"constructor":"valid","__proto__":"valid"}') as Record<string, unknown>;
+  assert.equal(Object.getPrototypeOf(prototypeKeys), Object.prototype);
+  assert.equal(Object.hasOwn(prototypeKeys, "__proto__"), true);
+  assert.equal(prototypeKeys["__proto__"], "valid");
+  for (const value of [null, true, false, 0, Number.MIN_VALUE, Number.MAX_VALUE, -1.5, "  body\r\n", [], {}, { nested: [1, "x", null], optional: undefined }, prototypeKeys]) {
     const pack = await packSharedEvidence(request(), async () => ({ revision: "revision-1", value }));
     roundtrip(pack, "json"); assert.deepEqual(JSON.parse(pack.fragments[0]!.value_json), JSON.parse(JSON.stringify(value)));
   }
@@ -245,13 +249,17 @@ test("installed CLI and compiled SDK work without Git and refuse malformed guard
     t.after(() => harness.deactivate());
     for (const options of [{}, { packet: " " }]) await assert.rejects(harness.runCommand({ command: "context-evidence-shared", pmRoot: client.pmRoot, options }), code("INVALID_REQUEST"));
     await assert.rejects(harness.runCommand({ command: "context-evidence-shared", pmRoot: client.pmRoot, options: { packet: path }, args: ["extra"] }), code("INVALID_REQUEST"));
-    for (const global of [{}, { json: true }]) {
+    for (const global of [{ json: false }, { json: true }]) {
       const result = await harness.runCommand({ command: "context-evidence-shared", pmRoot: client.pmRoot, options: { packet: path }, global }); assert.equal(result.errorMessage, undefined);
     }
     await harness.runCommand({ command: "context-evidence-shared", pmRoot: client.pmRoot, options: { packet: path, format: "toon" }, global: {} });
     await assert.rejects(harness.runCommand({ command: "context-evidence-shared", pmRoot: client.pmRoot, options: { packet: path, format: " " } }), code("INVALID_REQUEST"));
-    writeFileSync(path, "null");
-    await assert.rejects(harness.runCommand({ command: "context-evidence-shared", pmRoot: client.pmRoot, options: { packet: path } }), code("INVALID_REQUEST"));
+    for (const invalid of ["null", "[]", "0"]) {
+      writeFileSync(path, invalid);
+      await assert.rejects(harness.runCommand({ command: "context-evidence-shared", pmRoot: client.pmRoot, options: { packet: path } }), code("INVALID_REQUEST"));
+    }
+    writeFileSync(path, JSON.stringify({ criteria: input.criteria, byte_budget: input.byte_budget }));
+    await harness.runCommand({ command: "context-evidence-shared", pmRoot: client.pmRoot, options: { packet: path }, global: { json: false } });
     writeFileSync(path, JSON.stringify(input));
   }
   for (const format of ["json", "toon"] as const) {
