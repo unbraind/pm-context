@@ -2,13 +2,16 @@ id: pm-context-acquisition-boundary
 title: Reject sparse evidence acquisition contracts before planning
 description: Revalidate the shipped next-evidence planner against the refreshed backlog contract; fix sparse SDK arrays and unbounded prevalidation serialization without duplicating PR 176 or PR 183.
 type: Issue
-status: in_progress
+status: closed
 priority: 2
-tags[2]: next-evidence,validation
+tags[3]: "gh:unbraind/pm-context#195",next-evidence,validation
 created_at: "2026-10-28T19:44:44.590Z"
-updated_at: "2026-10-28T20:32:53.219Z"
+updated_at: "2026-10-29T18:08:25.589Z"
+closed_at: "2026-10-29T18:08:25.441Z"
+completed_at: "2026-10-29T18:08:25.441Z"
 author: codex-agent
 acceptance_criteria: "Three overlapping reads select the cheapest complete cover or disclose uncovered criteria; no read executes; revised source contracts invalidate saved plans.; A single bounded dense packet schema is shared by SDK planning and CLI validation; sparse and extreme inputs refuse with typed remedies before planning; previously valid packets and JSON/TOON plans remain compatible.; At least 500 seeded operation sequences verify exact cover decisions, older-input replays, CRLF variants, serialization and SDK-read native state including relationships; public tracker copy is unchanged and measured.; Packed installation paths and targeted local checks pass; exact-head CI npm and Bun release gates pass at unchanged thresholds."
+release: 2026.10.29
 comments[10]{created_at,author,text}:
   "2026-10-28T19:45:31.186Z",codex-agent,"Overlap rechecked at main 0a8e1db: SDK packContextCandidates packs ranked present candidates under a token budget; pm-context evidence-packing.ts binds existing tracker fields. Acquisition planning already shipped in PR 176 (pm-context-next-evidence), with JSON estimate repair PR 183. Reuse those exports and context-next-evidence, not a duplicate planner. pm-ops diagnostic-plans.ts executes reviewed diagnostics; pm-rlm adaptive.ts owns model-driven decomposition. New reproduced defect: sparse missing/covers arrays pass the SDK parser and emit null IDs. Plan: enforce bounded dense schema before serialization, share the planner validation boundary with CLI, preserve valid v1 contracts, add property/refusal/compatibility/revert tests and refresh public-data plus packed acceptance."
   "2026-10-28T19:52:39.487Z",codex-agent,"Implemented bounded own-element array checks before cloning or serialization; CLI delegates raw JSON once to the same SDK parser. Revised public SDK signatures accept unknown at the validated boundary. Released-v1 fixture preserves original digest and plan. New refusal corpus covers every sparse location, inherited elements, maximum-length arrays and serialization hooks; 500 additional seeded mutations cover extreme numbers. Behavioral revert in a disposable copy: replacing only parseNextEvidencePacket with main and rebuilding makes the dense-schema regression fail (1 failed); restoring and rebuilding passes (1 passed). Refreshed public main 0a8e1db snapshot: 97 items, 36 with criteria/tests; 3 catalog reads selects 1; 7 missing criteria, 6 covered, 1 disclosed gap; estimated tokens 523, calls 1, cost 563 versus alternative 915; JSON 869 bytes, TOON 912 bytes; zero reads executed, unchanged tracker fingerprint. Typecheck and docstring lint pass. Initial focused suite exposed a test-only nonconfigurable hook; corrected and its three focused tests pass; complete focused rerun follows."
@@ -32,4 +35,5 @@ docs[3]{path,scope}:
   docs/next-evidence-validation.md,project
   docs/next-evidence.md,project
   README.md,project
+close_reason: Delivered in merged PR 195; validated by CI 40764438378; release-note recovery authorized for prepared 2026.10.29.
 body: ""
