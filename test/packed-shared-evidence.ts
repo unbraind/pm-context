@@ -1,3 +1,4 @@
+import { removeBunFixture } from "./bun-fixture.ts";
 /** Install one captured artifact through real isolated npm/Bun global and local hosts. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -82,4 +83,4 @@ try {
   }
   assert.equal(createHash("sha256").update(readFileSync(artifact)).digest("hex"), digest);
   process.stdout.write(`${JSON.stringify({ artifact_sha256: digest, host_version: version, passed: results.length, modes: results })}\n`);
-} finally { rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }
+} finally { await removeBunFixture(root); }

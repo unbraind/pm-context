@@ -7,10 +7,10 @@ status: in_progress
 priority: 2
 tags[3]: evidence,"gh:unbraind/pm-context#196",shared-fragment
 created_at: "2026-10-29T00:12:11.032Z"
-updated_at: "2026-10-29T03:58:09.596Z"
+updated_at: "2026-10-29T04:26:38.192Z"
 author: codex-agent
 acceptance_criteria: Twenty bindings to one fragment retain twenty traceable bindings and one text copy; Distinct revisions never collapse; Equivalent expanded and factored packets cover the same criteria
-comments[17]{created_at,author,text}:
+comments[20]{created_at,author,text}:
   "2026-10-29T00:12:33.147Z",codex-agent,"Overlap recheck: existing evidence-packing.ts packs explicit criterion/item/field bindings but repeats value_json per criterion. Core read-output sessions use id/ref references across calls; task-phase.ts already consumes that host convention. pm-memory consolidation persists durable knowledge; pm-evidence resolves source citations. This feature is read-only within-packet factoring, preserving every binding and revision identity with no new store, import, sync, journal, status interpretation or tracker mutation path. Reuse SDK authoritative reads, history snapshots and host id/ref convention; retain legacy expanded v1 output. No transaction isolation is claimed."
   "2026-10-29T00:17:25.224Z",codex-agent,"Implementation: additive context-evidence-shared command and typed packSharedEvidence SDK. Both expanded and factored representations use one producer/selector. Exact revision plus JSON bytes identify fragments; every binding retains criterion, item, field and packet context_ref. Native reader cross-checks SDK item state and history; ABA text restoration changes the revision. Whole-criterion byte costs are measured through the same output path and recomputed after each SDK-selected admission. Existing expanded v1 remains unchanged except dense-array boundary validation. Targeted validation in progress; 500 seeded state sequences include current/old request replays, native fields, relationships, custom active statuses and ambient focus."
   "2026-10-29T00:27:35.725Z",codex-agent,"Read-only public validation: committed tracker c9f2994caf0b682def7a7fe6cf67beabbc89c978, 98 items, actual 1448-byte description on pm-context-m6cr, 20 declared benchmark obligations. JSON expanded 38523 -> factored 8995 bytes (29528 saved); TOON 36072 -> 7036 (29036 saved). Both retain 20 bindings, 1 fragment, identical full coverage; expanded fits only 3 criteria at the factored ceiling. Complete file inventory and byte fingerprint unchanged on the permission-read-only non-git copy. Targeted source coverage shared-evidence.ts is 100/100/100/100. SDK interleaving injection covers all four observation boundaries and documents the remaining post-read window. Full release gates delegated to npm+Bun CI at unchanged thresholds."
@@ -28,10 +28,15 @@ comments[17]{created_at,author,text}:
   "2026-10-29T03:39:49.468Z",codex-agent,"Code/test-head CI PASS at 75b1ba578bbec38325d15be365d63bf210ee76aa: https://github.com/unbraind/pm-context/actions/runs/40812022361 . Node 22 npm release:check 441/441 and Bun release:check 441/441; Node 26 npm release:check 441/441 and Bun release:check 441/441. All four complete gates pass with zero failures. Each reports aggregate 100% statements, 99.96% branches, 100% functions and lines, and unchanged native thresholds. The local null-exit help example passes in all four CI gates and in its unchanged isolated rerun; the failed local receipt remains retained, not rewritten. This tracker-only receipt changes no shipped bytes; fresh checks on the receipt head will be verified before reporting final-head success. Claim is already released; item remains in progress for orchestrator verification. No additional review finding is open in the supplied review or PR discussion."
   "2026-10-29T03:55:33.111Z",codex-agent,"Final receipt-head CI 40813502905: 3/4 full gates passed, each 441/441; Node 22 Bun completed 440/441 because zero-budget fixture cleanup raced a Bun background cache write (ENOTEMPTY after every packet assertion passed). This is test cleanup, not a packet failure. General rule: removal of an owned runtime fixture must tolerate bounded transient filesystem races without suppressing persistent failures. Whole-package Bun-launcher audit found four owned roots: zero-budget, phase-restoration, packed-shared-evidence and validate-next-evidence-installations. All four now use the native rmSync bounded retry options (10 retries, 100 ms linear backoff), retaining hard failure after exhaustion. No packet assertion, timeout or coverage threshold changes. Shipped package bytes are unchanged. Focused regression and test typecheck precede fresh full CI gates; the failed CI receipt remains retained."
   "2026-10-29T03:58:05.085Z",codex-agent,"Bun-fixture cleanup follow-up validated on the declared Node 22 floor: node --test --test-concurrency=2 test/zero-budget.test.ts passes 2/2, including 500 boundary cases and installed Node/Bun no-git equality checks. npm run build:test, npm run typecheck and npm run docstring pass. All four Bun-owned fixture roots retain recursive forced cleanup and now use bounded native retries; product assertions and timeouts are identical. The captured artifact and all 53 shipped files remain unchanged. Full npm/Bun release gates will run at the new CI head; no second heavy local full suite is launched on the saturated host for these four cleanup-option edits. Claim released for final CI verification; item remains in progress."
-files[11]{path,scope}:
+  "2026-10-29T04:18:04.440Z",codex-agent,"Cleanup diagnosis refined by CI 40815280262: bounded synchronous retries still fail because Node 22 internal/fs/rimraf _rmdirSync enumerates children once, then retries rmdir without rescanning children created after that enumeration. The native asynchronous remover retries the full removal and rescans. All four Bun-owned roots now share removeBunFixture using fs/promises.rm with the same bounded retry policy; test hooks return its Promise and standalone finally blocks await it. Added an adversarial subprocess test that intercepts only directory-removal syscall entry to create a real late file after enumeration; the actual filesystem returns ENOTEMPTY and asynchronous cleanup must remove the late file. No SDK mocks, packet assertion changes or timeout changes. Node 22 adversarial check passes 1/1; behavioral revert and focused integration checks follow. Prior failed receipts and the insufficient synchronous retry attempt remain append-only."
+  "2026-10-29T04:20:02.961Z",codex-agent,"Deterministic cleanup revert proof in a disposable non-git copy: replace only removeBunFixture with the prior synchronous remover and the adversarial late-write test fails with actual ENOTEMPTY on Node 22. Restore the asynchronous implementation in finally, and the identical test passes 1/1. The reviewed worktree was never reverted. The test injects a real filesystem mutation at the removal boundary and forwards actual syscalls; it does not stub the SDK or fabricate an error."
+  "2026-10-29T04:26:33.093Z",codex-agent,"Asynchronous cleanup validation complete: linked Node 22 command node --test --test-concurrency=2 test/bun-fixture.test.ts test/zero-budget.test.ts passes 1/1 command and 3/3 tests (zero failures). Latest static-import adversarial test independently passes 1/1 on Node 22 and 1/1 on Node 26; its synchronous behavioral revert fails with real ENOTEMPTY, and restoration passes. npm run build:test, npm run typecheck and npm run docstring pass; all original packet assertions/timeouts remain. The full CI suite now has 442 tests, adding the deterministic filesystem interleaving test. All four Bun-launching installation/SDK fixtures await the shared native asynchronous remover. No shipped file changed; the existing 53-file artifact and 30/30 packed-consumer receipt remain valid. Releasing this author claim before final CI verification; the feature stays in progress for orchestrator review. Fresh npm/Bun CI will verify the complete matrix at the new head."
+files[13]{path,scope}:
   evidence-packing.ts,project
   index.ts,project
   shared-evidence.ts,project
+  test/bun-fixture.test.ts,project
+  test/bun-fixture.ts,project
   test/context-pack.test.ts,project
   test/measure-shared-evidence.ts,project
   test/packed-shared-evidence.ts,project
@@ -40,7 +45,7 @@ files[11]{path,scope}:
   test/shared-evidence.test.ts,project
   test/validate-next-evidence-installations.ts,project
   test/zero-budget.test.ts,project
-tests[3]:
+tests[4]:
   - command: node --test --test-concurrency=2 test/shared-evidence.test.ts
     scope: project
     timeout_seconds: 600
@@ -65,6 +70,13 @@ tests[3]:
     provenance:
       author: codex-agent
       created_at: "2026-10-29T01:33:30.420Z"
+      source_kind: local_mutation
+      source_ref: feat/shared-fragment-evidence-factoring
+  - command: node --test --test-concurrency=2 test/bun-fixture.test.ts test/zero-budget.test.ts
+    scope: project
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-29T04:20:06.104Z"
       source_kind: local_mutation
       source_ref: feat/shared-fragment-evidence-factoring
 docs[3]{path,scope}:

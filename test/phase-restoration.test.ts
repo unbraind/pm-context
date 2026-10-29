@@ -1,6 +1,7 @@
+import { removeBunFixture } from "./bun-fixture.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -32,7 +33,7 @@ function inspect(packet: PhaseContextPacket, state: Record<string, unknown>, col
 
 test("500 replayed runtime-field models exclude every SDK-derived collision in SDK, CLI and packed Node/Bun packets", async (t) => {
   const root = mkdtempSync(join(tmpdir(), "phase-meaning-"));
-  t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
+  t.after(() => removeBunFixture(root));
   const client = { cwd: root, pmRoot: join(root, "tracker"), noExtensions: true };
   await init("meaning", { defaults: true, agentGuidance: "skip", author: "fixture" }, client);
   const metadata = new Set(listListProjectionFields());
