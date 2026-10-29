@@ -1,5 +1,15 @@
 # Shared evidence validation
 
+Exact-fit budgets are successful terminal states: once the complete receipt
+consumes the byte ceiling, no positive-capacity SDK selector is invoked.
+`test/zero-budget.test.ts` generates 500 exact/adjacent boundary cases across
+both representations, JSON/TOON and source/compiled SDKs, checks the legacy
+producer and zero item slots, and executes the reported 512-byte case through
+installed Node/Bun CLIs without Git. Removing only the exhaustion guard in a
+disposable copy makes the property fail with the original SDK TypeError;
+restoring it passes. Packed acceptance also exercises exact JSON/TOON receipts
+through all five install modes and Node/Bun SDK consumers.
+
 Public source: the 98-item pm-context tracker at
 [`c9f2994caf0b682def7a7fe6cf67beabbc89c978`](https://github.com/unbraind/pm-context/tree/c9f2994caf0b682def7a7fe6cf67beabbc89c978/.agents/pm).
 `test/measure-shared-evidence.ts` copied the committed export to a non-Git

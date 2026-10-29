@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { create, init } from "@unbrained/pm-cli/sdk";
+import { packSharedEvidence, encodeSharedEvidence } from "../index.ts";
 
 const artifact = resolve(process.argv[2]!); const version = process.argv[3] ?? "2026.10.28";
 assert.match(version, /^\d{4}\.\d{1,2}\.\d{1,2}$/);
@@ -63,6 +64,21 @@ try {
       writeFileSync(consume, `import {readFileSync} from 'node:fs'; import {packSharedEvidence,createSharedEvidenceReader,encodeSharedEvidence} from './dist/index.js'; const input=JSON.parse(readFileSync(process.argv[2],'utf8')); process.stdout.write(encodeSharedEvidence(await packSharedEvidence(input,createSharedEvidenceReader(process.argv[3])),'json'));`);
       const sdk = JSON.parse(run(process.execPath, [consume, packet, client.pmRoot])); assert.deepEqual(sdk, result); results.push(`${mode.name}-sdk`);
     }
+    for (const format of ["json", "toon"] as const) {
+      const criteria = [{ id: "A", text: "x", evidence: [] }];
+      const base = await packSharedEvidence({ criteria, format, byte_budget: 512 }, async () => { assert.fail("empty packet read a field"); });
+      criteria[0]!.text = "x".repeat(1 + 512 - Buffer.byteLength(encodeSharedEvidence(base, format)));
+      writeFileSync(packet, JSON.stringify({ criteria, format, byte_budget: 512 }));
+      const exact = run(mode.command, [...mode.args, "context-evidence-shared", "--packet", packet, "--format", format], mode.cwd, { PM_PATH: client.pmRoot, PM_AUTHOR: "fixture" });
+      assert.equal(Buffer.byteLength(exact), 512); results.push(`${mode.name}-exact-${format}`);
+      if (!["npx", "bunx"].includes(mode.name)) {
+        const consume = join(mode.directory, "consume.mjs");
+        writeFileSync(consume, `import {readFileSync} from 'node:fs'; import {packSharedEvidence,createSharedEvidenceReader,encodeSharedEvidence} from './dist/index.js'; const input=JSON.parse(readFileSync(process.argv[2],'utf8')); process.stdout.write(encodeSharedEvidence(await packSharedEvidence(input,createSharedEvidenceReader(process.argv[3])),input.format));`);
+        for (const runtime of [process.execPath, "bun"]) assert.equal(run(runtime, [consume, packet, client.pmRoot]), exact);
+        results.push(`${mode.name}-sdk-node-${format}`, `${mode.name}-sdk-bun-${format}`);
+      }
+    }
+    writeFileSync(packet, JSON.stringify(input));
   }
   assert.equal(createHash("sha256").update(readFileSync(artifact)).digest("hex"), digest);
   process.stdout.write(`${JSON.stringify({ artifact_sha256: digest, host_version: version, passed: results.length, modes: results })}\n`);

@@ -124,6 +124,10 @@ export async function packSharedEvidence(input, read) {
     const selected = new Set();
     for (;;) {
         const bytes = size(pack);
+        // The SDK requires a strictly positive budget even for an empty candidate
+        // set. An exact-fit receipt is a successful terminal packing state.
+        if (bytes === pack.byte_budget)
+            break;
         const candidates = pack.criteria.filter((row) => row.required > 0 && !selected.has(row.id)).map((row, rank) => {
             const item = project(pack, new Set([...selected, row.id]), rows);
             const cost = Math.max(1, size(item) - bytes);

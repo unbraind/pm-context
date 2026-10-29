@@ -5,12 +5,12 @@ type: Feature
 pm_format_version: 2
 status: in_progress
 priority: 2
-tags[2]: evidence,shared-fragment
+tags[3]: evidence,"gh:unbraind/pm-context#196",shared-fragment
 created_at: "2026-10-29T00:12:11.032Z"
-updated_at: "2026-10-29T01:18:47.675Z"
+updated_at: "2026-10-29T03:24:01.118Z"
 author: codex-agent
 acceptance_criteria: Twenty bindings to one fragment retain twenty traceable bindings and one text copy; Distinct revisions never collapse; Equivalent expanded and factored packets cover the same criteria
-comments[10]{created_at,author,text}:
+comments[14]{created_at,author,text}:
   "2026-10-29T00:12:33.147Z",codex-agent,"Overlap recheck: existing evidence-packing.ts packs explicit criterion/item/field bindings but repeats value_json per criterion. Core read-output sessions use id/ref references across calls; task-phase.ts already consumes that host convention. pm-memory consolidation persists durable knowledge; pm-evidence resolves source citations. This feature is read-only within-packet factoring, preserving every binding and revision identity with no new store, import, sync, journal, status interpretation or tracker mutation path. Reuse SDK authoritative reads, history snapshots and host id/ref convention; retain legacy expanded v1 output. No transaction isolation is claimed."
   "2026-10-29T00:17:25.224Z",codex-agent,"Implementation: additive context-evidence-shared command and typed packSharedEvidence SDK. Both expanded and factored representations use one producer/selector. Exact revision plus JSON bytes identify fragments; every binding retains criterion, item, field and packet context_ref. Native reader cross-checks SDK item state and history; ABA text restoration changes the revision. Whole-criterion byte costs are measured through the same output path and recomputed after each SDK-selected admission. Existing expanded v1 remains unchanged except dense-array boundary validation. Targeted validation in progress; 500 seeded state sequences include current/old request replays, native fields, relationships, custom active statuses and ambient focus."
   "2026-10-29T00:27:35.725Z",codex-agent,"Read-only public validation: committed tracker c9f2994caf0b682def7a7fe6cf67beabbc89c978, 98 items, actual 1448-byte description on pm-context-m6cr, 20 declared benchmark obligations. JSON expanded 38523 -> factored 8995 bytes (29528 saved); TOON 36072 -> 7036 (29036 saved). Both retain 20 bindings, 1 fragment, identical full coverage; expanded fits only 3 criteria at the factored ceiling. Complete file inventory and byte fingerprint unchanged on the permission-read-only non-git copy. Targeted source coverage shared-evidence.ts is 100/100/100/100. SDK interleaving injection covers all four observation boundaries and documents the remaining post-read window. Full release gates delegated to npm+Bun CI at unchanged thresholds."
@@ -21,7 +21,11 @@ comments[10]{created_at,author,text}:
   "2026-10-29T00:56:51.013Z",codex-agent,"Static fixture correction verified: test typecheck and the focused finite-JSON regression pass 1/1, explicitly proving parsed __proto__ is an own data property with the ordinary prototype. All 53 shipped files remain byte-identical to the previously accepted artifact; runtime and package bytes are unchanged. Claim released again for orchestrator verification. Final CI supersedes the earlier head; no skipped or quota-limited automated review is counted as approval."
   "2026-10-29T00:58:47.704Z",codex-agent,"Final fixture verification: finite-JSON and installed CLI regressions pass 2/2; test typecheck passes. CLI coverage now explicitly exercises omitted format with global json=false and rejects null, array and scalar request roots. No runtime/shipped bytes changed; the 53-file captured artifact remains identical. PR 196 remains ready for review. The initial CI run 40796224047 is superseded by this fixture-only head; only the renewed final-head npm+Bun run can count as full-gate evidence. Existing claim is released and the item remains in progress for orchestrator verification."
   "2026-10-29T01:18:47.604Z",codex-agent,"CI cutoff receipt for PR 196, code/test head d83a40d1f6878c59b8a6a3613287d959dc8f0dcd: https://github.com/unbraind/pm-context/actions/runs/40797639865 . Node 26 full npm release gate PASS 439/439 tests, zero failures; full Bun release gate PASS 439/439 tests, zero failures. Aggregate instrumented coverage is 100% statements, 99.96% branches, 100% functions and lines, passing unchanged repository thresholds; targeted evidence modules remain 100% in every dimension. Node 22 npm is running and Bun is pending: full matrix is incomplete, with 2/4 gates passed at the cutoff observation. Per queue rules, stop waiting at the existing 30-minute limit; do not treat pending checks or skipped/neutral/quota-limited reviewers as approval. This final tracker-only receipt changes no shipped bytes and triggers fresh head checks; those remain unverified for orchestrator follow-up. Item stays in progress with claim released."
-files[8]{path,scope}:
+  "2026-10-29T01:33:26.418Z",codex-agent,"Review round 1: general rule is that an exhausted residual budget is a successful terminal state, never an admissible zero budget for an SDK selector requiring positive capacity. Whole-package audit found exactly three packContextCandidates callers: shared-evidence.ts lacked exhaustion handling; evidence-packing.ts already guards budget > overhead; index.ts createSdkPacker bypasses nonpositive item slots. No other selector calls exist in source/generated runtime. Fix terminates shared packing at equality, preserving inclusive byte ceilings. Added 500 seeded exact/adjacent boundary cases across source/built SDKs, JSON/TOON, factored/expanded, plus legacy producer and zero-slot checks and installed no-git Node/Bun CLI reproduction. No additional non-blocking finding was supplied or exposed in PR review comments; none is being silently dismissed."
+  "2026-10-29T01:35:27.259Z",codex-agent,"Behavioral revert proof: disposable non-git copy, only the new equality/exhaustion guard removed from packSharedEvidence. The 500-case exact-boundary property test fails with the original TypeError from the SDK. Guard restored in finally; complete zero-budget test file then passes 2/2, including installed Node/Bun no-git CLI. The first disposable verification lacked manifest.json; that fixture setup was corrected before the passing restored proof. Reviewed worktree was never mutated for reversion. Full npm and Bun release gates are running serially at unchanged thresholds and with the repository two-worker limit."
+  "2026-10-29T02:27:15.449Z",codex-agent,"Resume receipt: npm full release gate completed successfully, 441/441 tests with zero failures, unchanged thresholds; aggregate instrumented coverage 100% statements, 99.96% branches, 100% functions and lines. Captured artifact acceptance passed 30/30 journeys, including exact JSON/TOON ceilings across all five install modes and Node/Bun SDK consumers; SHA-256 19e37c7b8ba207f9db0ee6d97769c5850019a6545e494563873c567a717bf751 (53 files). The provider interruption ended the first Bun gate before a result; only that incomplete gate is restarted. No completed test was repeated. Origin/main has no missing commits, and PR review comments expose no further findings."
+  "2026-10-29T03:23:58.644Z",codex-agent,"Round-one fix validation complete: focused zero-budget regression 2/2, including the reported exact 512-byte no-git Node/Bun CLI and 500 source/compiled boundary cases; admitted-evidence equality cases pass in both representations and transports. Behavioral revert proof is retained above. Full local npm release:check PASS 441/441. Serial Bun release:check completed 440/441: an existing context-handoff suggestion returned a null child exit under its unchanged 15-second test timeout. The exact failed test rerun unchanged passes 1/1, executing all 28 suggestions: node --test --test-concurrency=2 --test-name-pattern=\"^runtime refreshes, discovery, recovery and static help examples\" test/suggested-command.test.ts. No test/assertion/timeout was weakened. Both complete instrumented coverage reports meet unchanged thresholds: aggregate 100% statements, 99.96% branches, 100% functions and lines; native source gate 100% in all dimensions. All 500 native shared-evidence state sequences passed in both runs. Packed acceptance remains 30/30 with artifact SHA-256 19e37c7b8ba207f9db0ee6d97769c5850019a6545e494563873c567a717bf751; all 53 current shipped files match it byte for byte. Origin/main is already contained. Remaining verification is fresh npm/Bun CI; no additional review finding was supplied or found in PR discussion. Feature remains in progress for orchestrator verification; releasing only this author claim."
+files[9]{path,scope}:
   evidence-packing.ts,project
   index.ts,project
   shared-evidence.ts,project
@@ -30,7 +34,8 @@ files[8]{path,scope}:
   test/packed-shared-evidence.ts,project
   test/renderer-ownership.test.ts,project
   test/shared-evidence.test.ts,project
-tests[2]:
+  test/zero-budget.test.ts,project
+tests[3]:
   - command: node --test --test-concurrency=2 test/shared-evidence.test.ts
     scope: project
     timeout_seconds: 600
@@ -47,6 +52,14 @@ tests[2]:
     provenance:
       author: codex-agent
       created_at: "2026-10-29T00:39:43.561Z"
+      source_kind: local_mutation
+      source_ref: feat/shared-fragment-evidence-factoring
+  - command: node --test --test-concurrency=2 test/zero-budget.test.ts
+    scope: project
+    timeout_seconds: 600
+    provenance:
+      author: codex-agent
+      created_at: "2026-10-29T01:33:30.420Z"
       source_kind: local_mutation
       source_ref: feat/shared-fragment-evidence-factoring
 docs[3]{path,scope}:
