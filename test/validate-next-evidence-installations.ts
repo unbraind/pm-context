@@ -70,4 +70,4 @@ try {
     results.push({ mode: launcher.mode, assertions: 6 });
   }
   console.log(JSON.stringify({ artifact_sha256: artifactSha256, host, launchers: results, assertions: 36, artifact_unchanged: true }, null, 2));
-} finally { rmSync(root, { recursive: true, force: true }); }
+} finally { rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }

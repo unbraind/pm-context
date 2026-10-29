@@ -82,4 +82,4 @@ try {
   }
   assert.equal(createHash("sha256").update(readFileSync(artifact)).digest("hex"), digest);
   process.stdout.write(`${JSON.stringify({ artifact_sha256: digest, host_version: version, passed: results.length, modes: results })}\n`);
-} finally { rmSync(root, { recursive: true, force: true }); }
+} finally { rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }

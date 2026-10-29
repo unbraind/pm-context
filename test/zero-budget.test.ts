@@ -55,7 +55,7 @@ test("zero remaining capacity is successful for every evidence producer and tran
 });
 
 test("exact 512-byte receipt succeeds through installed Node and Bun CLI without Git", async (t) => {
-  const root = mkdtempSync(join(tmpdir(), "zero-budget-")); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const root = mkdtempSync(join(tmpdir(), "zero-budget-")); t.after(() => rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   const pmRoot = join(root, "tracker"); await init("zero", { defaults: true, agentGuidance: "skip", author: "fixture" }, { cwd: root, pmRoot });
   const packageRoot = resolve(import.meta.dirname, ".."); const extension = join(pmRoot, "extensions", "pm-context"); mkdirSync(extension, { recursive: true });
   cpSync(join(packageRoot, "dist"), join(extension, "dist"), { recursive: true }); cpSync(join(packageRoot, "manifest.json"), join(extension, "manifest.json"));
