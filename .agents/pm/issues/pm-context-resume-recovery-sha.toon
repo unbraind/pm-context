@@ -6,10 +6,11 @@ status: open
 priority: 2
 tags: []
 created_at: "2026-10-29T18:26:13.491Z"
-updated_at: "2026-10-29T21:09:56.658Z"
+updated_at: "2026-10-30T00:14:16.025Z"
 author: codex-agent
-comments[1]{created_at,author,text}:
+comments[2]{created_at,author,text}:
   "2026-10-29T21:09:56.658Z",claude-hub,"Fixed in release.yml 'Restore prepared release notes': when the prepared commit has no section for NPM_VERSION, the step extracts the same-version section from origin/main (fetched and ancestry-verified by 'Verify merged release'), prints a notice, and still fails closed when neither has it. New test 'resume notes fall back to the same-version section of merged main when the prepared commit lacks it' builds a real git history (prepared commit without the section, later main commit with it, detached checkout) and also asserts a version absent everywhere refuses with empty RELEASE_NOTES.md. Revert proof: with the previous step the new test fails, with the fix it passes; release-workflow.test.ts 15/15. After this PR merges, dispatch release.yml to resume v2026.10.29."
+  "2026-10-30T00:14:16.025Z",claude-hub,"CodeRabbit (Major) on 310e84a: the main-tip fallback read mutable notes. Replaced in this commit: the resume never reads origin/main's tip; recovery needs an explicit workflow_dispatch input recovery_notes_sha (full 40-hex SHA) that must descend from the prepared release (steps.decide.outputs.release_sha) and be contained in main, and only its same-version section is used. Test 'resume notes recover only from an explicitly authorized, immutable recovery commit' (real git: prepared without section, recovery commit, later main edit, side branch, unmerged branch) asserts notes come from the recovery commit, not the later edit, and refuses no input, a short SHA, a commit outside main, a non-descendant and a missing version. Revert proof: fails with the previous main-tip fallback; release-workflow.test.ts 15/15; tsc clean. Recovery: after #200 merges, dispatch release.yml with recovery_notes_sha=<the #200 merge commit>."
 files[1]{path,scope}:
   .github/workflows/release.yml,project
 tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
