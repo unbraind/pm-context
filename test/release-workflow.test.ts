@@ -114,8 +114,17 @@ test("resume notes are extracted from the prepared version and absent notes fail
 test("resume notes recover only from an explicitly authorized, immutable recovery commit", () => {
   const root = mkdtempSync(resolve(tmpdir(), "pm-context-release-recovery-"));
   try {
-    const document = parse(workflow) as { jobs: { release: { steps: Array<{ name?: string; run?: string }> } } };
-    const script = document.jobs.release.steps.find((step) => step.name === "Restore prepared release notes")?.run;
+    const document = parse(workflow) as {
+      on: { workflow_dispatch: { inputs: Record<string, { required?: boolean; type?: string }> } };
+      jobs: { release: { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> } };
+    };
+    // The real dispatch input must reach the step: assert the binding, not only the script it feeds.
+    assert.equal(document.on.workflow_dispatch.inputs.recovery_notes_sha?.required, false);
+    assert.equal(document.on.workflow_dispatch.inputs.recovery_notes_sha?.type, "string");
+    const restore = document.jobs.release.steps.find((step) => step.name === "Restore prepared release notes");
+    assert.equal(restore?.env?.RECOVERY_NOTES_SHA, "${{ inputs.recovery_notes_sha }}");
+    assert.equal(restore?.env?.PREPARED_SHA, "${{ steps.decide.outputs.release_sha }}");
+    const script = restore?.run;
     assert.ok(script);
     const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
     const commit = (changelog: string, message: string) => {
@@ -136,6 +145,9 @@ test("resume notes recover only from an explicitly authorized, immutable recover
     // A reviewed notes-only repair adds it; a later main commit edits the same section again.
     const recovery = commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nRecovered fix\n\n" + older, "docs: add the 2026.9.27 section");
     commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nRewritten later\n\n" + older, "docs: edit the 2026.9.27 section");
+    // Main also contains the side branch (an "ours" merge keeps main's files), so `unrelated` passes the containment
+    // check and only the prepared-ancestor guard can refuse it.
+    git("merge", "-q", "--no-ff", "-s", "ours", "-m", "merge side notes", "side");
     git("update-ref", "refs/remotes/origin/main", "HEAD");
     git("checkout", "-q", "-b", "outside", recovery);
     const outsideMain = commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nNot on main\n\n" + older, "unmerged notes");
