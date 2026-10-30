@@ -2,11 +2,13 @@ id: pm-context-release-notes-1029
 title: Restore generated notes for the prepared 2026.10.29 release
 description: Recover release notes for merged PRs 195 and 196 without changing the prepared version or dispatching publication.
 type: Issue
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-29T18:07:50.165Z"
-updated_at: "2026-10-29T18:44:36.636Z"
+updated_at: "2026-10-30T05:17:50.014Z"
+closed_at: "2026-10-30T05:17:36.245Z"
+completed_at: "2026-10-30T04:44:24.000Z"
 author: codex-agent
 comments[4]{created_at,author,text}:
   "2026-10-29T18:12:00.283Z",codex,"Verified merged delivery PRs 195 and 196 and their exact-head passing CI receipts. Both owning items were still in_progress with no release field. As explicitly authorized for recovery, append-only pinned CLI updates close those delivered items and pin release 2026.10.29. npm run changelog:full now generates the exact 2026.10.29 - 2026-10-29 section with both entries; version and workflows are unchanged. Revert proof: origin/main lacks the requested heading; the same generator command after metadata repair emits it. Recovery item remains in progress for orchestrator verification; no merge or dispatch."
@@ -19,4 +21,5 @@ tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   "npm run changelog:check",project,codex-agent,"2026-10-29T18:10:49.769Z",local_mutation,fix/changelog-2026-10-29
 docs[1]{path,scope}:
   README.md,project
+close_reason: "Merged in #200 (0fd21ea); recovery dispatch run 41003642235 succeeded; npm pm-context@2026.10.29 and GitHub release v2026.10.29 publish the generated notes (Added: shared fragment evidence; Fixed: acquisition boundary)."
 body: ""
