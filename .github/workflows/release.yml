@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "23 3 * * *"
   workflow_dispatch:
+    inputs:
+      recovery_notes_sha:
+        description: "Recovery only: full SHA of a main commit that descends from the prepared release and whose CHANGELOG.md has that version's section"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -717,14 +722,40 @@ jobs:
         shell: bash
         env:
           NPM_VERSION: ${{ steps.decide.outputs.npm_version }}
+          PREPARED_SHA: ${{ steps.decide.outputs.release_sha }}
+          RECOVERY_NOTES_SHA: ${{ inputs.recovery_notes_sha }}
         run: |
           set -euo pipefail
-          awk -v version="$NPM_VERSION" '
-            /^## / { if (found) exit; if (index($0, "## " version " - ") == 1) found = 1 }
-            found { print }
-          ' CHANGELOG.md > RELEASE_NOTES.md
+          extract_notes() {
+            awk -v version="$NPM_VERSION" '
+              /^## / { if (found) exit; if (index($0, "## " version " - ") == 1) found = 1 }
+              found { print }
+            ' "$1"
+          }
+          extract_notes CHANGELOG.md > RELEASE_NOTES.md
+          if [[ ! -s RELEASE_NOTES.md && -n "${RECOVERY_NOTES_SHA:-}" ]]; then
+            # A notes-only repair merged after the prepared commit cannot change that commit. A maintainer authorizes
+            # one immutable recovery commit by dispatching with recovery_notes_sha: it must descend from the prepared
+            # commit and be contained in main, and only its same-version section is used. The mutable main tip is
+            # never read (2026-10-29: pm-context v2026.10.29 stayed unpublishable after its changelog repair merged).
+            if [[ ! "$RECOVERY_NOTES_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::recovery_notes_sha must be a full 40-character lowercase commit SHA."
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$PREPARED_SHA" "$RECOVERY_NOTES_SHA" || ! git merge-base --is-ancestor "$RECOVERY_NOTES_SHA" origin/main; then
+              echo "::error::recovery_notes_sha ${RECOVERY_NOTES_SHA} must descend from prepared release ${PREPARED_SHA} and be contained in main."
+              exit 1
+            fi
+            recovery_changelog="$(mktemp)"
+            git show "${RECOVERY_NOTES_SHA}:CHANGELOG.md" > "$recovery_changelog"
+            extract_notes "$recovery_changelog" > RELEASE_NOTES.md
+            rm -f "$recovery_changelog"
+            if [[ -s RELEASE_NOTES.md ]]; then
+              echo "::notice::Release notes for ${NPM_VERSION} come from recovery commit ${RECOVERY_NOTES_SHA}; the prepared commit has no section for it."
+            fi
+          fi
           if [[ ! -s RELEASE_NOTES.md ]]; then
-            echo "::error::The prepared release ${NPM_VERSION} has no changelog section; refusing to create empty release notes."
+            echo "::error::The prepared release ${NPM_VERSION} has no changelog section; refusing to create empty release notes. If a later main commit adds that section, dispatch this workflow with recovery_notes_sha set to that commit."
             exit 1
           fi
 

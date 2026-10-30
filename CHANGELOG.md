@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026.10.29 - 2026-10-29
+
+### Added
+
+- Factor shared criterion evidence into one revision-bound fragment ([pm-context-shared-fragment-evidence](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-shared-fragment-evidence.toon))
+
+### Fixed
+
+- Reject sparse evidence acquisition contracts before planning ([pm-context-acquisition-boundary](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-acquisition-boundary.toon))
+
 ## 2026.10.28 - 2026-10-28
 
 ### Added

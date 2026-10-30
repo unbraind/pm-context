@@ -1,0 +1,19 @@
+id: pm-context-resume-recovery-sha
+title: Resume must consume a verified same-version changelog recovery
+description: "The release decision selects the oldest untagged Release pm-context v commit and records its immutable SHA. Verify merged release checks out that SHA before Restore prepared release notes reads CHANGELOG.md. A later notes-only repair on main cannot repair the historical commit, so dispatch still refuses. Define and verify an explicitly authorized same-version recovery revision without weakening artifact, metadata, ancestry or gate checks. No dispatch or workflow mutation is part of the notes repair."
+type: Issue
+status: open
+priority: 2
+tags: []
+created_at: "2026-10-29T18:26:13.491Z"
+updated_at: "2026-10-30T04:16:49.063Z"
+author: codex-agent
+comments[3]{created_at,author,text}:
+  "2026-10-29T21:09:56.658Z",claude-hub,"Fixed in release.yml 'Restore prepared release notes': when the prepared commit has no section for NPM_VERSION, the step extracts the same-version section from origin/main (fetched and ancestry-verified by 'Verify merged release'), prints a notice, and still fails closed when neither has it. New test 'resume notes fall back to the same-version section of merged main when the prepared commit lacks it' builds a real git history (prepared commit without the section, later main commit with it, detached checkout) and also asserts a version absent everywhere refuses with empty RELEASE_NOTES.md. Revert proof: with the previous step the new test fails, with the fix it passes; release-workflow.test.ts 15/15. After this PR merges, dispatch release.yml to resume v2026.10.29."
+  "2026-10-30T00:14:16.025Z",claude-hub,"CodeRabbit (Major) on 310e84a: the main-tip fallback read mutable notes. Replaced in this commit: the resume never reads origin/main's tip; recovery needs an explicit workflow_dispatch input recovery_notes_sha (full 40-hex SHA) that must descend from the prepared release (steps.decide.outputs.release_sha) and be contained in main, and only its same-version section is used. Test 'resume notes recover only from an explicitly authorized, immutable recovery commit' (real git: prepared without section, recovery commit, later main edit, side branch, unmerged branch) asserts notes come from the recovery commit, not the later edit, and refuses no input, a short SHA, a commit outside main, a non-descendant and a missing version. Revert proof: fails with the previous main-tip fallback; release-workflow.test.ts 15/15; tsc clean. Recovery: after #200 merges, dispatch release.yml with recovery_notes_sha=<the #200 merge commit>."
+  "2026-10-30T04:16:49.062Z",claude-hub,"CodeRabbit follow-up on 8accda1 (2 threads): the recovery test now asserts the real bindings (workflow_dispatch input recovery_notes_sha optional string; step env RECOVERY_NOTES_SHA = inputs.recovery_notes_sha and PREPARED_SHA = steps.decide.outputs.release_sha) and merges the side branch into main with -s ours, so the non-descendant case passes containment and only the prepared-ancestor guard refuses it. Revert proofs: dropping the ancestor guard fails the test; dropping the input mapping fails the test; restored 15/15; tsc clean."
+files[1]{path,scope}:
+  .github/workflows/release.yml,project
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-name-pattern='resume notes' test/release-workflow.test.ts,project,300,claude-hub,"2026-10-29T21:09:55.299Z",local_mutation,fix/changelog-2026-10-29
+body: ""

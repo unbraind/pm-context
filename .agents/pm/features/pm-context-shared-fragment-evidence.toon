@@ -3,13 +3,16 @@ title: Factor shared criterion evidence into one revision-bound fragment
 description: "Read-only within-packet evidence factoring with complete criterion and item citation paths, typed SDK and compact CLI output."
 type: Feature
 pm_format_version: 2
-status: in_progress
+status: closed
 priority: 2
 tags[3]: evidence,"gh:unbraind/pm-context#196",shared-fragment
 created_at: "2026-10-29T00:12:11.032Z"
-updated_at: "2026-10-29T06:08:48.889Z"
+updated_at: "2026-10-29T18:08:32.652Z"
+closed_at: "2026-10-29T18:08:32.461Z"
+completed_at: "2026-10-29T18:08:32.461Z"
 author: codex-agent
 acceptance_criteria: Twenty bindings to one fragment retain twenty traceable bindings and one text copy; Distinct revisions never collapse; Equivalent expanded and factored packets cover the same criteria
+release: 2026.10.29
 comments[24]{created_at,author,text}:
   "2026-10-29T00:12:33.147Z",codex-agent,"Overlap recheck: existing evidence-packing.ts packs explicit criterion/item/field bindings but repeats value_json per criterion. Core read-output sessions use id/ref references across calls; task-phase.ts already consumes that host convention. pm-memory consolidation persists durable knowledge; pm-evidence resolves source citations. This feature is read-only within-packet factoring, preserving every binding and revision identity with no new store, import, sync, journal, status interpretation or tracker mutation path. Reuse SDK authoritative reads, history snapshots and host id/ref convention; retain legacy expanded v1 output. No transaction isolation is claimed."
   "2026-10-29T00:17:25.224Z",codex-agent,"Implementation: additive context-evidence-shared command and typed packSharedEvidence SDK. Both expanded and factored representations use one producer/selector. Exact revision plus JSON bytes identify fragments; every binding retains criterion, item, field and packet context_ref. Native reader cross-checks SDK item state and history; ABA text restoration changes the revision. Whole-criterion byte costs are measured through the same output path and recomputed after each SDK-selected admission. Existing expanded v1 remains unchanged except dense-array boundary validation. Targeted validation in progress; 500 seeded state sequences include current/old request replays, native fields, relationships, custom active statuses and ambient focus."
@@ -97,4 +100,5 @@ docs[3]{path,scope}:
   docs/shared-evidence-validation.md,project
   docs/shared-evidence.md,project
   README.md,project
+close_reason: Delivered in merged PR 196; validated by CI 40828010054; release-note recovery authorized for prepared 2026.10.29.
 body: ""

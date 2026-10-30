@@ -111,6 +111,77 @@ test("resume notes are extracted from the prepared version and absent notes fail
   }
 });
 
+test("resume notes recover only from an explicitly authorized, immutable recovery commit", () => {
+  const root = mkdtempSync(resolve(tmpdir(), "pm-context-release-recovery-"));
+  try {
+    const document = parse(workflow) as {
+      on: { workflow_dispatch: { inputs: Record<string, { required?: boolean; type?: string }> } };
+      jobs: { release: { steps: Array<{ name?: string; run?: string; env?: Record<string, string> }> } };
+    };
+    // The real dispatch input must reach the step: assert the binding, not only the script it feeds.
+    assert.equal(document.on.workflow_dispatch.inputs.recovery_notes_sha?.required, false);
+    assert.equal(document.on.workflow_dispatch.inputs.recovery_notes_sha?.type, "string");
+    const restore = document.jobs.release.steps.find((step) => step.name === "Restore prepared release notes");
+    assert.equal(restore?.env?.RECOVERY_NOTES_SHA, "${{ inputs.recovery_notes_sha }}");
+    assert.equal(restore?.env?.PREPARED_SHA, "${{ steps.decide.outputs.release_sha }}");
+    const script = restore?.run;
+    assert.ok(script);
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+    const commit = (changelog: string, message: string) => {
+      writeFileSync(resolve(root, "CHANGELOG.md"), changelog);
+      git("add", "CHANGELOG.md"); git("commit", "-q", "-m", message);
+      return git("rev-parse", "HEAD");
+    };
+    git("init", "-q", "-b", "main");
+    git("config", "user.email", "fixture@example.invalid"); git("config", "user.name", "fixture");
+    const older = "## 2026.9.26 - 2026-09-26\nOld fix\n", old = "# Changelog\n\n" + older;
+    const base = commit(old + "\n", "base");
+    // A side branch that never contained the prepared release.
+    git("checkout", "-q", "-b", "side");
+    const unrelated = commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nForged\n\n" + older, "side notes");
+    git("checkout", "-q", "main");
+    // The prepared release commit was cut without a section for its version.
+    const prepared = commit(old, "Release pm-context v2026.9.27");
+    // A reviewed notes-only repair adds it; a later main commit edits the same section again.
+    const recovery = commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nRecovered fix\n\n" + older, "docs: add the 2026.9.27 section");
+    commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nRewritten later\n\n" + older, "docs: edit the 2026.9.27 section");
+    // Main also contains the side branch (an "ours" merge keeps main's files), so `unrelated` passes the containment
+    // check and only the prepared-ancestor guard can refuse it.
+    git("merge", "-q", "--no-ff", "-s", "ours", "-m", "merge side notes", "side");
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    git("checkout", "-q", "-b", "outside", recovery);
+    const outsideMain = commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nNot on main\n\n" + older, "unmerged notes");
+    git("checkout", "-q", "--detach", prepared);
+    const run = (recoverySha: string, version = "2026.9.27") => spawnSync("bash", ["-e", "-c", script], {
+      cwd: root, encoding: "utf8", env: { ...process.env, NPM_VERSION: version, PREPARED_SHA: prepared, RECOVERY_NOTES_SHA: recoverySha },
+    });
+    const notes = () => readFileSync(resolve(root, "RELEASE_NOTES.md"), "utf8");
+
+    // Must allow: the authorized commit supplies the section, never the mutable main tip.
+    const recovered = run(recovery);
+    assert.equal(recovered.status, 0, recovered.stdout + recovered.stderr);
+    assert.equal(notes(), "## 2026.9.27 - 2026-09-27\nRecovered fix\n\n");
+    assert.match(recovered.stdout, new RegExp(`come from recovery commit ${recovery}`));
+
+    // Must refuse: no authorization, a short SHA, a commit outside main, a commit not descending from the prepared
+    // release, and a version the recovery commit does not contain.
+    for (const [sha, version, message] of [
+      ["", "2026.9.27", /has no changelog section/],
+      [recovery.slice(0, 12), "2026.9.27", /full 40-character/],
+      [outsideMain, "2026.9.27", /must descend from prepared release .* and be contained in main/],
+      [unrelated, "2026.9.27", /must descend from prepared release .* and be contained in main/],
+      [recovery, "2026.9.28", /has no changelog section/],
+    ] as const) {
+      const refused = run(sha, version);
+      assert.equal(refused.status, 1, `${sha} ${version}: ${refused.stdout}`);
+      assert.match(refused.stdout, message);
+    }
+    assert.notEqual(base, prepared);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a prepared version cannot flow through metadata generation or another release PR", () => {
   for (const step of ["Update release version", "Generate changelog and release notes", "Run release checks", "Commit release files", "Merge release metadata through protected PR"]) {
     assert.match(executable(stepSource(step)), /^ *if: .*steps\.decide\.outputs\.resume != 'true'/m);
