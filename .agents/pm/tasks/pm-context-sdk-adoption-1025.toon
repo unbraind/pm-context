@@ -2,12 +2,15 @@ id: pm-context-sdk-adoption-1025
 title: Use SDK reads for file focus and resumable deltas
 description: Replace the two remaining audit findings with certified complete item reads and paged mutation events where the pinned SDK preserves existing contracts. Follow-up to pm-context-lk82.
 type: Task
-status: in_progress
+status: closed
 priority: 2
 tags[2]: audit-1025,sdk-adoption
 created_at: "2026-10-25T15:04:57.630Z"
-updated_at: "2026-10-25T15:20:05.989Z"
+updated_at: "2026-10-30T05:18:24.486Z"
+closed_at: "2026-10-30T05:17:35.402Z"
+completed_at: "2026-10-25T15:28:13.000Z"
 author: codex-agent
+release: 2026.10.26
 dependencies[1]{id,kind,created_at,author,source_kind,author_source}:
   pm-context-lk82,related,"2026-10-25T15:04:57.630Z",codex-agent,"cli:create:dep",detected
 comments[6]{created_at,author,text}:
@@ -28,4 +31,5 @@ tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,
 docs[2]{path,scope}:
   docs/sdk-adoption.md,project
   docs/since.md,project
+close_reason: "Merged in #179 (41fa36e): delta stream discovery and file focus use pm SDK reads; differential and revert proofs recorded on the item."
 body: ""

@@ -2,13 +2,16 @@ id: pm-context-json-estimates
 title: Saved acquisition plans retain numeric estimates through JSON round trips
 description: "Review finding from PR #176: accepted signed-zero estimates survive in memory but serialize as positive zero, causing saved-plan validation to disagree. Audit package plan and estimate producers and canonicalize numeric output boundaries."
 type: Issue
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-10-26T08:28:29.422Z"
-updated_at: "2026-10-26T09:21:56.824Z"
+updated_at: "2026-10-30T05:18:25.361Z"
+closed_at: "2026-10-30T05:17:34.537Z"
+completed_at: "2026-10-26T10:29:44.000Z"
 author: codex-agent
 acceptance_criteria: "All emitted acquisition packet and plan numbers are finite bounded integers with positive zero; Seeded random plans survive JSON stringify/parse with Object.is-equal numbers and command --check succeeds; Regression fails with only implementation reverted and proof is recorded; Targeted tests, typecheck, available lint and npm plus Bun CI release gates pass"
+release: 2026.10.26
 comments[7]{created_at,author,text}:
   "2026-10-26T08:28:34.891Z",codex-agent,"No duplicate open item found. Preserve strict saved-plan comparison. Normalize canonical packet estimates and every numeric plan field at SDK return and JSON/TOON encoder boundaries; reject nonfinite, fractional and out-of-range plan values. Audit other package estimate producers for caller-number passthrough. Do not change dependency pins or release thresholds."
   "2026-10-26T08:32:54.955Z",codex-agent,"Package-wide audit: acquisition SDK packet/plan outputs and JSON/TOON encoders now canonicalize every declared numeric field. index.ts projection estimates derive from bounded string lengths and positive sums; evidence-packing.ts byte/count outputs derive from bounded byte sizes and cardinalities. Found and fixed another affected estimate producer: receipt protocol overhead could round to signed zero or become negative after JSON whitespace compaction. Clamp derived overhead to zero for JSON and text. Receipt reports sum validated nonnegative estimates from a positive-zero accumulator. Added real installed CLI saved-plan checks for both signed-zero estimate fields."
@@ -30,4 +33,5 @@ tests[2]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,
 docs[2]{path,scope}:
   docs/next-evidence.md,project
   README.md,project
+close_reason: "Merged in #183 (1f6fb18): saved evidence plans retain numeric estimates through JSON round trips."
 body: ""

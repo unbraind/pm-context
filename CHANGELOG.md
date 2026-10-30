@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Restore generated notes for the prepared 2026.10.29 release ([pm-context-release-notes-1029](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-release-notes-1029.toon))
+- Resume must consume a verified same-version changelog recovery ([pm-context-resume-recovery-sha](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-resume-recovery-sha.toon))
+
 ## 2026.10.29 - 2026-10-29
 
 ### Added
@@ -18,6 +25,7 @@
 
 ### Other
 
+- Point the npm homepage at the package catalog and link the author ([pm-context-78wz](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-78wz.toon))
 - Stop Hound from linting generated dist/ output ([pm-context-hound-generated-dist](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-hound-generated-dist.toon))
 
 ## 2026.10.26 - 2026-10-26
@@ -25,6 +33,14 @@
 ### Added
 
 - Plan the cheapest next reads for missing criterion evidence ([pm-context-next-evidence](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-next-evidence.toon))
+
+### Fixed
+
+- Saved acquisition plans retain numeric estimates through JSON round trips ([pm-context-json-estimates](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-json-estimates.toon))
+
+### Other
+
+- Use SDK reads for file focus and resumable deltas ([pm-context-sdk-adoption-1025](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-sdk-adoption-1025.toon))
 
 ## 2026.10.25 - 2026-10-25
 
