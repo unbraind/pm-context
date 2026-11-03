@@ -126,5 +126,8 @@
   },
   "dependencies": {
     "@toon-format/toon": "4.4.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.1"
   }
 }
