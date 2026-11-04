@@ -94,7 +94,7 @@ test("expanded and factored native SDK and installed Node/Bun CLI references res
   const root = mkdtempSync(join(tmpdir(), "shared-reference-")); t.after(() => removeBunFixture(root));
   const client = { cwd: root, pmRoot: join(root, "tracker"), noExtensions: true };
   await init("refs", { defaults: true, author: "fixture", agentGuidance: "skip" }, client);
-  const { item } = await create({ title: "Reference source", body: "Native quoted \" evidence\r\n📚 ".repeat(30), author: "fixture", parent: "none", goal: "none", objective: "none", assignee: "none", clearDeps: true }, client);
+  const { item } = await create({ title: "Reference source", body: "Native quoted \" evidence\r\n📚 ".repeat(30), author: "fixture", unset: ["parent", "goal", "objective", "assignee"], clearDeps: true }, client);
   const criteria = Array.from({ length: 20 }, (_, i) => ({ id: `c${i}`, text: `Criterion ${i}`, evidence: [{ item: item.id, field: "body" }] }));
   const observed = await source.createSharedEvidenceReader(client.pmRoot)({ item: item.id, field: "body" });
   const packageRoot = resolve(import.meta.dirname, ".."); const extension = join(client.pmRoot, "extensions", "pm-context"); mkdirSync(extension, { recursive: true });

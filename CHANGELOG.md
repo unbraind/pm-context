@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.11.1 - 2026-11-01
+
+No changes.
+
 ## 2026.10.31 - 2026-10-31
 
 ### Fixed
@@ -61,6 +65,10 @@
 - Certify complete context corpora and recover abandoned receipt locks ([pm-context-pbcw](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-pbcw.toon))
 - Correct tracker reconciliation review evidence for PR 163 ([pm-context-r163](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-r163.toon))
 
+## 2026.10.24 - 2026-10-24
+
+No changes.
+
 ## 2026.10.23 - 2026-10-23
 
 ### Added
@@ -91,6 +99,22 @@
 
 - Closed: Daily Release workflow is failing ([pm-context-github-356cb2a080ed-81](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-81.toon))
 
+## 2026.10.20 - 2026-10-20
+
+No changes.
+
+## 2026.10.18 - 2026-10-18
+
+No changes.
+
+## 2026.10.17 - 2026-10-17
+
+No changes.
+
+## 2026.10.16 - 2026-10-16
+
+No changes.
+
 ## 2026.10.14 - 2026-10-14
 
 ### Fixed
@@ -103,11 +127,27 @@
 
 - pm context-usage: report which served context an agent actually used ([pm-context-ci6v](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-ci6v.toon))
 
+## 2026.10.11 - 2026-10-11
+
+No changes.
+
+## 2026.10.10 - 2026-10-10
+
+No changes.
+
+## 2026.10.9 - 2026-10-09
+
+No changes.
+
 ## 2026.10.5 - 2026-10-05
 
 ### Other
 
 - Auto-merge green Dependabot updates and group the pm toolchain into one daily PR ([pm-context-h34i](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-h34i.toon))
+
+## 2026.10.3 - 2026-10-03
+
+No changes.
 
 ## 2026.9.26 - 2026-09-26
 
@@ -142,6 +182,10 @@
 ### Other
 
 - Certify pm CLI 2026.9.10 and pick up the canonical auditor fixes the lockfile was holding back ([pm-context-syd5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-syd5.toon))
+
+## 2026.9.9 - 2026-09-09
+
+No changes.
 
 ## 2026.9.8 - 2026-09-08
 
@@ -248,11 +292,19 @@
 
 - Resolve pm-changelog to the release that derives release dates in UTC ([pm-context-6rua](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-6rua.toon))
 
+## 2026.8.3 - 2026-08-03
+
+No changes.
+
 ## 2026.8.1 - 2026-08-01
 
 ### Fixed
 
 - Release commits discard the rebuilt dist, so the git-install path serves the previous version ([pm-context-bbsp](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-bbsp.toon))
+
+## 2026.7.31 - 2026-07-31
+
+No changes.
 
 ## 2026.7.29 - 2026-07-29
 
@@ -310,11 +362,27 @@
 
 - Closed: Recommend pm merge reconcile (2026.7.22) over raw history-repair in Multi-agent merge safety docs ([pm-context-164t](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-164t.toon))
 
+## 2026.7.22 - 2026-07-22
+
+No changes.
+
+## 2026.7.20 - 2026-07-20
+
+No changes.
+
 ## 2026.7.14 - 2026-07-14
 
 ### Fixed
 
 - context-pack and context-handoff write rendered output to stderr instead of stdout ([pm-context-ubca](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-ubca.toon))
+
+## 2026.7.13 - 2026-07-13
+
+No changes.
+
+## 2026.7.11 - 2026-07-11
+
+No changes.
 
 ## 2026.7.10-1 - 2026-07-10
 
@@ -341,6 +409,10 @@
 
 - Ecosystem release readiness pass 2026-07-06 ([pm-context-m959](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-m959.toon))
 
+## 2026.7.7 - 2026-07-07
+
+No changes.
+
 ## 2026.7.6 - 2026-07-06
 
 ### Fixed
@@ -365,12 +437,28 @@
 
 - Daily Release publish step runs prepublishOnly post-tag: align npm publish with --ignore-scripts ([pm-context-wvup](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-wvup.toon))
 
+## 2026.6.10 - 2026-06-10
+
+No changes.
+
 ## 2026.6.9 - 2026-06-09
 
 ### Added
 
 - Add compact format alias and recent activity section ([pm-context-8vgi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-8vgi.toon))
 - Add --neighborhood-depth for transitive context neighbors ([pm-context-qbmf](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-qbmf.toon))
+
+## 2026.6.8 - 2026-06-08
+
+No changes.
+
+## 2026.6.7-2 - 2026-06-07
+
+No changes.
+
+## 2026.6.7-1 - 2026-06-06
+
+No changes.
 
 ## 2026.6.7 - 2026-06-06
 
