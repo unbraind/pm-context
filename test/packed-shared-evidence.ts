@@ -13,7 +13,8 @@ import { decodeToon } from "@unbrained/pm-cli/sdk/testing";
 import type { SharedEvidencePack } from "../index.ts";
 import { assertSharedReferenceClosure } from "./shared-reference-closure.ts";
 
-const artifact = resolve(process.argv[2]!); const version = process.argv[3] ?? "2026.10.28";
+const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { devDependencies: Record<string, string> };
+const artifact = resolve(process.argv[2]!); const version = process.argv[3] ?? manifest.devDependencies["@unbrained/pm-cli"]!;
 assert.match(version, /^\d{4}\.\d{1,2}\.\d{1,2}$/);
 const digest = createHash("sha256").update(readFileSync(artifact)).digest("hex");
 const root = mkdtempSync(join(tmpdir(), "shared-packed-"));
@@ -36,7 +37,7 @@ try {
   run("bun", ["add", "--global", "--ignore-scripts", `@unbrained/pm-cli@${version}`, artifact]);
   const client = { cwd: root, pmRoot: join(root, "tracker"), noExtensions: true };
   await init("packed", { defaults: true, agentGuidance: "skip", author: "fixture" }, client);
-  const { item } = await create({ title: "Packed shared evidence", description: "Recorded fragment ".repeat(100), author: "fixture", parent: "none", goal: "none", objective: "none", assignee: "none", clearDeps: true }, client);
+  const { item } = await create({ title: "Packed shared evidence", description: "Recorded fragment ".repeat(100), author: "fixture", unset: ["parent", "goal", "objective", "assignee"], clearDeps: true }, client);
   const input = { criteria: Array.from({ length: 20 }, (_, i) => ({ id: `AC${i}`, text: `Criterion ${i}`, evidence: [{ item: item.id, field: "description" }] })), byte_budget: 20000, format: "json" };
   const packet = join(root, "packet.json"); writeFileSync(packet, JSON.stringify(input));
   const extensionParent = join(client.pmRoot, "extensions"); mkdirSync(extensionParent, { recursive: true });

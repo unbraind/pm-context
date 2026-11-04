@@ -2,7 +2,8 @@
 
 Tracked by [pm-context-sdk-adoption-1025](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-sdk-adoption-1025.toon),
 related to the earlier [SDK adoption](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-lk82.toon).
-The dependency remains pinned to `@unbrained/pm-cli@2026.10.23`.
+The 2026-10-25 audit used `@unbrained/pm-cli@2026.10.23`;
+`package.json` declares the current development pin.
 
 | Audit finding | Decision | Evidence |
 | --- | --- | --- |

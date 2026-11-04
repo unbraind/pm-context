@@ -1,0 +1,33 @@
+id: pm-context-toolchain-1104
+title: Adopt November 4 SDK clearing in shared-evidence fixtures
+description: "Verify issue #212 and update https://github.com/unbraind/pm-context/pull/211 to the November 4 toolchain without weakening shared-evidence contracts."
+type: Chore
+status: in_progress
+priority: 2
+tags[5]: dependencies,"gh:unbraind/pm-context#211","gh:unbraind/pm-context#212",migration,sdk
+created_at: "2026-11-04T19:10:53.847Z"
+updated_at: "2026-11-04T20:31:42.465Z"
+author: codex-toolchain-1104
+acceptance_criteria: "Native fixture clears preserve focus isolation, all 500 sequences, revision and no-write assertions; full coverage and typecheck pass at unchanged thresholds."
+comments[7]{created_at,author,text}:
+  "2026-11-04T19:14:23.827Z",codex-toolchain-1104,"Verified issue #212 on SDK 2026.11.4: six targeted cases abort with the GH-1614 typed parent sentinel refusal (introduced 2026.10.30). Classification: test fixtures pinned old behavior. Replace create/update and injected child-process parent/goal/objective/assignee sentinels with explicit unset; preserve all 500 seeded sequences, focus isolation, ABA/revision, closure and zero-write assertions."
+  "2026-11-04T19:14:28.622Z",codex-toolchain-1104,"Auxiliary host-pin coupling: packed-shared-evidence.ts silently defaulted to SDK 2026.10.28. It now defaults to the declared development SDK, with an explicit compatibility override; the documented invocation follows the same default. The minimum SDK declarations and historical evidence stay deliberate."
+  "2026-11-04T19:35:38.087Z",codex-toolchain-1104,"Production build-tool contract: pm-changelog 2026.10.31 pmc-pending-version-notes refuses the requested 2026.11.1 section because that daily tag has no qualifying closed tracker changes. Preserve the existing closed-only scope and explicitly include empty release windows with --include-empty; generation and its check share that policy. Do not attribute this in-progress migration to an earlier published release."
+  "2026-11-04T19:36:01.650Z",codex-toolchain-1104,"Correction to release-window diagnosis: 2026.11.1 is the untagged package version awaiting release, not an existing daily tag. The new guard requests its pending section; closed-only generation has no qualifying entries for it. The explicit empty-window policy preserves that scope and keeps future release generation able to render an intentionally empty pending section."
+  "2026-11-04T19:42:18.103Z",codex-toolchain-1104,"Corrected shared-evidence and reference-closure files pass 9/9 on SDK 2026.11.4. All 500 seeded sequences pass: 52 native fields, 1972 JSON/TOON representation round trips, 28 expected missing-field refusals, current/older inputs and zero packing writes. Typecheck, test compilation, build, docstring and regenerated changelog check pass. No lint script is configured. Packed npm/Bun host checks are running; full coverage waits for the preceding package suite."
+  "2026-11-04T19:44:50.832Z",codex-toolchain-1104,"Packed acceptance passes 74 checks on host SDK 2026.11.4: project-local, npm-global, Bun-global, npx, bunx and installed SDK consumers; exact JSON/TOON budgets plus expanded/factored reference closure. One captured package was verified unchanged by SHA-256 854722f9a5ff3eeae456e67b02936981a5dfaebdeb86fa67dd3de0b1d8876f63 and removed after the run. The runner was node test/packed-shared-evidence.ts with that captured artifact; its default host now follows the package declaration."
+  "2026-11-04T20:31:38.925Z",codex-toolchain-1104,"Complete npm run coverage passes 446/446 tests with zero failures, skips or cancellations. Native source gate: 17 files, 100% lines/branches/functions. Wider c8 report: 19 files; lines/statements 5919/5919 (100%), functions 247/247 (100%), branches 2730/2731 (99.96%), meeting the existing unchanged 99.9% c8 branch floor. This does not certify 100/100/100/100 for that wider scope; existing coverage goal pm-context-3s5f stays open. Packed acceptance passes 74 checks; typecheck, test compilation, build, docstrings and changelog check pass."
+files[4]{path,scope,note}:
+  package.json,project,Explicit empty daily changelog-window policy
+  test/packed-shared-evidence.ts,project,Current host default and typed fixture clears
+  test/shared-evidence.test.ts,project,Typed clears across all native and injected transitions
+  test/shared-reference-closure.test.ts,project,Typed root fixture clear
+tests[2]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  nice -n 10 node --test test/shared-evidence.test.ts test/shared-reference-closure.test.ts,project,900,codex-toolchain-1104,"2026-11-04T19:15:03.816Z",local_mutation,dependabot/npm_and_yarn/pm-toolchain-f7b0fd4832
+  nice -n 10 node --test --test-name-pattern=twenty test/shared-evidence.test.ts,project,180,codex-toolchain-1104,"2026-11-04T19:16:34.844Z",local_mutation,dependabot/npm_and_yarn/pm-toolchain-f7b0fd4832
+docs[4]{path,scope,note}:
+  CHANGELOG.md,project,Regenerated history with explicit empty pending windows
+  docs/sdk-adoption.md,project,Audit version is historical; current pin belongs to package.json
+  docs/shared-evidence-validation.md,project,Host follows the declared SDK by default
+  README.md,project,Empty daily release-window policy
+body: ""

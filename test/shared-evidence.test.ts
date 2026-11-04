@@ -28,7 +28,7 @@ async function tracker() {
   const root = mkdtempSync(join(tmpdir(), "shared-evidence-"));
   const client = { cwd: root, pmRoot: join(root, "tracker"), noExtensions: true };
   await init("shared", { defaults: true, author: "fixture", agentGuidance: "skip" }, client);
-  const { item } = await create({ title: "Shared source", description: "Exact 📚 fragment, with quotes \" and CRLF\r\n".repeat(50), author: "fixture", parent: "none", goal: "none", objective: "none", assignee: "none", clearDeps: true }, client);
+  const { item } = await create({ title: "Shared source", description: "Exact 📚 fragment, with quotes \" and CRLF\r\n".repeat(50), author: "fixture", unset: ["parent", "goal", "objective", "assignee"], clearDeps: true }, client);
   return { root, client, item };
 }
 /** One criterion can be repeated without losing its independent binding. */
@@ -100,8 +100,8 @@ test("twenty real SDK bindings retain twenty citation paths, one text copy and e
   await assert.rejects(packSharedEvidence({ ...input, byte_budget: 512 }, read), code("BUDGET_TOO_SMALL"));
   assert.equal(JSON.stringify(input), original); assert.equal(fingerprint(client.pmRoot), before);
   const first = await read({ item: item.id, field: "description" });
-  await update(item.id, { description: "Changed away", author: "fixture", parent: "none", goal: "none", objective: "none" }, client);
-  await update(item.id, { description: first.value as string, author: "fixture", parent: "none", goal: "none", objective: "none" }, client);
+  await update(item.id, { description: "Changed away", author: "fixture", unset: ["parent", "goal", "objective"] }, client);
+  await update(item.id, { description: first.value as string, author: "fixture", unset: ["parent", "goal", "objective"] }, client);
   const restored = await read({ item: item.id, field: "description" });
   assert.equal(restored.value, first.value); assert.notEqual(restored.revision, first.revision, "ABA never reuses the historical revision");
   const both = { criteria: [{ id: "old", text: "Old revision", evidence: [{ item: "old", field: "body" }] }, { id: "new", text: "New revision", evidence: [{ item: "new", field: "body" }] }], byte_budget: 20000 };
@@ -148,7 +148,7 @@ test("finite JSON source and output fuzz refuses lossy values and preserves prev
 
 test("500 seeded state sequences preserve all native fields, relationships, old-request replays and whitespace through SDK read-back", async (t) => {
   const { root, client, item } = await tracker(); t.after(() => rmSync(root, { recursive: true, force: true }));
-  const peer = (await create({ title: "Related peer", author: "fixture", parent: "none", goal: "none", objective: "none", assignee: "none", clearDeps: true }, client)).item;
+  const peer = (await create({ title: "Related peer", author: "fixture", unset: ["parent", "goal", "objective", "assignee"], clearDeps: true }, client)).item;
   await update(item.id, {
     author: "fixture", parent: peer.id, goal: "Goal", objective: "Objective", assignee: "fixture", reviewer: "reviewer", priority: 0, tags: "one,two", deadline: "2030-01-01", estimatedMinutes: "13", body: "Body\r\n", acceptanceCriteria: "One; Two", definitionOfReady: "Ready", order: "12", risk: "medium", confidence: "85", sprint: "future", release: "future", value: "Value", impact: "Impact", outcome: "Outcome", whyNow: "Reason", blockedBy: peer.id, blockedReason: "Wait", reporter: "fixture", severity: "high", environment: "test", reproSteps: "Reproduce", resolution: "Pending", expectedResult: "Expected", actualResult: "Actual", affectedVersion: "old", fixedVersion: "new", component: "context", regression: "true", customerImpact: "Bounded", comment: ["text=Comment"], note: ["text=Note"], learning: ["text=Learning"], file: ["path=index.ts"], test: ["command=node --version"], doc: ["path=README.md"], reminder: ["at=2030-01-01T00:00:00Z,text=Reminder"], event: ["start=2030-01-01T00:00:00Z,end=2030-01-01T01:00:00Z,title=Event"], replaceDeps: true, dep: [`id=${peer.id},kind=related_to`],
   }, client);
@@ -169,7 +169,7 @@ test("500 seeded state sequences preserve all native fields, relationships, old-
   for (let sequence = 0; sequence < 500; sequence++) {
     await focus(random(2) ? peer.id : item.id, {}, client);
     const variant = [" text ", "\r\nparagraph\r\n", "\nparagraph\n", "", "é📚,\"\\"][random(5)]!;
-    await update(item.id, { author: "fixture", description: variant, body: variant, priority: random(5), status: custom[random(5)]!, parent: random(2) ? peer.id : "none", goal: "Goal", objective: "Objective", replaceDeps: true, dep: [`id=${peer.id},kind=${random(2) ? "related_to" : "blocked_by"}`] }, client);
+    await update(item.id, { author: "fixture", description: variant, body: variant, priority: random(5), status: custom[random(5)]!, ...(random(2) ? { parent: peer.id } : { unset: ["parent"] }), goal: "Goal", objective: "Objective", replaceDeps: true, dep: [`id=${peer.id},kind=${random(2) ? "related_to" : "blocked_by"}`] }, client);
     // The reference model stores authoritative SDK state, never a handwritten
     // approximation of native trimming, status aliases or relationship parsing.
     const model = await sdkRead({ kind: "item", id: item.id }) as Record<string, unknown>;
@@ -213,12 +213,12 @@ export function activate(api) {
     if (!path.endsWith(control.id+'.toon') && !path.endsWith(control.id+'.jsonl')) return;
     if (++reads!==control.boundary || fired) return;
     fired=true;
-    await update(control.id,{description:'Competing transition',author:'peer',parent:'none',goal:'none',objective:'none'}, {cwd:${JSON.stringify(root)},pmRoot:${JSON.stringify(client.pmRoot)},noExtensions:true});
+    await update(control.id,{description:'Competing transition',author:'peer',unset:['parent','goal','objective']}, {cwd:${JSON.stringify(root)},pmRoot:${JSON.stringify(client.pmRoot)},noExtensions:true});
     writeFileSync(${JSON.stringify(controlPath)},JSON.stringify({...control,fired:true}));
   });
 }`);
   for (let boundary = 1; boundary <= 4; boundary++) {
-    await update(item.id, { description: "Before peer", author: "fixture", parent: "none", goal: "none", objective: "none" }, client);
+    await update(item.id, { description: "Before peer", author: "fixture", unset: ["parent", "goal", "objective"] }, client);
     const original = await createSharedEvidenceReader(client.pmRoot)({ item: item.id, field: "description" });
     writeFileSync(controlPath, JSON.stringify({ id: item.id, boundary, fired: false }));
     const result = runWithActiveExtensions({ cwd: root, path: client.pmRoot }, () => packSharedEvidence(request(item.id), createSharedEvidenceReader(client.pmRoot)));

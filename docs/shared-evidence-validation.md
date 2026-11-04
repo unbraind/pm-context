@@ -83,8 +83,11 @@ The SDK is imported through its supported package exports; no argv, executable
 symlink or installation-path discovery is used by the feature.
 
 ```sh
-node test/packed-shared-evidence.ts captured-package.tgz 2026.10.28
+node test/packed-shared-evidence.ts captured-package.tgz
 ```
+
+The host defaults to the SDK declared in `devDependencies`; an optional third
+argument selects a different SDK for explicit compatibility checks.
 
 The full npm/Bun release gates run in CI at the repository's unchanged coverage
 thresholds. Local checks are targeted tests, type checks, the docstring gate and

@@ -609,3 +609,7 @@ SDK and CLI packets share one strict validation boundary. All arrays must be
 dense and within the documented bounds; sparse arrays refuse with
 `INVALID_PACKET` before planning or serialization. Valid v1 packets and saved
 plans retain their existing contract hashes.
+
+Changelog history explicitly includes empty version windows, including the
+package version awaiting release. A version with no qualifying closed tracker
+changes is recorded as “No changes.”
