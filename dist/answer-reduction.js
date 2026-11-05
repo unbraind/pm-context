@@ -37,7 +37,7 @@ function id(value) { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9
 function label(value) { return typeof value === "string" && value.length <= 256 && value.trim().length > 0; }
 /** Scalar domains avoid arithmetic and preserve distinctions between strings and numbers. */
 function scalar(value) { return value === null || typeof value === "boolean" || (typeof value === "string" && value.length <= 256) || (typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 1e12); }
-/** Bound arbitrary SDK JSON before serialization, including aggregate string bytes. */
+/** Bound arbitrary SDK JSON traversal, counting string/key UTF-16 code units. */
 function json(value, budget, depth = 0, sdk = false) {
     if (--budget.nodes < 0 || depth > 24)
         return false;
@@ -142,6 +142,9 @@ function project(contract, sources, representation) {
 export function parseAnswerReduction(value) {
     const fail = () => new AnswerReductionError("INVALID_OUTPUT", "Regenerate using reduceAnswerContext; retain the complete contract, routing, branch proofs and revision-bound fragments. Use full or reduced representation and finite bounded JSON.");
     if (!json(value, { nodes: 100000, chars: 8388608 }) || !record(value) || !keys(value, ["protocol", "basis", "contract", "representation", "state", "combinations", "relevant_variables", "routing", "proofs", "fragments", "remedy"]) || (value.representation !== "full" && value.representation !== "reduced"))
+        throw fail();
+    // Structural validation makes serialization safe; include the encoder's newline.
+    if (Buffer.byteLength(JSON.stringify(value)) + 1 > MAX_PACKET_BYTES)
         throw fail();
     let contract;
     try {

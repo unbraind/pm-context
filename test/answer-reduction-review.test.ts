@@ -151,6 +151,66 @@ function wideRouting(width: number, fill = "x"): api.AnswerReductionRequest {
   return request;
 }
 
+/** Construct a complete valid packet independently of the producer's size guard. */
+function wirePacket(): api.AnswerReduction {
+  const contract = wideRouting(158, "\0");
+  const rows = contract.variables.reduce<api.AnswerValue[][]>((rows, variable) => rows.flatMap((row) => variable.values.map((value) => [...row, value])), [[]]);
+  const routing = rows.map((inputs) => {
+    const first = inputs.findIndex((value, i) => value === contract.variables[i]!.values[0]);
+    return { inputs, answer: first < 0 ? contract.fallback : contract.rules[first]!.answer };
+  });
+  return {
+    protocol: "pm-context-answer-reduction/v1", basis: "declared-domains-and-fragment-dependencies;not-inferred-semantics",
+    contract, representation: "full", state: "proved", combinations: rows.length,
+    relevant_variables: contract.variables.map((variable) => variable.id), routing, proofs: [],
+    fragments: [{ id: "routing", revision: "r1", state: "retained", proof_variables: [], value_json: JSON.stringify("") }],
+    remedy: "Proof applies only to declared domains and fragment dependencies. Revalidate after source or contract changes.",
+  };
+}
+
+/** Fill a retained string to an exact wire byte size, including escaped JSON and newline. */
+function fillWirePacket(packet: api.AnswerReduction, fill: string, target: number): void {
+  packet.fragments[0]!.value_json = JSON.stringify("");
+  const room = target - Buffer.byteLength(JSON.stringify(packet)) - 1;
+  const unit = Buffer.byteLength(JSON.stringify(JSON.stringify(fill))) - Buffer.byteLength(JSON.stringify(JSON.stringify("")));
+  assert.ok(room >= 0);
+  packet.fragments[0]!.value_json = JSON.stringify(fill.repeat(Math.floor(room / unit)) + "x".repeat(room % unit));
+  assert.equal(Buffer.byteLength(JSON.stringify(packet)) + 1, target);
+}
+
+test("public packet parsing and encoding enforce exact UTF-8 byte boundaries for multibyte and astral text", () => {
+  const packet = wirePacket();
+  for (const implementation of [api, built]) for (const fill of ["é", "界", "😀"]) {
+    fillWirePacket(packet, fill, 33554432);
+    assert.ok(JSON.stringify(packet).length + 1 < 33554432, "UTF-16 length cannot decide the wire budget");
+    assert.equal(implementation.parseAnswerReduction(packet).fragments[0]!.value_json, packet.fragments[0]!.value_json);
+    assert.equal(Buffer.byteLength(implementation.encodeAnswerReduction(packet, "json")), 33554432, "the final newline fits exactly");
+    fillWirePacket(packet, fill, 33554433);
+    assert.throws(() => implementation.parseAnswerReduction(packet), { code: "INVALID_OUTPUT" });
+    for (const format of ["json", "toon"] as const) assert.throws(() => implementation.encodeAnswerReduction(packet, format), { code: "INVALID_OUTPUT" });
+  }
+});
+
+test("seeded packet fuzz accepts iff serialized UTF-8 bytes plus newline fit the limit", (t) => {
+  const packet = wirePacket();
+  const fills = ["é", "界", "😀", "\0", "\\", "\"\n", "é😀\0"];
+  let seed = 0x213b17e;
+  /** Deterministic samples mix Unicode, escapes and byte offsets around the ceiling. */
+  function random(max: number): number { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) % max; }
+  let accepted = 0; let refused = 0;
+  for (let sample = 0; sample < 24; sample++) {
+    fillWirePacket(packet, fills[random(fills.length)]!, 33554432 + random(257) - 128);
+    const fits = Buffer.byteLength(`${JSON.stringify(packet)}\n`) <= 33554432;
+    for (const implementation of [api, built]) {
+      if (fits) {
+        assert.equal(implementation.parseAnswerReduction(packet).fragments[0]!.value_json, packet.fragments[0]!.value_json); accepted++;
+      } else { assert.throws(() => implementation.parseAnswerReduction(packet), { code: "INVALID_OUTPUT" }); refused++; }
+    }
+  }
+  assert.ok(accepted > 0 && refused > 0);
+  t.diagnostic(`24 seeded Unicode/escape boundary packets; source and built SDK: ${accepted} accepted, ${refused} refused by independent byte oracle`);
+});
+
 test("routing overhead is bounded before source reads while nearby declarations remain supported", async () => {
   for (const implementation of [api, built]) for (const width of [200, 256]) {
     const request = wideRouting(width);

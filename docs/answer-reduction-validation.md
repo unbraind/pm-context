@@ -157,3 +157,14 @@ launcher / 60 total**, in addition to preserving the captured artifact digest.
 The artifact digest and counts above describe the earlier feature baseline;
 review-round artifact and release-gate receipts are recorded on the PR and its
 pm item.
+
+Round 2 adds direct parser/encoder packets built independently of the producer.
+Two-byte and three-byte Unicode characters and astral characters are accepted at
+exactly 33,554,432 UTF-8 JSON bytes including the newline, and refused one byte
+over. Both JSON and TOON encoders reject oversized supplied packets. A seeded
+24-packet Unicode/escape corpus checks parser acceptance if and only if an
+independent serialized byte oracle fits the ceiling, through source and rebuilt
+SDK exports (18 accepted and 30 refused implementation checks). Removing only the
+parser byte guard in a disposable copy and rebuilding `dist` makes both new tests
+fail with missing expected refusals. Final restoration and unchanged-threshold
+npm/Bun gate receipts are recorded on the pm item.

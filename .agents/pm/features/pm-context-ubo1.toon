@@ -2,14 +2,15 @@ id: pm-context-ubo1
 title: Reduce context with declared answer-preservation proofs
 description: "Accept an explicit finite decision table and source-fragment dependencies. Exhaustively prove which declared input values cannot affect the answer, omit only invariant fragments, and retain branch irrelevance certificates. Coverage packing selects evidence; shared factoring deduplicates it; pm-jev proposes answers but cannot supply this proof."
 type: Feature
+pm_format_version: 2
 status: in_progress
 priority: 2
 tags[5]: answer-preservation,context,"gh:unbraind/pm-context#213",proof,reduction
 created_at: "2026-11-05T06:03:31.478Z"
-updated_at: "2026-11-05T10:14:43.607Z"
+updated_at: "2026-11-05T14:01:37.663Z"
 author: codex-agent
 acceptance_criteria: Every declared routing input combination produces the same full and reduced answer with at least 50 percent fewer measured UTF-8 bytes including proofs; unsupported predicates retain evidence and report unknown; typed SDK and CLI with JSON/TOON and actionable refusals; non-git real public tracker validation; seeded 500-sequence producer/validator and SDK-state replay tests; packed npm/Bun installation acceptance; unchanged CI release gates pass.
-comments[18]{created_at,author,text}:
+comments[27]{created_at,author,text}:
   "2026-11-05T06:04:14.364Z",codex-agent,"Overlap check against main: pm CLI 2026.11.4 public context-packing declarations expose candidate selection and projections, without finite-domain answer-preservation certificates. Existing evidence-packing.ts covers criteria, shared-evidence.ts factors exact revision/value pairs, and pm-jev counterfactual.ts produces model-dependent explanations. None proves declared deterministic routing invariance. Plan: bounded exhaustive first-match equality table, revision-bound source reads through createSharedEvidenceReader, cofactor certificates for each omitted variable branch, conservative unknown predicates, common JSON/TOON producer/validator, read-only non-git and packed-launcher acceptance. This feature introduces no tracker imports, writes, retry journal, outbox, claims or mutable shared state; all tracker state remains SDK-owned."
   "2026-11-05T06:16:12.529Z",codex-agent,"Implemented bounded exhaustive eq/neq first-match routing, exact cofactor comparisons and branch certificates, revision-bound fragments, per-source unknowns and shared producer-derived JSON/TOON validation. Public origin/main snapshot 363e8bc: 102 items; four distinct descriptions totaling 5071 UTF-8 bytes. Full/reduced JSON 7600/2526 bytes (66.7632 percent saved); TOON 7625/2547 (66.5967 percent). All four combinations agree; four omitted fragments reference two proved background branches; read-only snapshot fingerprint unchanged. Disposable-copy behavioral reverts: disabling omission and bypassing stale-revision comparison each fail the routing regression after rebuild. Focused new-module coverage initially measured 100 percent across all four c8 dimensions; final seeded-model and packed runs are pending."
   "2026-11-05T06:25:21.044Z",codex-agent,"Packed acquisition passed 6 modes and 42 assertions: npm/Bun project-local, npm/Bun global, npx and bunx, all with host 2026.11.4. Captured artifact SHA-256 e0a519d38f618d72777186671f975321f93e749cbbd68eb906fb23564ae12564 stayed unchanged; 57 packed files, 655809 unpacked bytes. Typecheck, test typecheck, docstring gate and production audit pass (zero production vulnerabilities). Targeted answer-reduction.ts c8 coverage is 210/210 statements, 210/210 branches and 21/21 functions (100 percent lines). Model fixture now verifies every initially populated native field before SDK status transitions, then compares current and absent fields against SDK read-back rather than assuming terminal fields persist. Test result tracking is disabled, so linked-run receipts are documented here without changing that policy."
@@ -28,14 +29,32 @@ comments[18]{created_at,author,text}:
   "2026-11-05T10:12:06.560Z",codex-agent,"Final unchanged-threshold release gates both pass on the byte-hardened source: npm 460/460 and Bun 460/460, zero failures, cancellations or skips. V8 all 18 required files at 100 percent lines/branches/functions; c8 new module 230/230 statements and lines, 229/229 branches, 21/21 functions, all 100 percent. Whole-package c8 100 percent statements/functions/lines and 99.96 percent branches. Both production audits, package dry-runs and release attestation checks pass. Capturing the immutable artifact for six-launcher acceptance next."
   "2026-11-05T10:14:37.712Z",codex-agent,"Final immutable package acceptance passed 60/60 semantic assertions across npm/Bun project-local and isolated global installs, npx and bunx, including proved state, retained Routing title, background omission, JSON/TOON, saved checks and artifact stability. One captured artifact: SHA-256 7878f0024b8daba70ac6e56660f791114fce5b2870e0fd61623b3e556f179035, 57 files, 659006 unpacked bytes. Public origin/main export measurement passed on 102 items: 5071 source-description bytes, 4 combinations, 8 independent answer checks, 4 omissions, JSON 7600 -> 2526 bytes (66.76 percent), TOON 7625 -> 2547 (66.60 percent), read-only non-git copy unchanged. Binary artifacts remain untracked."
   "2026-11-05T10:14:42.402Z",codex-agent,"All four unresolved review findings are fixed and each has a failing behavioral revert. Self-review covers standard prototypes, enumerable data descriptors, proxies, accessors, sparse arrays, representation coercion and both character/wire-byte limits. Final npm and Bun release gates each pass 460/460 at unchanged thresholds; 12/12 mutations fail and restored focused tests pass 12/12. Latest complete review census still has only the original four threads and no Outside diff range section. No replies or resolutions were made. Item remains in progress for orchestrator verification; verify the pushed head via https://github.com/unbraind/pm-context/pull/213/checks. Open advisory: legacy provenance warning retained under append-only history policy; no pm CLI/SDK defect was filed."
-files[7]{path,scope}:
-  answer-reduction.ts,project
-  index.ts,project
-  test/answer-reduction-model.test.ts,project
-  test/answer-reduction-review.test.ts,project
-  test/answer-reduction.test.ts,project
-  test/measure-answer-reduction.ts,project
-  test/validate-answer-installations.ts,project
+  "2026-11-05T12:01:24.480Z",codex-agent,"Review round 2: fetched all unresolved review threads with all comments. One unresolved finding PRRT_kwDOSzDuFs60CRbW is valid: parseAnswerReduction lacks a serialized UTF-8 byte guard. Latest substantive CodeRabbit review has no Outside diff range findings. Remote branch is current and already contains main. Plan: enforce MAX_PACKET_BYTES including newline, cover exact and one-byte-over Unicode/escaped boundaries plus seeded byte-oracle fuzz, self-review all module size limits, prove behavioral revert failure, run unchanged npm/Bun release gates, rebuild dist, and push without replying to or resolving threads."
+  "2026-11-05T12:04:33.927Z",codex-agent,"Self-review checked every size limit in answer-reduction.ts and the whole PR diff. Declaration and source/packet wire accounting already use Buffer.byteLength; readFreshnessFile uses the shared byte ceiling. Scalar and traversal limits deliberately use UTF-16 code units, now labeled explicitly in docs and the traversal docstring. No additional byte/code-unit defect found. New direct packets are built independently of reduceAnswerContext, with exact 33554432-byte and 33554433-byte JSON/newline boundaries for two-byte, three-byte and astral text, plus 24 seeded Unicode/escape packets checked against an independent serialized byte oracle through source and rebuilt SDK."
+  "2026-11-05T12:05:57.019Z",codex-agent,"Focused new regression run passes 2/2 with no skips or failures. Exact Unicode boundaries pass through source and rebuilt SDK; 24 seeded packets produce 18 accepted and 30 refused implementation checks, matching the independent UTF-8/newline oracle. Behavioral removal of only the parser byte guard, with dist rebuilt in a disposable copy, is now running; fixed restoration is mandatory before returning."
+  "2026-11-05T12:07:03.415Z",codex-agent,"Behavioral revert proof: in a disposable tracked-file copy, removed only the parseAnswerReduction UTF-8 guard, rebuilt dist with node_modules/.bin/tsc, and ran node --test --test-concurrency=2 --test-name-pattern=\"public packet|seeded packet fuzz\" test/answer-reduction-review.test.ts. Both regressions fail (0/2 pass, 2/2 fail), each with Missing expected exception because oversized packets are accepted. The fixed source has been restored in that copy and rebuilt; its passing confirmation is running. The delivery worktree was never behaviorally reverted."
+  "2026-11-05T12:08:26.054Z",codex-agent,"Revert proof complete: removing only the parseAnswerReduction byte guard and rebuilding dist fails both new regressions (0 pass, 2 fail, missing expected exception). Restoring the fixed function and rebuilding dist in the same disposable copy passes 2/2, no failures/skips/cancellations. Exact command: node --test --test-concurrency=2 --test-name-pattern=\"public packet|seeded packet fuzz\" test/answer-reduction-review.test.ts. Main-worktree focused run also passed 2/2. No delivery source was altered by the mutation proof."
+  "2026-11-05T12:10:34.436Z",codex-agent,"Linked review suite passes 8/8, zero failures/skips/cancellations: pm test pm-context-ubo1 --run --progress --match answer-reduction-review.test.ts --timeout 900; receipt test-local-mw3i72ex-x2m5j0. Automatic result tracking remains disabled by project policy, so this comment preserves the result. Tracker health is ok with no drift and a pre-existing legacy provenance advisory; append-only records are retained. Starting serial npm and Bun release checks with unchanged thresholds, isolated HOME/Git configuration and credential-free child environments."
+  "2026-11-05T13:06:10.952Z",codex-agent,"npm run release:check passes completely on Node 24.19.0: 462/462 tests, zero failures/skips/cancellations, unchanged thresholds. All 18 required native V8 sources meet 100 percent lines/branches/functions. Changed module c8: 232/232 statements and lines, 231/231 branches, 21/21 functions (100 percent all dimensions). Whole-package c8: 6178/6178 statements and lines, 269/269 functions, 2986/2987 branches (99.96 percent). Production audit, package dry-run and release attestation/date checks pass. Isolated HOME/Git config and credential-free environment; no test timeout retries. Starting the same full gate under Bun serially."
+  "2026-11-05T13:59:12.985Z",codex-agent,"Final unchanged-threshold gates both pass completely: npm run release:check 462/462 and bun run release:check 462/462, zero failures/skips/cancellations. Native V8: all 18 required sources at 100 percent lines/branches/functions. c8 changed module: 232/232 statements and lines, 231/231 branches, 21/21 functions; whole package 100 percent statements/functions/lines and 99.96 percent branches. Both production audits, package dry-runs and release attestation/date checks pass. Both gates used isolated HOME/Git configuration and credential-free environments; no test timeout retries. Linked review tests pass 8/8; new regressions pass 2/2, fail 2/2 with only the parser guard removed and dist rebuilt, then pass 2/2 after restoration/rebuild. Refreshed complete review census still has only PRRT_kwDOSzDuFs60CRbW, valid and fixed by serialized UTF-8 bytes plus newline; latest CodeRabbit body has no Outside diff range findings. Remote branch/main base are unchanged. Full-diff and all-size-limit self-review found no further byte/code-unit defect. Committed dist is rebuilt; tracker history remains append-only. No review replies/resolutions, merge, release or item closure. Existing legacy provenance advisory retained; no new pm CLI/SDK bug encountered. The orchestrator should verify the pushed head via https://github.com/unbraind/pm-context/pull/213/checks."
+  "2026-11-05T14:01:37.635Z",codex-agent,"Final handoff checks: npm run changelog:full and npm run changelog:check pass without a tracked changelog change. Tracker health authority is ok, with integrity/history_drift ok and only the pre-existing legacy provenance storage advisory retained. Claim released; item remains in_progress for orchestrator verification. No new pm CLI/SDK bugs were encountered. Regenerating/checking the changelog once more after this final tracker note, then committing explicit code/dist/docs/tracker paths and pushing. Pushed-head CI remains for orchestrator verification at the PR checks link above."
+files[7]:
+  - path: answer-reduction.ts
+    scope: project
+    note: Serialized UTF-8 packet ceiling
+  - path: index.ts
+    scope: project
+  - path: test/answer-reduction-model.test.ts
+    scope: project
+  - path: test/answer-reduction-review.test.ts
+    scope: project
+    note: Direct parser and encoder Unicode byte boundaries and seeded byte-oracle fuzz
+  - path: test/answer-reduction.test.ts
+    scope: project
+  - path: test/measure-answer-reduction.ts
+    scope: project
+  - path: test/validate-answer-installations.ts
+    scope: project
 tests[2]:
   - command: node --test --test-concurrency=2 test/answer-reduction.test.ts test/answer-reduction-model.test.ts test/renderer-ownership.test.ts
     scope: project
@@ -46,13 +65,18 @@ tests[2]:
       source_ref: feat/answer-sensitive-context-reduction
   - command: node --test --test-concurrency=2 test/answer-reduction-review.test.ts
     scope: project
-    timeout_seconds: 180
+    timeout_seconds: 900
     provenance:
       author: codex-agent
       created_at: "2026-11-05T08:27:37.392Z"
       source_kind: local_mutation
       source_ref: feat/answer-sensitive-context-reduction
-docs[2]{path,scope}:
-  docs/answer-reduction-validation.md,project
-  docs/answer-reduction.md,project
+    updated_by: codex-agent
+    updated_at: "2026-11-05T12:05:50.438Z"
+docs[2]:
+  - path: docs/answer-reduction-validation.md
+    scope: project
+  - path: docs/answer-reduction.md
+    scope: project
+    note: Explicit UTF-16 traversal versus UTF-8 wire limits
 body: ""

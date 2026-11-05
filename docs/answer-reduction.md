@@ -44,11 +44,11 @@ using your application's SDK status-registry roles if the task depends on them.
 | Rules / predicates per rule | 64 / 8 |
 | Fragments / dependency variables per fragment | 64 / 8 |
 | Identifier | 1–128 ASCII letters, digits, `_`, `.`, `:`, `-`; starts alphanumeric |
-| Revision, answer, string scalar | 256 characters; revision and answers nonblank |
+| Declaration revision, answer, string scalar | 256 UTF-16 code units; revision and answers nonblank |
 | Number scalar | finite, between −10¹² and 10¹² inclusive |
 | Declaration | 262,144 UTF-8 bytes |
-| Source JSON traversal | 100,000 nodes, 4,000,000 string/key characters total; depth 24 |
-| Packet JSON traversal | 100,000 nodes, 8,388,608 string/key characters including serialized source JSON |
+| Source JSON traversal | 100,000 nodes, 4,000,000 string/key UTF-16 code units total; depth 24 |
+| Packet JSON traversal | 100,000 nodes, 8,388,608 string/key UTF-16 code units including serialized source JSON |
 | Produced JSON packet | 33,554,432 UTF-8 bytes including the final newline |
 | Saved JSON file | 33,554,432 bytes |
 
@@ -117,7 +117,9 @@ native history, including an A→B→A change. Content-only hashes are insuffici
 
 `parseAnswerReduction` verifies the serialized schema, routing, cofactor
 certificates and omission decisions through the same projection used by the
-producer. It does not authenticate supplied source revisions. To trust a saved
+producer. It enforces the UTF-8 JSON packet ceiling including the final newline,
+also for directly supplied packets and decoded TOON. It does not authenticate
+supplied source revisions. To trust a saved
 packet against a tracker, use `validateAnswerReduction` or `--check`: these reread
 every source and recompute the packet, including the contract revision. Stale
 inputs refuse rather than replaying an earlier decision. Native reads are
