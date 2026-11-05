@@ -15,6 +15,8 @@ function paths(root: string, prefix = ""): string[] {
   });
 }
 const source = process.argv[2]; assert.ok(source, "Supply a public committed tracker export");
+const sourceStat = lstatSync(source);
+assert.ok(!sourceStat.isSymbolicLink() && sourceStat.isDirectory(), "Supply a real export directory, not a symlink");
 process.env.GIT_CEILING_DIRECTORIES = tmpdir();
 const scratch = mkdtempSync(join(tmpdir(), "answer-public-")); const root = join(scratch, "copy");
 let entries: string[] = [];

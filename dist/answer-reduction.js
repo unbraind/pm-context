@@ -1,10 +1,12 @@
 /** Exhaustive answer-preserving reduction over an explicitly declared finite task. */
 import { createHash } from "node:crypto";
-import { isDeepStrictEqual } from "node:util";
+import { isDeepStrictEqual, types } from "node:util";
 import { encode } from "@toon-format/toon";
 import { PmCliError } from "@unbrained/pm-cli/sdk";
 import { isUtf8 } from "node:buffer";
 import { readFreshnessFile } from "./freshness.js";
+/** Saved JSON and newly produced packets share the same UTF-8 byte ceiling. */
+const MAX_PACKET_BYTES = 33554432;
 /** Host-compatible refusals never expose source contents or private input paths. */
 export class AnswerReductionError extends PmCliError {
     /** Corrective action available alongside the host next_steps field. */
@@ -16,15 +18,18 @@ export class AnswerReductionError extends PmCliError {
 }
 /** Reject exotic objects, hidden keys and accessor/serialization hooks at the boundary. */
 function record(value) {
-    return value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
+    return value !== null && typeof value === "object" && !types.isProxy(value) && Object.getPrototypeOf(value) === Object.prototype;
 }
 /** Strict keys also reject nonenumerable additions and getters before reading them. */
 function keys(value, allowed) {
-    return Reflect.ownKeys(value).every((key) => typeof key === "string" && allowed.includes(key) && "value" in Object.getOwnPropertyDescriptor(value, key));
+    return Reflect.ownKeys(value).every((key) => {
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        return typeof key === "string" && allowed.includes(key) && "value" in descriptor && descriptor.enumerable;
+    });
 }
 /** Dense, bounded arrays have only their own indexed data properties and length. */
 function dense(value, maximum) {
-    return Array.isArray(value) && value.length <= maximum && Reflect.ownKeys(value).length === value.length + 1 && Array.from({ length: value.length }, (_, i) => Object.getOwnPropertyDescriptor(value, i)).every((entry) => entry !== undefined && "value" in entry);
+    return !types.isProxy(value) && Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype && value.length <= maximum && Reflect.ownKeys(value).length === value.length + 1 && Array.from({ length: value.length }, (_, i) => Object.getOwnPropertyDescriptor(value, i)).every((entry) => entry !== undefined && "value" in entry && entry.enumerable);
 }
 /** Coordinates are opaque identifiers; prototype-like names are safe Map keys. */
 function id(value) { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(value); }
@@ -84,7 +89,7 @@ export function parseAnswerReductionRequest(value) {
 /** Read bounded stable UTF-8 JSON with the package's existing file-reader contract. */
 export function readAnswerReductionJson(path) {
     try {
-        const bytes = readFreshnessFile(path, 33554432);
+        const bytes = readFreshnessFile(path, MAX_PACKET_BYTES);
         if (!isUtf8(bytes))
             throw new Error();
         return JSON.parse(bytes.toString("utf8"));
@@ -136,7 +141,7 @@ function project(contract, sources, representation) {
 /** Verify shape and certificates using the producer, including every emitted numeric domain. */
 export function parseAnswerReduction(value) {
     const fail = () => new AnswerReductionError("INVALID_OUTPUT", "Regenerate using reduceAnswerContext; retain the complete contract, routing, branch proofs and revision-bound fragments. Use full or reduced representation and finite bounded JSON.");
-    if (!json(value, { nodes: 100000, chars: 8388608 }) || !record(value) || !keys(value, ["protocol", "basis", "contract", "representation", "state", "combinations", "relevant_variables", "routing", "proofs", "fragments", "remedy"]) || !["full", "reduced"].includes(String(value.representation)))
+    if (!json(value, { nodes: 100000, chars: 8388608 }) || !record(value) || !keys(value, ["protocol", "basis", "contract", "representation", "state", "combinations", "relevant_variables", "routing", "proofs", "fragments", "remedy"]) || (value.representation !== "full" && value.representation !== "reduced"))
         throw fail();
     let contract;
     try {
@@ -179,14 +184,32 @@ export async function reduceAnswerContext(input, read, representation = "reduced
         throw new AnswerReductionError("INVALID_ARGUMENT", "Use full or reduced representation.");
     const sources = [];
     const budget = { nodes: 100000, chars: 4000000 };
+    // Reserve the packet's fixed strings, including the longer unavailable remedy.
+    // Accepted sources add their revision, serialized value and possible proof ids.
+    const packetBudget = { nodes: 100000, chars: 8388608 };
+    const baseline = project(contract, contract.fragments.map(() => ({ revision: null, value_json: null })), representation);
+    if (!json(baseline, packetBudget))
+        throw new AnswerReductionError("INVALID_REQUEST", "Reduce domain widths, answer lengths or combinations so routing and proofs fit the 8388608 packet string/key character budget before reading evidence.");
+    let bytesRemaining = MAX_PACKET_BYTES - Buffer.byteLength(JSON.stringify(baseline)) - 1;
+    if (bytesRemaining < 0)
+        throw new AnswerReductionError("INVALID_REQUEST", "Reduce escaped domain widths, answer lengths or combinations so routing and proofs fit the 33554432 UTF-8 JSON byte budget before reading evidence.");
     for (const fragment of contract.fragments) {
         try {
             const source = await read({ item: fragment.item, field: fragment.field });
             const remaining = { ...budget };
             if (!record(source) || !keys(source, ["revision", "value"]) || typeof source.revision !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$/.test(source.revision) || !json(source.value, remaining, 0, true))
                 throw new Error();
+            const value_json = JSON.stringify(source.value);
+            const chars = value_json.length + source.revision.length + fragment.variables.reduce((sum, variable) => sum + variable.length, 0);
+            if (chars > packetBudget.chars)
+                throw new Error();
+            const bytes = Buffer.byteLength(JSON.stringify({ revision: source.revision, value_json, proof_variables: fragment.variables }));
+            if (bytes > bytesRemaining)
+                throw new Error();
+            bytesRemaining -= bytes;
+            packetBudget.chars -= chars;
             Object.assign(budget, remaining);
-            sources.push({ revision: source.revision, value_json: JSON.stringify(source.value) });
+            sources.push({ revision: source.revision, value_json });
         }
         catch {
             sources.push({ revision: null, value_json: null });

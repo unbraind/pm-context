@@ -60,14 +60,18 @@ try {
     const packet = join(workspace, "packet.json"); writeFileSync(packet, JSON.stringify(routingRequest(item.id)));
     const saved = join(workspace, "saved.json");
     const output = invoke(["context-reduce", "--packet", packet, "--format", "json"]);
-    const reduced = parseAnswerReduction(JSON.parse(output)); assert.equal(assertAnswers(reduced), 4); writeFileSync(saved, output);
+    const reduced = parseAnswerReduction(JSON.parse(output)); assert.equal(assertAnswers(reduced), 4);
+    assert.equal(reduced.state, "proved");
+    assert.equal(reduced.fragments.find((fragment) => fragment.id === "routing")?.value_json, JSON.stringify("Routing"));
+    assert.equal(reduced.fragments.find((fragment) => fragment.id === "background")?.state, "omitted");
+    writeFileSync(saved, output);
     const full = parseAnswerReduction(JSON.parse(invoke(["context-reduce", "--packet", packet, "--representation", "full", "--json"])));
     assert.equal(assertAnswers(full), 4);
     assert.deepEqual(JSON.parse(invoke(["context-reduce", "--packet", packet, "--check", saved, "--json"])), reduced);
     assert.deepEqual(parseAnswerReduction(decodeToon(invoke(["context-reduce", "--packet", packet, "--format", "toon"]))), reduced);
     assert.equal(JSON.parse(invoke(["context-reduce", "--packet", packet, "--check", " \r\n ", "--json"], 2)).code, "INVALID_ARGUMENT");
     assert.equal(digest(), artifactSha256);
-    results.push({ mode: launcher.mode, assertions: 7 });
+    results.push({ mode: launcher.mode, assertions: 10 });
   }
-  console.log(JSON.stringify({ artifact_sha256: artifactSha256, host, launchers: results, assertions: 42, artifact_unchanged: true }, null, 2));
+  console.log(JSON.stringify({ artifact_sha256: artifactSha256, host, launchers: results, assertions: 60, artifact_unchanged: true }, null, 2));
 } finally { await removeBunFixture(root); }

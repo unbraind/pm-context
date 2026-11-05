@@ -48,9 +48,13 @@ using your application's SDK status-registry roles if the task depends on them.
 | Number scalar | finite, between −10¹² and 10¹² inclusive |
 | Declaration | 262,144 UTF-8 bytes |
 | Source JSON traversal | 100,000 nodes, 4,000,000 string/key characters total; depth 24 |
+| Packet JSON traversal | 100,000 nodes, 8,388,608 string/key characters including serialized source JSON |
+| Produced JSON packet | 33,554,432 UTF-8 bytes including the final newline |
 | Saved JSON file | 33,554,432 bytes |
 
-Arrays must be dense. Unknown keys, getters, serialization hooks and duplicate
+Objects and arrays must have their standard prototypes and enumerable own data
+properties (except array length); proxies and sparse arrays are refused.
+Unknown keys, getters, serialization hooks and duplicate
 IDs/domain values are refused before source reads. No declaration is truncated.
 SDK optional object fields use normal JSON serialization; their absent values
 are not replaced with invented defaults. Scalar whitespace and CRLF are exact.
@@ -82,6 +86,12 @@ is included; there is no universal compression promise.
 Missing, changing, malformed or oversized sources produce an `unavailable` row,
 `state: unknown` and a remedy. Healthy fields are preserved or independently
 proved irrelevant. Failed reads never consume the remaining source budget.
+Serialized values count their JSON escapes against a cumulative packet budget,
+with space reserved for the contract, certificates, revisions and dependencies.
+Overflow makes that source unavailable and leaves budget for later healthy fields.
+Both character and UTF-8 JSON byte budgets include escaped routing and source
+strings. If routing and proofs alone exceed either budget, reduction refuses the
+declaration with `INVALID_REQUEST` before any evidence read.
 No omitted fragment is claimed readable when its source was unavailable.
 
 ## SDK and validation

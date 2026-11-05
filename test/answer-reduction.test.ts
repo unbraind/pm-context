@@ -36,12 +36,14 @@ function roundtrip(packet: api.AnswerReduction) {
 test("exhaustive routing reduction keeps every answer, with at least half the bytes including proofs", async (t) => {
   const { root, client, item, read } = await tracker(); t.after(() => rmSync(root, { recursive: true, force: true }));
   const before = fingerprint(client.pmRoot); const request = routingRequest(item.id);
+  request.fragments.push({ id: "mixed", item: item.id, field: "title", variables: ["urgent", "background"] });
   for (const implementation of [api, built]) {
     const full = await implementation.reduceAnswerContext(request, read, "full");
     const reduced = await implementation.reduceAnswerContext(request, read);
     roundtrip(full); roundtrip(reduced); assertAnswers(full); assertAnswers(reduced);
     assert.deepEqual(reduced.relevant_variables, ["urgent"]);
     assert.equal(reduced.fragments[1]!.state, "omitted"); assert.equal(reduced.fragments[0]!.state, "retained");
+    assert.equal(reduced.fragments.at(-1)!.state, "retained", "mixed dependencies preserve relevant evidence");
     assert.equal(reduced.proofs[0]!.contexts, 2);
     assert.equal(new Set(reduced.proofs[0]!.branches.map((branch) => branch.answers_sha256)).size, 1);
     assert.deepEqual(await implementation.validateAnswerReduction(reduced, request, read), reduced);

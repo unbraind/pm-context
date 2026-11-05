@@ -115,3 +115,45 @@ Captured artifact SHA-256:
 The artifact contains 57 files (655,809 unpacked bytes); its digest remained
 unchanged across **6 launcher modes / 42 assertions**. Binary tarballs remain
 untracked. The build used for the tests is the committed generated output.
+
+## PR 213 review regressions
+
+`test/answer-reduction-review.test.ts` walks every nested container in request,
+source and saved-packet fixtures. It rejects custom/null prototypes, subclass
+arrays, transparent/revoked/trapping proxies, accessors, hidden properties,
+symbol additions and sparse arrays. Rejections do not invoke validation hooks.
+Ordinary JSON, frozen declarations and SDK objects with optional undefined
+fields remain supported. A malformed representation object receives
+`INVALID_OUTPUT` without string coercion.
+
+Escaped-string tests cover a single oversized serialized value, cumulative
+serialized overflow, and later healthy fields that must retain the unconsumed
+raw-source budget. Both full and reduced representations are checked through
+source and rebuilt SDK exports. Packet overhead is reserved before source
+acceptance. The measurement regression uses only disposable data and verifies
+original file/directory modes after refusing a linked export root.
+
+Behavioral mutations are built and run in disposable copies. Removing each of
+object enumerability, array prototype, object proxy, array proxy or array-element
+enumerability guards fails its shape matrix. Restoring the original source
+acceptance function fails the escaped-size test. Restoring output representation
+coercion fails the saved-packet matrix. Removing the export-root guard fails the
+permission regression. Replacing all-dependency omission with any-dependency
+omission fails the mixed-dependency retention assertion. Fixed implementations
+are rebuilt and rerun after these checks.
+
+An additional routing-budget regression refuses an oversized 4,096-row packet
+before source reads, while accepting the same table with narrower values.
+Removing that early guard also fails its behavioral mutation check.
+Escaped routing values can exceed the existing saved-file byte ceiling while
+fitting the character limit. A separate regression checks refusal before reads,
+per-source byte overflow without consuming peer budget, and a large accepted
+packet read back through the real saved-file reader. The producer reserves the
+JSON newline and shares its byte ceiling with that reader.
+
+The packed-installation acceptance also requires a proved packet, the exact
+retained routing title, and an omitted background fragment: **10 assertions per
+launcher / 60 total**, in addition to preserving the captured artifact digest.
+The artifact digest and counts above describe the earlier feature baseline;
+review-round artifact and release-gate receipts are recorded on the PR and its
+pm item.
