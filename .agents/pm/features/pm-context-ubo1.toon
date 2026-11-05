@@ -1,0 +1,29 @@
+id: pm-context-ubo1
+title: Reduce context with declared answer-preservation proofs
+description: "Accept an explicit finite decision table and source-fragment dependencies. Exhaustively prove which declared input values cannot affect the answer, omit only invariant fragments, and retain branch irrelevance certificates. Coverage packing selects evidence; shared factoring deduplicates it; pm-jev proposes answers but cannot supply this proof."
+type: Feature
+status: in_progress
+priority: 2
+tags[4]: answer-preservation,context,proof,reduction
+created_at: "2026-11-05T06:03:31.478Z"
+updated_at: "2026-11-05T06:27:03.162Z"
+author: codex-agent
+acceptance_criteria: Every declared routing input combination produces the same full and reduced answer with at least 50 percent fewer measured UTF-8 bytes including proofs; unsupported predicates retain evidence and report unknown; typed SDK and CLI with JSON/TOON and actionable refusals; non-git real public tracker validation; seeded 500-sequence producer/validator and SDK-state replay tests; packed npm/Bun installation acceptance; unchanged CI release gates pass.
+comments[4]{created_at,author,text}:
+  "2026-11-05T06:04:14.364Z",codex-agent,"Overlap check against main: pm CLI 2026.11.4 public context-packing declarations expose candidate selection and projections, without finite-domain answer-preservation certificates. Existing evidence-packing.ts covers criteria, shared-evidence.ts factors exact revision/value pairs, and pm-jev counterfactual.ts produces model-dependent explanations. None proves declared deterministic routing invariance. Plan: bounded exhaustive first-match equality table, revision-bound source reads through createSharedEvidenceReader, cofactor certificates for each omitted variable branch, conservative unknown predicates, common JSON/TOON producer/validator, read-only non-git and packed-launcher acceptance. This feature introduces no tracker imports, writes, retry journal, outbox, claims or mutable shared state; all tracker state remains SDK-owned."
+  "2026-11-05T06:16:12.529Z",codex-agent,"Implemented bounded exhaustive eq/neq first-match routing, exact cofactor comparisons and branch certificates, revision-bound fragments, per-source unknowns and shared producer-derived JSON/TOON validation. Public origin/main snapshot 363e8bc: 102 items; four distinct descriptions totaling 5071 UTF-8 bytes. Full/reduced JSON 7600/2526 bytes (66.7632 percent saved); TOON 7625/2547 (66.5967 percent). All four combinations agree; four omitted fragments reference two proved background branches; read-only snapshot fingerprint unchanged. Disposable-copy behavioral reverts: disabling omission and bypassing stale-revision comparison each fail the routing regression after rebuild. Focused new-module coverage initially measured 100 percent across all four c8 dimensions; final seeded-model and packed runs are pending."
+  "2026-11-05T06:25:21.044Z",codex-agent,"Packed acquisition passed 6 modes and 42 assertions: npm/Bun project-local, npm/Bun global, npx and bunx, all with host 2026.11.4. Captured artifact SHA-256 e0a519d38f618d72777186671f975321f93e749cbbd68eb906fb23564ae12564 stayed unchanged; 57 packed files, 655809 unpacked bytes. Typecheck, test typecheck, docstring gate and production audit pass (zero production vulnerabilities). Targeted answer-reduction.ts c8 coverage is 210/210 statements, 210/210 branches and 21/21 functions (100 percent lines). Model fixture now verifies every initially populated native field before SDK status transitions, then compares current and absent fields against SDK read-back rather than assuming terminal fields persist. Test result tracking is disabled, so linked-run receipts are documented here without changing that policy."
+  "2026-11-05T06:27:01.160Z",codex-agent,"Final local linked run passed 15/15 tests, zero skipped/canceled/failed, via pm test pm-context-ubo1 --run --progress --timeout 900 (receipt test-local-mw35wyg4-jsos7q). The 500 seeded sequences exercised 52 populated native fields, 4000 transport round trips and 8000 independent routing answers; every current/older request compared with SDK read-back, and all four peer-read boundaries passed. The additional registration regression passed 1/1. Scope: finite declared domains and dependencies only; optimistic revision observations are not locks. Final full npm/Bun release evidence will be attached to the ready-for-review PR after CI; tracker writes finish before that verification. Item remains in progress for orchestrator verification; no merge, release or closure is authorized."
+files[6]{path,scope}:
+  answer-reduction.ts,project
+  index.ts,project
+  test/answer-reduction-model.test.ts,project
+  test/answer-reduction.test.ts,project
+  test/measure-answer-reduction.ts,project
+  test/validate-answer-installations.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/answer-reduction.test.ts test/answer-reduction-model.test.ts test/renderer-ownership.test.ts,project,codex-agent,"2026-11-05T06:16:22.314Z",local_mutation,feat/answer-sensitive-context-reduction
+docs[2]{path,scope}:
+  docs/answer-reduction-validation.md,project
+  docs/answer-reduction.md,project
+body: ""

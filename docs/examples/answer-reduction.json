@@ -1,0 +1,16 @@
+{
+  "contract_revision": "routing-v1",
+  "variables": [
+    { "id": "urgent", "values": [false, true] },
+    { "id": "background", "values": ["brief", "detailed"] }
+  ],
+  "rules": [
+    { "when": [{ "variable": "urgent", "op": "eq", "value": true }, { "variable": "background", "op": "eq", "value": "brief" }], "answer": "priority" },
+    { "when": [{ "variable": "urgent", "op": "eq", "value": true }, { "variable": "background", "op": "eq", "value": "detailed" }], "answer": "priority" }
+  ],
+  "fallback": "normal",
+  "fragments": [
+    { "id": "routing", "item": "routing-task", "field": "title", "variables": ["urgent"] },
+    { "id": "background", "item": "routing-task", "field": "description", "variables": ["background"] }
+  ]
+}

@@ -568,6 +568,9 @@ See [validation and measured public data](docs/task-phase-validation.md).
 
 ## Without git
 
+`context-reduce` and its saved-packet `--check` work in plain trackers without Git.
+They read SDK-native fields and revisions without creating tracker state.
+
 Next-evidence acquisition plans, criterion evidence packs, item-selected packs, handoffs, usage reports, `context-pack since`, freshness record/resume and `context-witnesses` work in a
 plain initialized tracker without invoking Git. Corpus reads use `listAllComplete`
 with extension hooks disabled and re-certify its full-corpus receipt before packing,
@@ -613,3 +616,24 @@ plans retain their existing contract hashes.
 Changelog history explicitly includes empty version windows, including the
 package version awaiting release. A version with no qualifying closed tracker
 changes is recorded as “No changes.”
+
+## Answer-sensitive context reduction
+
+`pm context-reduce` accepts an explicit finite decision table and source-fragment
+influence declarations. It checks every input combination and omits only fields
+whose declared variables cannot change the answer, retaining a branch proof and
+source revision for every omission. Unsupported predicates keep evidence and
+report `unknown`. This complements evidence packing and deduplication.
+
+```sh
+pm context-reduce --packet routing.json --format toon
+pm context-reduce --packet routing.json --json > reduced.json
+pm context-reduce --packet routing.json --check reduced.json --json
+```
+
+Use [the example](docs/examples/answer-reduction.json) with your item IDs. The
+[contract and SDK guide](docs/answer-reduction.md) explains bounds, proof scope,
+`full` comparison output, typed remedies, and revision revalidation. The public
+tracker benchmark reduced JSON from **7,600 to 2,526 bytes (66.76%)**, including
+proofs, while preserving all four routing combinations. This guarantee applies
+to the caller's declared task; dependencies are never inferred from prose.

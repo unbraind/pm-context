@@ -1,4 +1,6 @@
 import { buildSuggestedCommand } from "./suggested-command.js";
+import { reduceAnswerContext, encodeAnswerReduction, readAnswerReductionJson, validateAnswerReduction, AnswerReductionError } from "./answer-reduction.js";
+export { reduceAnswerContext, encodeAnswerReduction, parseAnswerReductionRequest, parseAnswerReduction, readAnswerReductionJson, validateAnswerReduction, AnswerReductionError } from "./answer-reduction.js";
 import { createSharedEvidenceReader, packSharedEvidence, encodeSharedEvidence, SharedEvidenceError } from "./shared-evidence.js";
 export { createSharedEvidenceReader, packSharedEvidence, encodeSharedEvidence, parseSharedEvidenceRequest, SharedEvidenceError } from "./shared-evidence.js";
 export { buildSuggestedCommand, buildRestoreCommand, quotePosixArgument } from "./suggested-command.js";
@@ -1304,6 +1306,29 @@ function setupCommands(api) {
         },
     });
     api.registerCommand({
+        name: "context-reduce",
+        description: "Omit declared answer-invariant evidence with exhaustive finite-domain proofs.",
+        flags: [
+            { long: "--packet", value_name: "file", description: "JSON finite decision table and source fragment dependencies", type: "string" },
+            { long: "--check", value_name: "file", description: "Revalidate saved JSON output against current source revisions", type: "string" },
+            { long: "--representation", value_name: "mode", description: "reduced (default) or full for measured comparison", type: "string" },
+            { long: "--format", value_name: "format", description: "toon (default) or json", type: "string" },
+        ],
+        async run(ctx) {
+            const path = stringOption(ctx.options, "packet");
+            const check = stringOption(ctx.options, "check");
+            const declared = stringOption(ctx.options, "format");
+            const mode = stringOption(ctx.options, "representation");
+            const format = declared ?? (ctx.global.json ? "json" : "toon");
+            if (!path || ctx.args.length || (ctx.options.check !== undefined && !check) || (ctx.options.format !== undefined && !declared) || (ctx.options.representation !== undefined && !mode) || (format !== "json" && format !== "toon") || (mode !== undefined && mode !== "full" && mode !== "reduced") || (check && mode))
+                throw new AnswerReductionError("INVALID_ARGUMENT", "Supply --packet JSON, --format json|toon and either --representation full|reduced or a nonblank --check JSON path, without positional arguments.");
+            const input = readAnswerReductionJson(path);
+            const read = createSharedEvidenceReader(ctx.pm_root);
+            const packet = check ? await validateAnswerReduction(readAnswerReductionJson(check), input, read) : await reduceAnswerContext(input, read, mode);
+            return renderedCommandResult(encodeAnswerReduction(packet, format));
+        },
+    });
+    api.registerCommand({
         name: "context-next-evidence",
         description: "Plan the cheapest declared reads covering explicitly missing evidence; execute nothing.",
         flags: [
@@ -1631,7 +1656,7 @@ export default {
         setupCommands(api);
         if (typeof api.registerRenderer === "function") {
             const rendererOwnership = {
-                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-evidence-shared", "context-next-evidence", "context-phase"],
+                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-evidence-shared", "context-next-evidence", "context-phase", "context-reduce"],
                 resultDiscriminator: isRenderedCommandResult,
             };
             api.registerRenderer("toon", renderCommandResult, rendererOwnership);

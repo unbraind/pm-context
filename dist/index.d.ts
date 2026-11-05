@@ -1,3 +1,5 @@
+export { reduceAnswerContext, encodeAnswerReduction, parseAnswerReductionRequest, parseAnswerReduction, readAnswerReductionJson, validateAnswerReduction, AnswerReductionError } from "./answer-reduction.ts";
+export type { AnswerValue, AnswerVariable, AnswerPredicate, AnswerRule, AnswerFragment, AnswerReductionRequest, AnswerIrrelevanceProof, ReducedAnswerFragment, AnswerReduction } from "./answer-reduction.ts";
 export { createSharedEvidenceReader, packSharedEvidence, encodeSharedEvidence, parseSharedEvidenceRequest, SharedEvidenceError } from "./shared-evidence.ts";
 export type { SharedEvidenceRequest, SharedEvidenceReader, RevisionedEvidence, SharedEvidenceFragment, SharedEvidenceBinding, ExpandedSharedEvidence, SharedEvidencePack } from "./shared-evidence.ts";
 import type { SuggestedCommand } from "./suggested-command.ts";
