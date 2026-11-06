@@ -98,7 +98,8 @@ test("SDK freshness codec keeps byte-sized prefix omissions and source completen
   const report = await resumeFreshness(packet, manifest, read);
   assert.equal(encodeFreshness(report, "toon", 10000), `${encodeToon(report)}\n`);
   for (const format of ["json", "toon"] as const) {
-    for (const budget of [1000, 1500, 2000]) {
+    const full = encodeFreshness(report, format, 10000);
+    for (const budget of [1000, 1500, 2000, Buffer.byteLength(full) - 1, Buffer.byteLength(full), Buffer.byteLength(full) + 1]) {
       const output = encodeFreshness(report, format, budget);
       const decoded = (format === "json" ? JSON.parse(output) : decodeToon(output)) as FreshnessResult;
       assert.ok(Buffer.byteLength(output) <= budget);
