@@ -1,7 +1,7 @@
 import { buildRestoreCommand, buildSuggestedCommand } from "./suggested-command.js";
 /** Mandatory field contracts over cache-free SDK reads and caller-carried SDK sessions. */
 import { createHash } from "node:crypto";
-import { encode } from "@toon-format/toon";
+import { encodeToon as encode } from "@unbrained/pm-cli/sdk/testing";
 import { PmCliError, applyReadOutputSessionReferences, attachReadOutputSessionReceipt, composeContextIntentContracts, createOutputOmissionReceipt, parseReadOutputSession, resolveContextIntentContract, resolveRuntimeFieldRegistry, } from "@unbrained/pm-cli/sdk";
 import { listGetProjectionFields, listListProjectionFields } from "@unbrained/pm-cli/sdk/query";
 import { createFreshnessReader, readFreshnessJson } from "./freshness.js";

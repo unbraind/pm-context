@@ -41,6 +41,7 @@ import type {
   RelationshipKindRegistry,
 } from "@unbrained/pm-cli/sdk";
 import {
+  estimatePmOutputTokens,
   createRelationshipKindRegistry,
   readSettings,
   resolveRuntimeStatusRegistry,
@@ -1009,8 +1010,6 @@ export async function readPmItems(pmRoot: string, list: PmListAction = listAllCo
   return result.items;
 }
 
-/** Per-item token estimate for one character of text (rough 4 chars/token). */
-const TOKENS_PER_CHAR = 0.25;
 /** Default token budget allocated per `--max-items` slot when token-budgeted packing runs. */
 const TOKENS_PER_ITEM_SLOT = 220;
 
@@ -1122,9 +1121,9 @@ export function createSdkRanker(allItems: readonly PmItem[], options: SdkRankOpt
   };
 }
 
-/** Rough token estimate for one projection level of a context candidate. */
+/** SDK UTF-8 estimate for one projection level; these are ranking costs, not an output ceiling. */
 function estimateTokens(text: string): number {
-  return Math.max(1, Math.ceil(text.length * TOKENS_PER_CHAR));
+  return Math.max(1, estimatePmOutputTokens(Buffer.byteLength(text, "utf8")));
 }
 
 /**

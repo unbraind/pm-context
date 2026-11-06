@@ -1,6 +1,6 @@
 /** Revision-bound within-packet factoring over authoritative SDK field reads. */
 import { createHash } from "node:crypto";
-import { encode } from "@toon-format/toon";
+import { encodeToon as encode } from "@unbrained/pm-cli/sdk/testing";
 import { getHistoryPath, PmCliError, readHistorySnapshot } from "@unbrained/pm-cli/sdk";
 import { packContextCandidates } from "@unbrained/pm-cli/sdk/query";
 import { createFreshnessReader } from "./freshness.js";

@@ -306,7 +306,7 @@ test("installed CLI records/resumes without a Git executable and returns typed r
   const defaultRoot = run(["resume", "--packet", packetPath, "--manifest", manifestPath, "--json"]);
   assert.equal(defaultRoot.status, 0, defaultRoot.stderr);
   assert.equal((JSON.parse(defaultRoot.stdout) as FreshnessResult).reusable, true);
-  const toon = run(base); assert.equal(toon.status, 0, toon.stderr); assert.match(toon.stdout, /code: "FRESH"/);
+  const toon = run(base); assert.equal(toon.status, 0, toon.stderr); assert.equal((decodeToon(toon.stdout) as unknown as FreshnessResult).code, "FRESH");
   assert.deepEqual(history, readFileSync(join(f.pmRoot, "history", `${f.a}.jsonl`)));
   chmodSync(join(f.root, "evidence.txt"), 0);
   const refused = run([...base, "--format", "json", "--byte-budget", "1500"]);

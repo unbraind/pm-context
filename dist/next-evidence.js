@@ -1,6 +1,7 @@
 /** Stateless acquisition planning over explicit missing evidence and declared read costs. */
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { encodeToon } from "@unbrained/pm-cli/sdk/testing";
 import { encodePmTableRows } from "@unbrained/pm-cli/sdk";
 import { PmCliError } from "@unbrained/pm-cli/sdk";
 import { readFreshnessJson } from "./freshness.js";
@@ -145,7 +146,6 @@ export function encodeNextEvidencePlan(plan, format = "toon") {
         throw new NextEvidenceError("INVALID_ARGUMENT", "Use --format json or toon.");
     const { steps, ...summary } = plan;
     const table = encodePmTableRows(steps.map((step) => ({ ...step })));
-    const fields = ["read", "source", "revision", "adds", "estimated_tokens", "estimated_tool_calls", "cost"];
-    return `${Object.entries(summary).map(([key, value]) => Array.isArray(value) ? `${key}[${value.length}]: ${value.map((entry) => JSON.stringify(entry)).join(",")}` : `${key}: ${JSON.stringify(value)}`).join("\n")}\nsteps[${steps.length}]{${fields.join(",")}}:\n${table.rows.map((step) => `  ${fields.map((field) => JSON.stringify(step[field])).join(",")}\n`).join("")}steps_encoding:\n  json_columns[${table.encoding.json_columns.length}]: ${table.encoding.json_columns.map((field) => JSON.stringify(field)).join(",")}\n  absent[0]:\n`;
+    return `${encodeToon({ ...summary, steps: table.rows, steps_encoding: table.encoding })}\n`;
 }
 //# sourceMappingURL=next-evidence.js.map
