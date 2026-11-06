@@ -2,7 +2,7 @@ import { buildRestoreCommand, buildSuggestedCommand } from "./suggested-command.
 import type { SuggestedCommand, SuggestedRestore } from "./suggested-command.ts";
 /** Mandatory field contracts over cache-free SDK reads and caller-carried SDK sessions. */
 import { createHash } from "node:crypto";
-import { encode } from "@toon-format/toon";
+import { encodeToon as encode } from "@unbrained/pm-cli/sdk/testing";
 import {
   PmCliError, applyReadOutputSessionReferences, attachReadOutputSessionReceipt,
   composeContextIntentContracts, createOutputOmissionReceipt, parseReadOutputSession,

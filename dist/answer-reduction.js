@@ -1,7 +1,7 @@
 /** Exhaustive answer-preserving reduction over an explicitly declared finite task. */
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual, types } from "node:util";
-import { encode } from "@toon-format/toon";
+import { encodeToon as encode } from "@unbrained/pm-cli/sdk/testing";
 import { PmCliError } from "@unbrained/pm-cli/sdk";
 import { isUtf8 } from "node:buffer";
 import { readFreshnessFile } from "./freshness.js";

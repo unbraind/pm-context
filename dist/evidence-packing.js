@@ -1,3 +1,4 @@
+import { encodeToon } from "@unbrained/pm-cli/sdk/testing";
 /** Criterion-level packing over explicit tracker bindings; no semantic search or review. */
 import { PmCliError } from "@unbrained/pm-cli/sdk";
 import { packContextCandidates } from "@unbrained/pm-cli/sdk/query";
@@ -64,14 +65,7 @@ export function encodeEvidencePack(pack, format) {
         return `${JSON.stringify(pack)}\n`;
     if (format !== "toon")
         throw new EvidencePackingError("INVALID_ARGUMENT", "Use --format json or toon.");
-    const { criteria, evidence, ...summary } = pack;
-    const lines = Object.entries(summary).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
-    for (const [name, rows, fields] of [["criteria", criteria, ["id", "text", "state", "required", "packed"]], ["evidence", evidence, ["criterion", "item", "field", "value_json"]]]) {
-        lines.push(`${name}[${rows.length}]{${fields.join(",")}}:`);
-        for (const row of rows)
-            lines.push(`  ${fields.map((field) => JSON.stringify(row[field])).join(",")}`);
-    }
-    return `${lines.join("\n")}\n`;
+    return `${encodeToon(pack)}\n`;
 }
 /** Pack complete criterion groups using SDK selection and exact serialized transport costs. */
 export async function packCriterionEvidence(input, read, options = {}) {
@@ -124,7 +118,7 @@ export async function packCriterionEvidence(input, read, options = {}) {
     if (overhead > budget)
         throw new EvidencePackingError("BUDGET_TOO_SMALL", "Increase --byte-budget to retain every criterion and the complete coverage receipt.");
     const candidates = groups.map((group, index) => {
-        const cost = group.rows.reduce((sum, row) => sum + Buffer.byteLength(format === "json" ? JSON.stringify(row) : `  ${[row.criterion, row.item, row.field, row.value_json].map((value) => JSON.stringify(value)).join(",")}\n`) + 1, 8);
+        const cost = group.rows.reduce((sum, row) => sum + Buffer.byteLength(format === "json" ? JSON.stringify(row) : encodeToon([row])) + 1, 8);
         return { id: group.id, item: group.rows, rank: index + 1, score: 1, token_costs: { identity: cost, summary: cost, full: cost } };
     });
     if (budget > overhead) {

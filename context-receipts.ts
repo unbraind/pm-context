@@ -2,7 +2,7 @@
  * Receipt protocol for the final output of pm-context's serving commands.
  * The package owns only runtime/context-receipts, never the SDK usage ledger.
  */
-import { acquireLock } from "@unbrained/pm-cli/sdk";
+import { acquireLock, estimatePmOutputTokens } from "@unbrained/pm-cli/sdk";
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, isAbsolute, join, posix } from "node:path";
@@ -143,8 +143,8 @@ export async function serveContextReceipt(
     const files = [...new Set(knownFiles.filter((file) => item_ids.includes(file.itemId) && (format === "json" ? text.includes(JSON.stringify(file.value)) : text === `- ${file.itemId} file: ${file.value}`)).map((file) => file.normalized))].sort();
     const id = `f-${createHash("sha256").update(JSON.stringify([section.id, item_ids, text])).digest("hex").slice(0, 24)}`;
     const existing = receipt.facts.find((fact) => fact.id === id);
-    if (existing) { existing.estimated_tokens += Math.ceil(text.length / 4); return existing; }
-    const fact = { id, section_id: section.id, item_ids, files, estimated_tokens: Math.ceil(text.length / 4) };
+    if (existing) { existing.estimated_tokens += estimatePmOutputTokens(Buffer.byteLength(text, "utf8")); return existing; }
+    const fact = { id, section_id: section.id, item_ids, files, estimated_tokens: estimatePmOutputTokens(Buffer.byteLength(text, "utf8")) };
     receipt.facts.push(fact);
     return fact;
   };
@@ -160,9 +160,12 @@ export async function serveContextReceipt(
     payload.context_receipt = publicReceipt;
     // Preserve compact JSON when the original output was minified.
     rendered = `${JSON.stringify(payload, null, output.trim().includes("\n") ? 2 : 0)}\n`;
-    receipt.protocol_tokens = Math.max(0, Math.ceil((rendered.length - output.length) / 4));
-    publicReceipt.protocol_tokens = receipt.protocol_tokens;
-    rendered = `${JSON.stringify(payload, null, output.trim().includes("\n") ? 2 : 0)}\n`;
+    // Stabilize the overhead including the final receipt digits and newline.
+    while (receipt.protocol_tokens !== estimatePmOutputTokens(Math.max(0, Buffer.byteLength(rendered) - Buffer.byteLength(output)))) {
+      receipt.protocol_tokens = estimatePmOutputTokens(Math.max(0, Buffer.byteLength(rendered) - Buffer.byteLength(output)));
+      publicReceipt.protocol_tokens = receipt.protocol_tokens;
+      rendered = `${JSON.stringify(payload, null, output.trim().includes("\n") ? 2 : 0)}\n`;
+    }
   } else {
     let section = sectionFor("preamble");
     let inheritedItems: string[] = [];
@@ -177,7 +180,7 @@ export async function serveContextReceipt(
       return `${line} [${fact.id}]`;
     });
     rendered = `${lines.join("\n")}\n\nContext receipt: ${receipt.receipt_id}; session: ${receipt.session}; protocol: ${receipt.protocol}\n`;
-    receipt.protocol_tokens = Math.max(0, Math.ceil((rendered.length - output.length) / 4));
+    receipt.protocol_tokens = estimatePmOutputTokens(Math.max(0, Buffer.byteLength(rendered) - Buffer.byteLength(output)));
   }
   await withReceiptStore(pmRoot, (directory) => {
     const path = join(directory, `${receipt.receipt_id}.json`);

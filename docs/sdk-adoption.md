@@ -74,3 +74,9 @@ Result: **1 failed**, `Missing expected rejection`. Restore SDK stream discovery
 both adoption tests pass (**2/2**). The existing delta suites pass **26/26**.
 The blocked file-focus replacement has no revert proof; its capability test
 demonstrates the missing side-effect policy directly against the real SDK.
+
+## Remaining codec and UTF-8 adoption, 2026-11-06
+
+The G5 follow-up replaces character-based receipt/projection estimates and
+handwritten TOON containers with public SDK estimation and host codecs. See
+[the design, retained domain rules and behavioral revert evidence](sdk-codecs-utf8.md).

@@ -1,3 +1,4 @@
+import { encodeToon } from "@unbrained/pm-cli/sdk/testing";
 /** Portable assumption validation; manifests contain digests, never source snapshots. */
 import { isUtf8 } from "node:buffer";
 import { createHash } from "node:crypto";
@@ -174,20 +175,11 @@ export async function resumeFreshness(packet: FreshnessPacket, manifest: Freshne
 export function encodeFreshness(result: FreshnessResult | FreshnessManifest, format: "json" | "toon", budget: number): string {
   if (!Number.isSafeInteger(budget) || budget < 512) throw new FreshnessError("INVALID_ARGUMENT", "Use an integer --byte-budget of at least 512 and --format json or toon.");
   const value = structuredClone(result);
-  /** TOON's quoted scalars permit lossless identifiers and Unicode without bespoke escaping. */
+  /** Serialize through the host codec, including the command's final newline. */
   function encode(): string {
-    if (format === "json") return `${JSON.stringify(value)}\n`;
-    // A small schema-specific TOON projection; nested protocol data remains proper TOON lists.
-    const { invalidated, ...summary } = value as FreshnessResult;
-    const lines = Object.entries(summary).map(([key, field]) => `${key}: ${JSON.stringify(field)}`);
-    lines.push(`invalidated[${invalidated.length}]:`);
-    for (const row of invalidated) {
-      lines.push(`  - section: ${JSON.stringify(row.section)}`);
-      lines.push(`    causes[${row.causes.length}]: ${row.causes.map((cause) => JSON.stringify(cause)).join(",")}`);
-    }
-    return `${lines.join("\n")}\n`;
+    return `${format === "json" ? JSON.stringify(value) : encodeToon(value)}\n`;
   }
-  // Manifests are always JSON artifacts: object-valued source declarations have no compact TOON projection.
+  // Persisted manifests retain their JSON-only artifact contract.
   if (!("invalidated" in value) && format === "toon") throw new FreshnessError("INVALID_ARGUMENT", "Record manifests with --format json; resume supports both json and toon.");
   if ("invalidated" in value) {
     const rows = value.invalidated;
@@ -195,8 +187,10 @@ export function encodeFreshness(result: FreshnessResult | FreshnessManifest, for
     const fixed = Buffer.byteLength(encode()) - String(value.omitted_sections).length - Number(format === "toon");
     let included = 0; let bytes = 0;
     for (const row of rows) {
-      const encoded = format === "json" ? JSON.stringify(row) : `  - section: ${JSON.stringify(row.section)}\n    causes[${row.causes.length}]: ${row.causes.map((cause) => JSON.stringify(cause)).join(",")}\n`;
-      const next = bytes + Buffer.byteLength(encoded) + Number(format === "json" && included > 0);
+      // Single-row SDK render deltas preserve linear work without copying container grammar.
+      const rowBytes = format === "json" ? Buffer.byteLength(JSON.stringify(row))
+        : Buffer.byteLength(encodeToon({ invalidated: [row] })) - Buffer.byteLength(encodeToon({ invalidated: [] }));
+      const next = bytes + rowBytes + Number(format === "json" && included > 0);
       const omitted = value.omitted_sections + rows.length - included - 1;
       const size = fixed + next + String(omitted).length + (format === "toon" ? String(included + 1).length : 0);
       if (size > budget) break;

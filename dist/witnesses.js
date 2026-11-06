@@ -1,3 +1,4 @@
+import { encodeToon } from "@unbrained/pm-cli/sdk/testing";
 /** Read-only consistency checks over producer-declared, co-current packet claims. */
 import { PmCliError } from "@unbrained/pm-cli/sdk";
 import { readFreshnessJson } from "./freshness.js";
@@ -99,21 +100,7 @@ export function checkContextWitnesses(input) {
 export function encodeWitnessReport(report, format = "toon", budget = 4000) {
     if (!["json", "toon"].includes(format) || !Number.isSafeInteger(budget) || budget < 512 || budget > 262144)
         throw new WitnessError("INVALID_ARGUMENT", "Use json or toon and an integer byte budget between 512 and 262144.");
-    const { witness, ...summary } = report;
-    const lines = Object.entries(summary).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
-    if (witness) {
-        lines.push("witness:", `  rule: ${JSON.stringify(witness.rule)}`, `  claims[${witness.claims.length}]:`);
-        for (const claim of witness.claims) {
-            const { citation, supersedes, ...fields } = claim;
-            Object.entries(fields).forEach(([key, value], index) => lines.push(`    ${index === 0 ? "- " : "  "}${key}: ${JSON.stringify(value)}`));
-            lines.push("      citation:", `        item: ${JSON.stringify(citation.item)}`, `        field: ${JSON.stringify(citation.field)}`);
-            if (supersedes)
-                lines.push(`      supersedes[${supersedes.length}]: ${supersedes.map((id) => JSON.stringify(id)).join(",")}`);
-        }
-    }
-    else
-        lines.push("witness: null");
-    const output = format === "json" ? `${JSON.stringify(report)}\n` : `${lines.join("\n")}\n`;
+    const output = `${format === "json" ? JSON.stringify(report) : encodeToon(report)}\n`;
     if (Buffer.byteLength(output) > budget)
         throw new WitnessError("BUDGET_TOO_SMALL", "Increase byte budget to retain the complete smallest witness, or select claims with shorter coordinates.");
     return output;
