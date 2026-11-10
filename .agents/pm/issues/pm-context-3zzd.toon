@@ -1,17 +1,18 @@
 id: pm-context-3zzd
-title: "Daily release fails its own release:check: the release regenerates CHANGELOG.md without --include-empty"
-description: "The release step Generate changelog and release notes rendered CHANGELOG.md without --include-empty, but changelog:check (run by release:check) renders with it. The release therefore dropped the empty tag sections the check expects, and every daily release since the pm-changelog 2026.11.6 bump failed at Run release checks with 'Changelog is out of date' (reproduced on 2026-11-10 run logs)."
+title: "The release commits a CHANGELOG.md without --include-empty, so CI's changelog:check fails on main after every release"
+description: "The release step 'Generate changelog and release notes' expands a shared common=(...) array that lacked --include-empty, while changelog:full (the command CI's changelog:check runs) passes it. The release's own paired --check expands the same array, so it passed and the release committed a CHANGELOG.md without the empty tag sections. CI's changelog:check then refused that file on main and on every following PR. release:check does not run changelog:check in this repo. Correction: the first version of this item said it did; CodeRabbit (PRRT_kwDOSzDuFs61zYYQ) and Greptile (PRRT_kwDOSzDuFs61yPV-) pointed out the right check."
 type: Issue
 status: in_progress
 priority: 1
 tags[3]: changelog,ci,release
 created_at: "2026-11-10T16:07:45.389Z"
-updated_at: "2026-11-10T16:07:55.623Z"
+updated_at: "2026-11-10T17:22:36.702Z"
 author: claude-orchestrator
 acceptance_criteria: "The release generates CHANGELOG.md with exactly the section-selection flags changelog:check verifies; A contract test fails when the two drift apart again, and fails on revert"
-actual_result: "Run release checks: Changelog is out of date; the generated file lacks 'No changes.' sections for older tags."
-comments[1]{created_at,author,text}:
+actual_result: "After a release, CI's changelog:check reports 'Changelog is out of date': the generated file has 'No changes.' sections for empty tags that the committed file lacks."
+comments[2]{created_at,author,text}:
   "2026-11-10T16:07:52.202Z",claude-orchestrator,"Fix: --include-empty added to the release's CHANGELOG.md generation, matching changelog:check. A new contract test in test/release-workflow-sync.test.ts compares the flags. Revert proof: with the workflow change reverted the test fails, and with it the test passes. pm-context: typecheck clean, full npm test 472 pass / 0 fail across its three runs; release-workflow-sync tests 2/0 with the fix, 1/1 without it."
+  "2026-11-10T17:22:36.701Z",claude-orchestrator,"Review round: (1) the attribution in the title, description and test comment is corrected: CI's changelog:check, not release:check. (2) extractCommonArray skips full-line and trailing shell comments, and a new test fails without that (0/1) and passes with it. (3) CHANGELOG.md is regenerated: main's toolchain entry lacked the (#219) link, which the squash merge added after the branch-side regeneration. release-workflow-sync 3/0, typecheck clean."
 files[2]{path,scope}:
   .github/workflows/release.yml,project
   test/release-workflow-sync.test.ts,project

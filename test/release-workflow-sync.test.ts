@@ -303,7 +303,9 @@ function extractCommonArray(runScript: string): string[] {
   for (let i = start + 1; i < rawLines.length; i++) {
     const line = rawLines[i];
     if (/^\s*\)\s*$/.test(line)) break;
-    elements.push(line.trim());
+    // A commented-out option is not passed to pm-changelog; full-line and trailing comments carry no array elements.
+    if (/^\s*#/.test(line)) continue;
+    elements.push(line.replace(/\s+#.*$/, "").trim());
   }
   return elements.join(" ").split(/\s+/).filter((token) => token !== "");
 }
@@ -389,8 +391,9 @@ test("release workflow names the changelog section after the tag in both generat
 });
 
 test("the release renders CHANGELOG.md with the same section-selection flags as changelog:check", () => {
-  // 2026-11-10: changelog:full carried --include-empty but the common array did not, so the release regenerated
-  // CHANGELOG.md without the empty tag sections and the later release:check (changelog:check) refused it.
+  // 2026-11-10: changelog:full (which CI's changelog:check runs) carried --include-empty but the common array did
+  // not. The release committed a CHANGELOG.md without the empty tag sections, so CI's changelog:check failed on main
+  // after every release. The release's own paired --check expands the same array and could not notice.
   const doc = parseWorkflowYaml(readFileSync(WORKFLOW_PATH, "utf8")) as {
     jobs?: { release?: { steps?: Array<{ name?: string; run?: string }> } };
   };
@@ -402,4 +405,9 @@ test("the release renders CHANGELOG.md with the same section-selection flags as 
   for (const flag of ["--all-release-tags", "--include-empty", "--respect-item-release", "--date-from-version"]) {
     assert.equal(common.has(flag), full.has(flag), `${flag} must be set in both the release common array and changelog:full, or in neither`);
   }
+});
+
+test("extractCommonArray ignores commented-out options", () => {
+  const script = "common=(\n  --pm-root .agents/pm\n  # --include-empty\n  --all-release-tags # every tag\n)\n";
+  assert.deepEqual(extractCommonArray(script), ["--pm-root", ".agents/pm", "--all-release-tags"]);
 });
