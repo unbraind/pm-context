@@ -2,7 +2,17 @@
 
 ## 2026.11.1 - 2026-11-01
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#217](https://github.com/unbraind/pm-context/pull/217))
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#216](https://github.com/unbraind/pm-context/pull/216))
+- Bump the codeql-action group with 2 updates ([#215](https://github.com/unbraind/pm-context/pull/215))
+- Bump the pm-toolchain group with 3 updates ([#211](https://github.com/unbraind/pm-context/pull/211))
+- Bump the pm-toolchain group across 1 directory with 3 updates ([#208](https://github.com/unbraind/pm-context/pull/208))
+- Bump @types/node ([#209](https://github.com/unbraind/pm-context/pull/209))
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#205](https://github.com/unbraind/pm-context/pull/205))
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#206](https://github.com/unbraind/pm-context/pull/206))
 
 ## 2026.10.31 - 2026-10-31
 
