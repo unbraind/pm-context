@@ -303,7 +303,9 @@ function extractCommonArray(runScript: string): string[] {
   for (let i = start + 1; i < rawLines.length; i++) {
     const line = rawLines[i];
     if (/^\s*\)\s*$/.test(line)) break;
-    elements.push(line.trim());
+    // A commented-out option is not passed to pm-changelog; full-line and trailing comments carry no array elements.
+    if (/^\s*#/.test(line)) continue;
+    elements.push(line.replace(/\s+#.*$/, "").trim());
   }
   return elements.join(" ").split(/\s+/).filter((token) => token !== "");
 }
@@ -386,4 +388,26 @@ test("release workflow names the changelog section after the tag in both generat
     tokenize(notesLine).includes('"${common[@]}"'),
     "the notes invocation must expand the same common options array as generate and check",
   );
+});
+
+test("the release renders CHANGELOG.md with the same section-selection flags as changelog:check", () => {
+  // 2026-11-10: changelog:full (which CI's changelog:check runs) carried --include-empty but the common array did
+  // not. The release committed a CHANGELOG.md without the empty tag sections, so CI's changelog:check failed on main
+  // after every release. The release's own paired --check expands the same array and could not notice.
+  const doc = parseWorkflowYaml(readFileSync(WORKFLOW_PATH, "utf8")) as {
+    jobs?: { release?: { steps?: Array<{ name?: string; run?: string }> } };
+  };
+  const generate = doc.jobs?.release?.steps?.find((step) => step.name === "Generate changelog and release notes");
+  assert.ok(generate?.run, "expected the generate step");
+  const common = new Set(extractCommonArray(generate.run));
+  const scripts = JSON.parse(readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8")).scripts as Record<string, string>;
+  const full = new Set(scripts["changelog:full"]!.split(/\s+/));
+  for (const flag of ["--all-release-tags", "--include-empty", "--respect-item-release", "--date-from-version"]) {
+    assert.equal(common.has(flag), full.has(flag), `${flag} must be set in both the release common array and changelog:full, or in neither`);
+  }
+});
+
+test("extractCommonArray ignores commented-out options", () => {
+  const script = "common=(\n  --pm-root .agents/pm\n  # --include-empty\n  --all-release-tags # every tag\n)\n";
+  assert.deepEqual(extractCommonArray(script), ["--pm-root", ".agents/pm", "--all-release-tags"]);
 });
