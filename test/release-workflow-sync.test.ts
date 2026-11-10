@@ -387,3 +387,19 @@ test("release workflow names the changelog section after the tag in both generat
     "the notes invocation must expand the same common options array as generate and check",
   );
 });
+
+test("the release renders CHANGELOG.md with the same section-selection flags as changelog:check", () => {
+  // 2026-11-10: changelog:full carried --include-empty but the common array did not, so the release regenerated
+  // CHANGELOG.md without the empty tag sections and the later release:check (changelog:check) refused it.
+  const doc = parseWorkflowYaml(readFileSync(WORKFLOW_PATH, "utf8")) as {
+    jobs?: { release?: { steps?: Array<{ name?: string; run?: string }> } };
+  };
+  const generate = doc.jobs?.release?.steps?.find((step) => step.name === "Generate changelog and release notes");
+  assert.ok(generate?.run, "expected the generate step");
+  const common = new Set(extractCommonArray(generate.run));
+  const scripts = JSON.parse(readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8")).scripts as Record<string, string>;
+  const full = new Set(scripts["changelog:full"]!.split(/\s+/));
+  for (const flag of ["--all-release-tags", "--include-empty", "--respect-item-release", "--date-from-version"]) {
+    assert.equal(common.has(flag), full.has(flag), `${flag} must be set in both the release common array and changelog:full, or in neither`);
+  }
+});

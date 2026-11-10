@@ -344,6 +344,7 @@ jobs:
           common=(
             --pm-root .agents/pm
             --all-release-tags
+            --include-empty
             --version "$RELEASE_TAG"
             --date-from-version
             --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm

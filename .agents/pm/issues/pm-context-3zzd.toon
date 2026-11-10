@@ -1,0 +1,20 @@
+id: pm-context-3zzd
+title: "Daily release fails its own release:check: the release regenerates CHANGELOG.md without --include-empty"
+description: "The release step Generate changelog and release notes rendered CHANGELOG.md without --include-empty, but changelog:check (run by release:check) renders with it. The release therefore dropped the empty tag sections the check expects, and every daily release since the pm-changelog 2026.11.6 bump failed at Run release checks with 'Changelog is out of date' (reproduced on 2026-11-10 run logs)."
+type: Issue
+status: in_progress
+priority: 1
+tags[3]: changelog,ci,release
+created_at: "2026-11-10T16:07:45.389Z"
+updated_at: "2026-11-10T16:07:55.623Z"
+author: claude-orchestrator
+acceptance_criteria: "The release generates CHANGELOG.md with exactly the section-selection flags changelog:check verifies; A contract test fails when the two drift apart again, and fails on revert"
+actual_result: "Run release checks: Changelog is out of date; the generated file lacks 'No changes.' sections for older tags."
+comments[1]{created_at,author,text}:
+  "2026-11-10T16:07:52.202Z",claude-orchestrator,"Fix: --include-empty added to the release's CHANGELOG.md generation, matching changelog:check. A new contract test in test/release-workflow-sync.test.ts compares the flags. Revert proof: with the workflow change reverted the test fails, and with it the test passes. pm-context: typecheck clean, full npm test 472 pass / 0 fail across its three runs; release-workflow-sync tests 2/0 with the fix, 1/1 without it."
+files[2]{path,scope}:
+  .github/workflows/release.yml,project
+  test/release-workflow-sync.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test test/release-workflow-sync.test.ts,project,claude-orchestrator,"2026-11-10T16:07:50.695Z",local_mutation,fix/release-changelog-include-empty
+body: ""
