@@ -11,6 +11,7 @@ const workflow = readFileSync(
   resolve(import.meta.dirname, "../.github/workflows/release.yml"),
   "utf-8"
 );
+const releaseEnvironment = (parse(workflow) as { jobs: { release: { env: Record<string, string> } } }).jobs.release.env;
 
 /** Execute the real Decide release script against a disposable Git history. */
 function decideRelease(commits: Array<{ version: string; title: string; body?: string; tag?: string; manifestVersion?: string; changelog?: string }>): Record<string, string> {
@@ -38,7 +39,7 @@ function decideRelease(commits: Array<{ version: string; title: string; body?: s
     const run = spawnSync("bash", ["-e", "-c", script], {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: resolve(root, "summary"), RELEASE_TIMEZONE: "Europe/Vienna", RECOVERY_NOTES_SHA: "" },
+      env: { ...process.env, ...releaseEnvironment, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: resolve(root, "summary"), RELEASE_TIMEZONE: "Europe/Vienna", RECOVERY_NOTES_SHA: "" },
     });
     if (run.error) throw run.error;
     if (run.status !== 0) throw new Error(`${run.stdout}\n${run.stderr}`);
@@ -98,12 +99,12 @@ test("resume notes are extracted from the prepared version and absent notes fail
     const script = document.jobs.release.steps.find((step) => step.name === "Restore prepared release notes")?.run;
     assert.ok(script);
     writeFileSync(resolve(root, "CHANGELOG.md"), "# Changelog\n\n## 2026.9.27 - 2026-09-27\nRecovered fix\n\n## 2026.9.26 - 2026-09-26\nOld fix\n");
-    execFileSync("bash", ["-e", "-c", script], { cwd: root, env: { ...process.env, NPM_VERSION: "2026.9.27" } });
+    execFileSync("bash", ["-e", "-c", script], { cwd: root, env: { ...process.env, ...releaseEnvironment, NPM_VERSION: "2026.9.27" } });
     assert.equal(readFileSync(resolve(root, "RELEASE_NOTES.md"), "utf8"), "## 2026.9.27 - 2026-09-27\nRecovered fix\n\n");
     const missing = spawnSync("bash", ["-e", "-c", script], {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, NPM_VERSION: "2026.9.25" },
+      env: { ...process.env, ...releaseEnvironment, NPM_VERSION: "2026.9.25" },
     });
     assert.equal(missing.status, 1);
     assert.match(missing.stdout, /has no changelog section/);
@@ -154,7 +155,7 @@ test("resume notes recover only from an explicitly authorized, immutable recover
     const outsideMain = commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nNot on main\n\n" + older, "unmerged notes");
     git("checkout", "-q", "--detach", prepared);
     const run = (recoverySha: string, version = "2026.9.27") => spawnSync("bash", ["-e", "-c", script], {
-      cwd: root, encoding: "utf8", env: { ...process.env, NPM_VERSION: version, PREPARED_SHA: prepared, RECOVERY_NOTES_SHA: recoverySha },
+      cwd: root, encoding: "utf8", env: { ...process.env, ...releaseEnvironment, NPM_VERSION: version, PREPARED_SHA: prepared, RECOVERY_NOTES_SHA: recoverySha },
     });
     const notes = () => readFileSync(resolve(root, "RELEASE_NOTES.md"), "utf8");
 

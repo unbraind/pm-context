@@ -35,6 +35,37 @@ jobs:
     runs-on: ubuntu-latest
     env:
       RELEASE_TIMEZONE: Europe/Vienna
+      # Shared even after checkout of an older immutable prepared commit.
+      RELEASE_NOTES_AWK: |
+        function visible(line, text, end) {
+          text = ""
+          while (length(line)) {
+            if (comment) {
+              end = index(line, "-->")
+              if (!end) return text
+              line = substr(line, end + 3); comment = 0
+            } else {
+              end = index(line, "<!--")
+              if (!end) return text line
+              text = text substr(line, 1, end - 1); line = substr(line, end + 4); comment = 1
+            }
+          }
+          return text
+        }
+        {
+          sub(/\r$/, "")
+          text = visible($0)
+          if (text ~ /^## /) {
+            active = index(text, "## " version " - ") == 1
+            if (active) matches++
+          }
+          if (active) {
+            notes = notes $0 ORS
+            gsub(/[[:space:]]/, "", text)
+            if (text != "" && text !~ /^#/ && text != "Nochanges." && text !~ /^[-*_][-*_][-*_]+$/) content = 1
+          }
+        }
+        END { if (matches == 1 && content) printf "%s", notes; else exit 1 }
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -96,6 +127,12 @@ jobs:
           # immutable transaction before choosing another calendar version.
           # The commit can be behind HEAD when source work landed meanwhile.
           range="${latest_tag:+${latest_tag}..}HEAD"
+          if [[ -n "${RECOVERY_NOTES_SHA:-}" ]]; then
+            if [[ ! "$RECOVERY_NOTES_SHA" =~ ^[0-9a-f]{40}$ ]] || ! git merge-base --is-ancestor "$RECOVERY_NOTES_SHA" origin/main; then
+              echo "::error::recovery_notes_sha must be a full main commit SHA."
+              exit 1
+            fi
+          fi
           while IFS= read -r candidate_sha; do
             [[ -z "$candidate_sha" ]] && continue
             subject="$(git show -s --format=%s "$candidate_sha")"
@@ -128,14 +165,23 @@ jobs:
               exit 1
             fi
             # Empty prepared metadata must not monopolize every later daily run.
-            # An explicit recovery request still follows the immutable recovery checks below.
-            if [[ -z "${RECOVERY_NOTES_SHA:-}" ]] && ! git show "${candidate_sha}:CHANGELOG.md" | awk -v version="$candidate_version" '
-              /^## / { active = index($0, "## " version " - ") == 1; next }
-              active && $0 !~ /^[[:space:]]*($|#)/ && $0 !~ /^No changes\.[[:space:]]*$/ { content = 1 }
-              END { exit !content }
-            '; then
-              echo "::notice::Abandoning untagged prepared release ${candidate_tag} (${candidate_sha}): no usable same-version changelog section; continuing current release selection."
-              continue
+            # Preserve already-published transactions and only use recovery for its covered version.
+            if ! git show "${candidate_sha}:CHANGELOG.md" | awk -v version="$candidate_version" "$RELEASE_NOTES_AWK" >/dev/null; then
+              recovery_matches=false
+              if [[ -n "${RECOVERY_NOTES_SHA:-}" ]] && git merge-base --is-ancestor "$candidate_sha" "$RECOVERY_NOTES_SHA" && git show "${RECOVERY_NOTES_SHA}:CHANGELOG.md" | awk -v version="$candidate_version" "$RELEASE_NOTES_AWK" >/dev/null; then
+                recovery_matches=true
+              fi
+              if [[ "$recovery_matches" != true ]]; then
+                if registry_result="$(npm view "pm-context@${candidate_version}" version --json 2>/dev/null)"; then
+                  echo "::notice::Prepared ${candidate_tag} is already published; retaining its immutable reconciliation despite missing notes. Supply an exact recovery commit."
+                elif jq -e '.error.code == "E404"' <<< "$registry_result" >/dev/null; then
+                  echo "::notice::Abandoning untagged prepared release ${candidate_tag} (${candidate_sha}): no usable same-version changelog section and not published; continuing current release selection."
+                  continue
+                else
+                  echo "::error::Cannot establish whether prepared ${candidate_tag} is published; refusing to abandon it."
+                  exit 1
+                fi
+              fi
             fi
             {
               echo "should_release=true"
@@ -148,6 +194,10 @@ jobs:
             echo "Resuming untagged ${candidate_tag} from ${candidate_sha}." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           done < <(git log --reverse --format='%H%x09%s' "$range" | awk -F '\t' '$2 ~ /^Release pm-context v/ { print $1 }')
+          if [[ -n "${RECOVERY_NOTES_SHA:-}" ]]; then
+            echo "::error::No pending prepared release matches the authorized recovery notes."
+            exit 1
+          fi
           release_date="$(TZ="$RELEASE_TIMEZONE" date +%Y.%m.%d)"
           base_tag="v${release_date}"
           max_suffix=-1
@@ -373,12 +423,7 @@ jobs:
           # Extract the exact pending version, never an older section returned by --limit 1.
           # A heading alone or the include-empty placeholder is not usable release evidence.
           ./node_modules/.bin/pm-changelog "${common[@]}" --stdout --limit 1 \
-            | awk -v version="$NPM_VERSION" '
-                /^## / { active = index($0, "## " version " - ") == 1 }
-                active { print }
-                active && $0 !~ /^[[:space:]]*($|#)/ && $0 !~ /^No changes\.[[:space:]]*$/ && $0 !~ /^## / { content = 1 }
-                END { if (!content) exit 1 }
-              ' > RELEASE_NOTES.md
+            | awk -v version="$NPM_VERSION" "$RELEASE_NOTES_AWK" > RELEASE_NOTES.md
           [[ -s RELEASE_NOTES.md ]]
 
       - name: Run release checks
@@ -738,12 +783,7 @@ jobs:
         run: |
           set -euo pipefail
           extract_notes() {
-            awk -v version="$NPM_VERSION" '
-              /^## / { active = index($0, "## " version " - ") == 1 }
-              active { notes = notes $0 ORS }
-              active && $0 !~ /^[[:space:]]*($|#)/ && $0 !~ /^No changes\.[[:space:]]*$/ && $0 !~ /^## / { content = 1 }
-              END { if (content) printf "%s", notes }
-            ' "$1"
+            awk -v version="$NPM_VERSION" "$RELEASE_NOTES_AWK" "$1" || true
           }
           extract_notes CHANGELOG.md > RELEASE_NOTES.md
           if [[ ! -s RELEASE_NOTES.md && -n "${RECOVERY_NOTES_SHA:-}" ]]; then
