@@ -1,0 +1,22 @@
+id: pm-context-empty-prepared-release
+title: Abandon prepared releases without usable notes and validate the exact new section
+description: "Daily Release run 43010114851 repeatedly resumes untagged 2f226a2 (2026.11.1), whose changelog has no matching section. Preserve explicit immutable recovery and valid prepared transactions, but allow current-day work after an empty prepared release."
+type: Issue
+status: in_progress
+priority: 2
+tags: []
+created_at: "2026-11-11T21:55:31.608Z"
+updated_at: "2026-11-11T21:57:17.803Z"
+author: codex-release-repair-1111
+comments[2]{created_at,author,text}:
+  "2026-11-11T21:55:44.005Z",codex-release-repair-1111,"Root cause confirmed in job 130487299785: oldest untagged Release commit 2f226a2 is selected every day and checked out before restoration; it lacks 2026.11.1. Its generation used --limit 1 plus a nonempty-file check, so an older heading passed. Later main notes roll forward with dependency commits after preparation and do not identify the immutable artifact. Skip untagged candidates without usable same-version content unless explicit recovery is requested; require exact substantive notes during generation and recovery. No tags changed and no dispatch performed."
+  "2026-11-11T21:57:16.940Z",codex-release-repair-1111,"Revert proof: independently removing only the selection guard or restoring only the old generation block in disposable copies makes its behavioral regression fail (1 failure each); fixed suite passes. Added placeholder/header-only restoration refusals. Focused workflow readers, YAML verifier and source/test typechecks are the scoped gates; no npm lint script is configured, so verify:release-workflow is the workflow lint gate. CI certifies the full gate. No recovery dispatch is needed for this abandonment path."
+files[3]{path,scope}:
+  .github/workflows/release.yml,project
+  test/release-empty-preparation.test.ts,project
+  test/release-workflow.test.ts,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/release-empty-preparation.test.ts test/release-workflow.test.ts test/release-workflow-sync.test.ts test/release-workflow-verifier.test.ts test/release-merge-wait.test.ts test/alert-on-release-failure.test.ts test/verify-release-changelog-date.test.ts test/verify-release-publish-attestation.test.ts,project,codex-release-repair-1111,"2026-11-11T21:56:33.965Z",local_mutation,fix/release-stuck-prepared-2026-11-1
+docs[1]{path,scope}:
+  .github/workflows/release.yml,project
+body: ""

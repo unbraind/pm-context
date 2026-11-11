@@ -13,7 +13,7 @@ const workflow = readFileSync(
 );
 
 /** Execute the real Decide release script against a disposable Git history. */
-function decideRelease(commits: Array<{ version: string; title: string; body?: string; tag?: string; manifestVersion?: string }>): Record<string, string> {
+function decideRelease(commits: Array<{ version: string; title: string; body?: string; tag?: string; manifestVersion?: string; changelog?: string }>): Record<string, string> {
   const root = mkdtempSync(resolve(tmpdir(), "pm-context-release-resume-"));
   try {
     execFileSync("git", ["init", "-q", "-b", "main"], { cwd: root });
@@ -25,6 +25,7 @@ function decideRelease(commits: Array<{ version: string; title: string; body?: s
       writeFileSync(resolve(root, "manifest.json"), JSON.stringify({ version: commit.manifestVersion ?? commit.version }));
       writeFileSync(resolve(root, "package-lock.json"), JSON.stringify({ version: commit.version }));
       writeFileSync(resolve(root, "change.txt"), commit.title);
+      writeFileSync(resolve(root, "CHANGELOG.md"), commit.changelog ?? `# Changelog\n\n## ${commit.version} - 2026-09-27\n\n- Delivered fixture change\n`);
       execFileSync("git", ["add", "."], { cwd: root });
       execFileSync("git", ["commit", "-qm", commit.title, ...(commit.body ? ["-m", commit.body] : [])], { cwd: root });
       if (commit.tag) execFileSync("git", ["tag", commit.tag], { cwd: root });
@@ -37,7 +38,7 @@ function decideRelease(commits: Array<{ version: string; title: string; body?: s
     const run = spawnSync("bash", ["-e", "-c", script], {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: resolve(root, "summary"), RELEASE_TIMEZONE: "Europe/Vienna" },
+      env: { ...process.env, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: resolve(root, "summary"), RELEASE_TIMEZONE: "Europe/Vienna", RECOVERY_NOTES_SHA: "" },
     });
     if (run.error) throw run.error;
     if (run.status !== 0) throw new Error(`${run.stdout}\n${run.stderr}`);

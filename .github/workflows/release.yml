@@ -79,6 +79,8 @@ jobs:
 
       - name: Decide release
         id: decide
+        env:
+          RECOVERY_NOTES_SHA: ${{ inputs.recovery_notes_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -124,6 +126,16 @@ jobs:
             if [[ "$package_version" != "$candidate_version" || "$manifest_version" != "$candidate_version" || "$lock_version" != "$candidate_version" ]]; then
               echo "::error::Prepared release ${candidate_sha} (${candidate_tag}) has inconsistent package, manifest or lock versions; refusing to mint a newer release."
               exit 1
+            fi
+            # Empty prepared metadata must not monopolize every later daily run.
+            # An explicit recovery request still follows the immutable recovery checks below.
+            if [[ -z "${RECOVERY_NOTES_SHA:-}" ]] && ! git show "${candidate_sha}:CHANGELOG.md" | awk -v version="$candidate_version" '
+              /^## / { active = index($0, "## " version " - ") == 1; next }
+              active && $0 !~ /^[[:space:]]*($|#)/ && $0 !~ /^No changes\.[[:space:]]*$/ { content = 1 }
+              END { exit !content }
+            '; then
+              echo "::notice::Abandoning untagged prepared release ${candidate_tag} (${candidate_sha}): no usable same-version changelog section; continuing current release selection."
+              continue
             fi
             {
               echo "should_release=true"
@@ -327,6 +339,7 @@ jobs:
           # to avoid template-injection surface (zizmor); it is the pending tag
           # the final "Push release tag and main" step will create.
           RELEASE_TAG: ${{ steps.decide.outputs.tag }}
+          NPM_VERSION: ${{ steps.decide.outputs.npm_version }}
         run: |
           set -euo pipefail
           # Common pm-changelog options shared by the generate, check and notes
@@ -357,19 +370,16 @@ jobs:
           )
           ./node_modules/.bin/pm-changelog "${common[@]}" --mode replace --output CHANGELOG.md --github-step-summary
           ./node_modules/.bin/pm-changelog "${common[@]}" --mode replace --output CHANGELOG.md --check
-          # RELEASE_NOTES.md is the single section just generated for this tag,
-          # emitted to stdout with --limit 1 and trimmed of anything before the
-          # first '## ' heading.
+          # Extract the exact pending version, never an older section returned by --limit 1.
+          # A heading alone or the include-empty placeholder is not usable release evidence.
           ./node_modules/.bin/pm-changelog "${common[@]}" --stdout --limit 1 \
-            | sed -n '/^## /,$p' > RELEASE_NOTES.md
-          # Guard against an empty notes file: `sed -n '/^## /,$p'` exits 0 even
-          # when it matches nothing, so without this the job would reach "Create
-          # GitHub release" with an empty --notes-file and publish a release with
-          # no notes.
-          if [[ ! -s RELEASE_NOTES.md ]]; then
-            echo "::error::RELEASE_NOTES.md is empty for $RELEASE_TAG; no '## ' heading was extracted from the generated changelog."
-            exit 1
-          fi
+            | awk -v version="$NPM_VERSION" '
+                /^## / { active = index($0, "## " version " - ") == 1 }
+                active { print }
+                active && $0 !~ /^[[:space:]]*($|#)/ && $0 !~ /^No changes\.[[:space:]]*$/ && $0 !~ /^## / { content = 1 }
+                END { if (!content) exit 1 }
+              ' > RELEASE_NOTES.md
+          [[ -s RELEASE_NOTES.md ]]
 
       - name: Run release checks
         if: steps.decide.outputs.should_release == 'true' && steps.decide.outputs.resume != 'true'
@@ -729,8 +739,10 @@ jobs:
           set -euo pipefail
           extract_notes() {
             awk -v version="$NPM_VERSION" '
-              /^## / { if (found) exit; if (index($0, "## " version " - ") == 1) found = 1 }
-              found { print }
+              /^## / { active = index($0, "## " version " - ") == 1 }
+              active { notes = notes $0 ORS }
+              active && $0 !~ /^[[:space:]]*($|#)/ && $0 !~ /^No changes\.[[:space:]]*$/ && $0 !~ /^## / { content = 1 }
+              END { if (content) printf "%s", notes }
             ' "$1"
           }
           extract_notes CHANGELOG.md > RELEASE_NOTES.md
