@@ -4,6 +4,7 @@
 
 ### Dependencies
 
+- Bump the pm-toolchain group with 2 updates
 - Bump the pm-toolchain group with 3 updates ([#219](https://github.com/unbraind/pm-context/pull/219))
 - Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#217](https://github.com/unbraind/pm-context/pull/217))
 - Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#216](https://github.com/unbraind/pm-context/pull/216))
@@ -39,8 +40,8 @@
 
 ### Other
 
-- Point the npm homepage at the package catalog and link the author ([pm-context-78wz](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-78wz.toon))
 - Stop Hound from linting generated dist/ output ([pm-context-hound-generated-dist](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-hound-generated-dist.toon))
+- Point the npm homepage at the package catalog and link the author ([pm-context-78wz](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-78wz.toon))
 
 ## 2026.10.26 - 2026-10-26
 
@@ -225,9 +226,9 @@ No changes.
 
 ### Fixed
 
-- Refuse the unattested publish fallback after provenance failure ([pm-context-fuhi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-fuhi.toon))
 - Preserve append-only provenance history during review repair ([pm-context-9xfx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-9xfx.toon))
 - Make the affinity tiebreak test use one shared instant ([pm-context-hxj5](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-hxj5.toon))
+- Refuse the unattested publish fallback after provenance failure ([pm-context-fuhi](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-fuhi.toon))
 
 ## 2026.8.28 - 2026-08-28
 
@@ -474,8 +475,8 @@ No changes.
 
 ### Added
 
-- Build initial context pack command ([pm-context-0gyf](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-0gyf.toon))
 - Add agent handoff digest mode to context packs ([pm-context-opzn](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-opzn.toon))
+- Build initial context pack command ([pm-context-0gyf](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-0gyf.toon))
 
 ### Other
 
