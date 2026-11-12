@@ -63,8 +63,10 @@ jobs:
             notes = notes $0 ORS
             # List markers are structure, including nested and numbered list markers.
             while (sub(/^[[:space:]]*([-+*]|[0-9]+[.)])([[:space:]]+|$)/, "", text)) { }
+            # A heading is "#" runs followed by whitespace or the end; "#123 fixes the retry" is an issue reference in a note.
+            heading = text ~ /^[[:space:]]*#+([[:space:]]|$)/
             gsub(/[[:space:]]/, "", text)
-            if (text != "" && text !~ /^#/ && text != "Nochanges." && text !~ /^[-+*_]+$/) content = 1
+            if (text != "" && !heading && text != "Nochanges." && text !~ /^[-+*_]+$/) content = 1
           }
         }
         END { if (matches == 1 && content) printf "%s", notes; else exit 1 }

@@ -31,6 +31,11 @@ const listContentCases: readonly (readonly [string, boolean])[] = [
   ["* Delivered a real fix", true],
   ["Delivered a real fix in a non-list paragraph.", true],
   ["1.2 remains supported.", true],
+  ["#", false],
+  ["- ### Fixed", false],
+  ["   ### Fixed", false],
+  ["- #123 fixes the release retry", true],
+  ["#123 fixes the release retry", true],
 ];
 
 /** Use a fixed canonical section for the shared policy and each real workflow consumer. */
