@@ -11,9 +11,10 @@ const workflow = readFileSync(
   resolve(import.meta.dirname, "../.github/workflows/release.yml"),
   "utf-8"
 );
+const releaseEnvironment = (parse(workflow) as { jobs: { release: { env: Record<string, string> } } }).jobs.release.env;
 
 /** Execute the real Decide release script against a disposable Git history. */
-function decideRelease(commits: Array<{ version: string; title: string; body?: string; tag?: string; manifestVersion?: string }>): Record<string, string> {
+function decideRelease(commits: Array<{ version: string; title: string; body?: string; tag?: string; manifestVersion?: string; changelog?: string }>): Record<string, string> {
   const root = mkdtempSync(resolve(tmpdir(), "pm-context-release-resume-"));
   try {
     execFileSync("git", ["init", "-q", "-b", "main"], { cwd: root });
@@ -25,6 +26,7 @@ function decideRelease(commits: Array<{ version: string; title: string; body?: s
       writeFileSync(resolve(root, "manifest.json"), JSON.stringify({ version: commit.manifestVersion ?? commit.version }));
       writeFileSync(resolve(root, "package-lock.json"), JSON.stringify({ version: commit.version }));
       writeFileSync(resolve(root, "change.txt"), commit.title);
+      writeFileSync(resolve(root, "CHANGELOG.md"), commit.changelog ?? `# Changelog\n\n## ${commit.version} - 2026-09-27\n\n- Delivered fixture change\n`);
       execFileSync("git", ["add", "."], { cwd: root });
       execFileSync("git", ["commit", "-qm", commit.title, ...(commit.body ? ["-m", commit.body] : [])], { cwd: root });
       if (commit.tag) execFileSync("git", ["tag", commit.tag], { cwd: root });
@@ -37,7 +39,7 @@ function decideRelease(commits: Array<{ version: string; title: string; body?: s
     const run = spawnSync("bash", ["-e", "-c", script], {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: resolve(root, "summary"), RELEASE_TIMEZONE: "Europe/Vienna" },
+      env: { ...process.env, ...releaseEnvironment, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: resolve(root, "summary"), RELEASE_TIMEZONE: "Europe/Vienna", RECOVERY_NOTES_SHA: "" },
     });
     if (run.error) throw run.error;
     if (run.status !== 0) throw new Error(`${run.stdout}\n${run.stderr}`);
@@ -97,12 +99,12 @@ test("resume notes are extracted from the prepared version and absent notes fail
     const script = document.jobs.release.steps.find((step) => step.name === "Restore prepared release notes")?.run;
     assert.ok(script);
     writeFileSync(resolve(root, "CHANGELOG.md"), "# Changelog\n\n## 2026.9.27 - 2026-09-27\nRecovered fix\n\n## 2026.9.26 - 2026-09-26\nOld fix\n");
-    execFileSync("bash", ["-e", "-c", script], { cwd: root, env: { ...process.env, NPM_VERSION: "2026.9.27" } });
+    execFileSync("bash", ["-e", "-c", script], { cwd: root, env: { ...process.env, ...releaseEnvironment, NPM_VERSION: "2026.9.27" } });
     assert.equal(readFileSync(resolve(root, "RELEASE_NOTES.md"), "utf8"), "## 2026.9.27 - 2026-09-27\nRecovered fix\n\n");
     const missing = spawnSync("bash", ["-e", "-c", script], {
       cwd: root,
       encoding: "utf8",
-      env: { ...process.env, NPM_VERSION: "2026.9.25" },
+      env: { ...process.env, ...releaseEnvironment, NPM_VERSION: "2026.9.25" },
     });
     assert.equal(missing.status, 1);
     assert.match(missing.stdout, /has no changelog section/);
@@ -153,7 +155,7 @@ test("resume notes recover only from an explicitly authorized, immutable recover
     const outsideMain = commit("# Changelog\n\n## 2026.9.27 - 2026-09-27\nNot on main\n\n" + older, "unmerged notes");
     git("checkout", "-q", "--detach", prepared);
     const run = (recoverySha: string, version = "2026.9.27") => spawnSync("bash", ["-e", "-c", script], {
-      cwd: root, encoding: "utf8", env: { ...process.env, NPM_VERSION: version, PREPARED_SHA: prepared, RECOVERY_NOTES_SHA: recoverySha },
+      cwd: root, encoding: "utf8", env: { ...process.env, ...releaseEnvironment, NPM_VERSION: version, PREPARED_SHA: prepared, RECOVERY_NOTES_SHA: recoverySha },
     });
     const notes = () => readFileSync(resolve(root, "RELEASE_NOTES.md"), "utf8");
 
@@ -504,6 +506,56 @@ test("the empty credential that setup-node generates is removed before publishin
     publish.indexOf("_authToken") < publish.indexOf("npm publish"),
     "the generated credential must be removed before npm publish runs"
   );
+});
+
+/** The major version of the npm on PATH, which decides whether it enforces the prerelease tag rule. */
+const npmMajor = Number(execFileSync("npm", ["--version"], { encoding: "utf-8" }).split(".")[0]);
+
+/**
+ * Run the workflow's own `publish_with_provenance` function for a package at
+ * `version`, with the real npm in dry-run mode and an empty user config, so no
+ * registry write or credential is involved. `edit` lets a twin case change the
+ * function source before it runs.
+ */
+function dryRunPublish(version: string, edit: (source: string) => string = (source) => source) {
+  const definition = /^ *publish_with_provenance\(\) \{\n[\s\S]*?\n *\}$/m.exec(executable(stepSource("Publish npm package")))?.[0];
+  assert.ok(definition, "the publish step must define publish_with_provenance");
+  const root = mkdtempSync(resolve(tmpdir(), "pm-context-publish-tag-"));
+  try {
+    writeFileSync(resolve(root, "package.json"), JSON.stringify({ name: "pm-context-publish-tag-fixture", version }));
+    writeFileSync(resolve(root, "empty-npmrc"), "");
+    return spawnSync("bash", ["-c", `${edit(definition)}\npublish_with_provenance`], {
+      cwd: root,
+      encoding: "utf-8",
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: root,
+        NPM_CONFIG_USERCONFIG: resolve(root, "empty-npmrc"),
+        NPM_CONFIG_CACHE: resolve(root, "cache"),
+        NPM_CONFIG_DRY_RUN: "true"
+      }
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("a same-day suffix release publishes as latest instead of being refused as an untagged prerelease", () => {
+  const suffix = dryRunPublish("2026.11.11-1");
+  assert.equal(suffix.status, 0, suffix.stderr);
+  assert.match(`${suffix.stdout}${suffix.stderr}`, /pm-context-publish-tag-fixture@2026\.11\.11-1/);
+  assert.match(suffix.stderr, /with tag latest/);
+  // Must allow: an ordinary calendar release keeps publishing as latest.
+  const stable = dryRunPublish("2026.11.11");
+  assert.equal(stable.status, 0, stable.stderr);
+  assert.match(stable.stderr, /with tag latest/);
+});
+
+test("the dry-run harness detects an untagged prerelease publish", { skip: npmMajor < 11 && "npm before 11 has no prerelease tag rule" }, () => {
+  // Proves the case above can fail: the same function without its tag is refused by npm 11.
+  const untagged = dryRunPublish("2026.11.11-1", (source) => source.replace(/ --tag latest/, ""));
+  assert.notEqual(untagged.status, 0);
+  assert.match(untagged.stderr, /You must specify a tag using --tag when publishing a prerelease version/);
 });
 
 test("publication is proven possible before anything is mutated", () => {
