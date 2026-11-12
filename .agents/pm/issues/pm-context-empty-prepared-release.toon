@@ -2,12 +2,17 @@ id: pm-context-empty-prepared-release
 title: Abandon prepared releases without usable notes and validate the exact new section
 description: "Daily Release run 43010114851 repeatedly resumes untagged 2f226a2 (2026.11.1), whose changelog has no matching section. Preserve explicit immutable recovery and valid prepared transactions, but allow current-day work after an empty prepared release."
 type: Issue
-status: in_progress
+status: closed
 priority: 2
 tags: []
 created_at: "2026-11-11T21:55:31.608Z"
-updated_at: "2026-11-12T14:26:34.862Z"
+updated_at: "2026-11-12T16:33:37.556Z"
+closed_at: "2026-11-12T16:33:37.540Z"
+completed_at: "2026-11-12T16:33:37.540Z"
 author: codex-release-repair-1111
+resolution: Implemented and merged in #224 (6b15479).
+expected_result: The change described by this item is on main.
+actual_result: "Merged in #224 as 6b15479; checks successful at head a9a0eaa: CodeQL, codeql, semgrep-cloud-platform/scan, test (22), test (26)."
 comments[14]{created_at,author,text}:
   "2026-11-11T21:55:44.005Z",codex-release-repair-1111,"Root cause confirmed in job 130487299785: oldest untagged Release commit 2f226a2 is selected every day and checked out before restoration; it lacks 2026.11.1. Its generation used --limit 1 plus a nonempty-file check, so an older heading passed. Later main notes roll forward with dependency commits after preparation and do not identify the immutable artifact. Skip untagged candidates without usable same-version content unless explicit recovery is requested; require exact substantive notes during generation and recovery. No tags changed and no dispatch performed."
   "2026-11-11T21:57:16.940Z",codex-release-repair-1111,"Revert proof: independently removing only the selection guard or restoring only the old generation block in disposable copies makes its behavioral regression fail (1 failure each); fixed suite passes. Added placeholder/header-only restoration refusals. Focused workflow readers, YAML verifier and source/test typechecks are the scoped gates; no npm lint script is configured, so verify:release-workflow is the workflow lint gate. CI certifies the full gate. No recovery dispatch is needed for this abandonment path."
@@ -32,4 +37,5 @@ tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test --test-concurrency=2 test/identity-audit.test.ts,project,codex-agent,"2026-11-12T08:07:05.783Z",local_mutation,fix/release-stuck-prepared-2026-11-1
 docs[1]{path,scope}:
   .github/workflows/release.yml,project
+close_reason: "Delivered by #224 \"fix(release): skip empty prepared releases and require exact notes\" (merged as 6b15479). Checks successful at the PR head a9a0eaa: CodeQL, codeql, semgrep-cloud-platform/scan, test (22), test (26)."
 body: ""
