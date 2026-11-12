@@ -12,6 +12,39 @@ const workflow = parse(readFileSync(".github/workflows/release.yml", "utf8")) as
 const steps = workflow.jobs.release.steps;
 const releaseEnvironment = workflow.jobs.release.env;
 
+/** Empty formatting and placeholders must refuse; visible change text must remain publishable. */
+const listContentCases: readonly (readonly [string, boolean])[] = [
+  ["", false],
+  ["### Fixed", false],
+  ["- ", false],
+  ["* ", false],
+  ["+ ", false],
+  ["1. ", false],
+  ["- No changes.", false],
+  ["* No changes.", false],
+  ["+ No changes.", false],
+  ["1) No changes.", false],
+  ["- - No changes.", false],
+  ["- <!-- hidden change -->", false],
+  ["- --", false],
+  ["- Delivered a real fix", true],
+  ["* Delivered a real fix", true],
+  ["Delivered a real fix in a non-list paragraph.", true],
+  ["1.2 remains supported.", true],
+];
+
+/** Use a fixed canonical section for the shared policy and each real workflow consumer. */
+function releaseSection(content: string): string { return `## 2026.11.1 - 2026-11-01\n${content}\n\n`; }
+
+test("shared notes policy requires real text after Markdown list markers", () => {
+  for (const [content, usable] of listContentCases) {
+    const section = releaseSection(content);
+    const result = spawnSync("awk", ["-v", "version=2026.11.1", releaseEnvironment.RELEASE_NOTES_AWK], { encoding: "utf8", input: section, shell: false });
+    assert.equal(result.status === 0, usable, JSON.stringify(content));
+    assert.equal(result.stdout, usable ? section : "", JSON.stringify(content));
+  }
+});
+
 /** Execute unmodified workflow source from a script file; paths and values remain separate arguments. */
 function runWorkflowStep(root: string, name: string, variables: NodeJS.ProcessEnv = {}): SpawnSyncReturns<string> {
   const script = steps.find(step => step.name === name)?.run;
@@ -59,7 +92,7 @@ function selectAfterEmpty(notes: string, recovery = "", published: boolean | "un
 }
 
 test("an empty untagged preparation does not block the current daily release", () => {
-  for (const notes of ["# Changelog\n\n## 2026.10.31 - 2026-10-31\nOld change\n", "## 2026.11.1 - 2026-11-01\n\nNo changes.\n", "## 2026.11.1 - 2026-11-01\n\n### Fixed\n"]) {
+  for (const notes of ["# Changelog\n\n## 2026.10.31 - 2026-10-31\nOld change\n", "## 2026.11.1 - 2026-11-01\n\nNo changes.\n", ...listContentCases.filter(([, usable]) => !usable).map(([content]) => releaseSection(content))]) {
     const { output, log } = selectAfterEmpty(notes);
     assert.equal(output.should_release, "true");
     assert.equal(output.resume, "false");
@@ -69,7 +102,7 @@ test("an empty untagged preparation does not block the current daily release", (
 });
 
 test("explicit recovery and valid prepared notes retain immutable resume selection", () => {
-  for (const [notes, recovery] of [["# Changelog\nOld notes\n", "a".repeat(40)], ["## 2026.11.1 - 2026-11-01\n\n- Delivered change\n", ""]]) {
+  for (const [notes, recovery] of [["# Changelog\nOld notes\n", "a".repeat(40)], ...listContentCases.filter(([, usable]) => usable).map(([content]) => [releaseSection(content), ""])]) {
     const { output } = selectAfterEmpty(notes, recovery);
     assert.equal(output.resume, "true");
     assert.equal(output.npm_version, "2026.11.1");
@@ -88,7 +121,7 @@ test("generation rejects an older section, placeholder and heading-only notes be
       ["## 2026.11.1 - 2026-11-01\n### Fixed\n", false],
       ["## 2026.11.1 - 2026-11-01\n<!-- hidden\ncomment -->\n---\n", false],
       ["## 2026.11.1 - 2026-11-01\n- One fix\n## 2026.11.1 - 2026-11-01\n- Duplicate\n", false],
-      ["## 2026.11.1 - 2026-11-01\n- Delivered fix\n", true],
+      ...listContentCases.map(([content, usable]) => [releaseSection(content), usable] as const),
     ] as const) {
       writeFileSync(join(root, "fixture.md"), notes);
       const result = runWorkflowStep(root, "Generate changelog and release notes", { RELEASE_TAG: "v2026.11.01", NPM_VERSION: "2026.11.1" });
@@ -99,14 +132,15 @@ test("generation rejects an older section, placeholder and heading-only notes be
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("restoration refuses same-version placeholders and headings without content", () => {
+test("restoration refuses empty list content and retains real bullets and paragraphs", () => {
   const root = mkdtempSync(join(tmpdir(), "context-empty-restore-"));
   try {
-    for (const content of ["No changes.\n", "### Fixed\n"]) {
-      writeFileSync(join(root, "CHANGELOG.md"), `## 2026.11.1 - 2026-11-01\n${content}\n## 2026.10.31 - 2026-10-31\nOld fix\n`);
+    for (const [content, usable] of [["No changes.", false], ...listContentCases] as const) {
+      const section = releaseSection(content);
+      writeFileSync(join(root, "CHANGELOG.md"), `${section}## 2026.10.31 - 2026-10-31\nOld fix\n`);
       const result = runWorkflowStep(root, "Restore prepared release notes", { NPM_VERSION: "2026.11.1", RECOVERY_NOTES_SHA: "" });
-      assert.equal(result.status, 1);
-      assert.equal(readFileSync(join(root, "RELEASE_NOTES.md"), "utf8"), "");
+      assert.equal(result.status === 0, usable, JSON.stringify(content));
+      assert.equal(readFileSync(join(root, "RELEASE_NOTES.md"), "utf8"), usable ? section : "", JSON.stringify(content));
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
