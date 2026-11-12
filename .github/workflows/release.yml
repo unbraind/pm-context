@@ -141,6 +141,30 @@ jobs:
             day="${day_and_suffix%%-*}"; suffix="${day_and_suffix#"$day"}"
             printf '%s.%s.%s%s\n' "$((10#$year))" "$((10#$month))" "$((10#$day))" "$suffix"
           }
+          mapfile -t preparation_commits < <(git log --topo-order --format='%H%x09%s' "$range" | awk -F '\t' '$2 ~ /^Release pm-context v/ { print $1 }')
+          recovery_version=""
+          if [[ -n "${RECOVERY_NOTES_SHA:-}" ]]; then
+            # Repair the oldest covered coordinate still needing notes before it can
+            # fall outside the tag range. Choose its newest preparation in the main pass.
+            recovery_fallback=""
+            for recovery_candidate in "${preparation_commits[@]}"; do
+              recovery_tag="$(git show -s --format=%s "$recovery_candidate")"
+              recovery_tag="${recovery_tag#Release pm-context }"
+              if ! grep -Eq '^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(-[0-9]+)?$' <<< "$recovery_tag"; then continue; fi
+              recovery_coordinate="$(npm_version_for_tag "$recovery_tag")"
+              if git merge-base --is-ancestor "$recovery_candidate" "$RECOVERY_NOTES_SHA" && git show "${RECOVERY_NOTES_SHA}:CHANGELOG.md" | awk -v version="$recovery_coordinate" "$RELEASE_NOTES_AWK" >/dev/null; then
+                [[ -n "$recovery_fallback" ]] || recovery_fallback="$recovery_coordinate"
+                if ! git show "${recovery_candidate}:CHANGELOG.md" | awk -v version="$recovery_coordinate" "$RELEASE_NOTES_AWK" >/dev/null; then
+                  recovery_version="$recovery_coordinate"
+                fi
+              fi
+            done
+            recovery_version="${recovery_version:-$recovery_fallback}"
+            if [[ -z "$recovery_version" ]]; then
+              echo "::error::No pending prepared release matches the authorized recovery notes."
+              exit 1
+            fi
+          fi
           preparation_tags=()
           while IFS= read -r candidate_sha; do
             [[ -z "$candidate_sha" ]] && continue
@@ -160,6 +184,7 @@ jobs:
               continue
             fi
             candidate_version="$(npm_version_for_tag "$candidate_tag")"
+            if [[ -n "$recovery_version" && "$candidate_version" != "$recovery_version" ]]; then continue; fi
             package_version="$(git show "${candidate_sha}:package.json" | jq -r .version)"
             manifest_version="$(git show "${candidate_sha}:manifest.json" | jq -r .version)"
             lock_version="$(git show "${candidate_sha}:package-lock.json" | jq -r .version)"
@@ -196,7 +221,7 @@ jobs:
             } >> "$GITHUB_OUTPUT"
             echo "Resuming untagged ${candidate_tag} from ${candidate_sha}." >> "$GITHUB_STEP_SUMMARY"
             exit 0
-          done < <(git log --topo-order --format='%H%x09%s' "$range" | awk -F '\t' '$2 ~ /^Release pm-context v/ { print $1 }')
+          done < <(printf '%s\n' "${preparation_commits[@]}")
           if [[ -n "${RECOVERY_NOTES_SHA:-}" ]]; then
             echo "::error::No pending prepared release matches the authorized recovery notes."
             exit 1

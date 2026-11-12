@@ -164,15 +164,21 @@ function releaseHistory(t: Pick<TestContext, 'after'>) {
   writeFileSync(join(root, "bin/date"), '#!/bin/sh\nprintf "%s\\n" "$FIXTURE_RELEASE_DATE"\n', { mode: 0o755 });
   writeFileSync(join(root, "bin/npm"), '#!/bin/sh\nif [ "$2" = "pm-context@$FIXTURE_PUBLISHED_VERSION" ]; then printf \'"%s"\\n\' "$FIXTURE_PUBLISHED_VERSION"; else echo \'{"error":{"code":"E404"}}\'; exit 1; fi\n', { mode: 0o755 });
   /** Run selection against unchanged metadata, with all fixture values confined to environment entries. */
-  const select = (published = "", date = "2026.11.11"): Record<string, string> => {
+  const select = (published = "", date = "2026.11.11", recovery = ""): Record<string, string> => {
     writeFileSync(join(root, "output"), "");
     const result = runWorkflowStep(root, "Decide release", { PATH: join(root, "bin") + ":" + process.env.PATH,
-      GITHUB_OUTPUT: join(root, "output"), GITHUB_STEP_SUMMARY: join(root, "summary"), RECOVERY_NOTES_SHA: "",
+      GITHUB_OUTPUT: join(root, "output"), GITHUB_STEP_SUMMARY: join(root, "summary"), RECOVERY_NOTES_SHA: recovery,
       FIXTURE_RELEASE_DATE: date, FIXTURE_PUBLISHED_VERSION: published });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     return Object.fromEntries(readFileSync(join(root, "output"), "utf8").trim().split("\n").map(line => line.split("=")));
   };
-  return { git, prepare, select };
+  /** Commit an immutable full changelog repair, including any newer sections already present. */
+  const repair = (versions: readonly string[]): string => {
+    writeFileSync(join(root, "CHANGELOG.md"), versions.map(version => `## ${version} - 2026-11-11\n- Recovered fixture change\n`).join("\n"));
+    git("add", "CHANGELOG.md"); git("commit", "-qm", "Repair prepared notes");
+    return git("rev-parse", "HEAD");
+  };
+  return { git, prepare, select, repair };
 }
 
 test("publish-before-tag retry burns the abandoned coordinate and resumes the new preparation", t => {
@@ -216,4 +222,24 @@ test("allocation reserves every preparation suffix and existing tag using normal
   const allocation = history.select("", "2026.11.01");
   assert.equal(allocation.resume, "false");
   assert.equal(allocation.tag, "v2026.11.01-5");
+});
+
+test("explicit older recovery takes precedence over newer preparations", t => {
+  for (const newerHasNotes of [false, true]) {
+    const history = releaseHistory(t);
+    const older = history.prepare("v2026.11.11");
+    history.prepare("v2026.11.11-1", newerHasNotes);
+    const recovery = history.repair(["2026.11.11-1", "2026.11.11"]);
+    const selected = history.select("", "2026.11.11", recovery);
+    assert.equal(selected.release_sha, older);
+    assert.equal(selected.npm_version, "2026.11.11");
+  }
+});
+
+test("explicit recovery still chooses a newer usable duplicate of its target coordinate", t => {
+  const history = releaseHistory(t);
+  history.prepare("v2026.11.11");
+  const newer = history.prepare("v2026.11.11", true);
+  const recovery = history.repair(["2026.11.11"]);
+  assert.equal(history.select("", "2026.11.11", recovery).release_sha, newer);
 });
