@@ -508,6 +508,56 @@ test("the empty credential that setup-node generates is removed before publishin
   );
 });
 
+/** The major version of the npm on PATH, which decides whether it enforces the prerelease tag rule. */
+const npmMajor = Number(execFileSync("npm", ["--version"], { encoding: "utf-8" }).split(".")[0]);
+
+/**
+ * Run the workflow's own `publish_with_provenance` function for a package at
+ * `version`, with the real npm in dry-run mode and an empty user config, so no
+ * registry write or credential is involved. `edit` lets a twin case change the
+ * function source before it runs.
+ */
+function dryRunPublish(version: string, edit: (source: string) => string = (source) => source) {
+  const definition = /^ *publish_with_provenance\(\) \{\n[\s\S]*?\n *\}$/m.exec(executable(stepSource("Publish npm package")))?.[0];
+  assert.ok(definition, "the publish step must define publish_with_provenance");
+  const root = mkdtempSync(resolve(tmpdir(), "pm-context-publish-tag-"));
+  try {
+    writeFileSync(resolve(root, "package.json"), JSON.stringify({ name: "pm-context-publish-tag-fixture", version }));
+    writeFileSync(resolve(root, "empty-npmrc"), "");
+    return spawnSync("bash", ["-c", `${edit(definition)}\npublish_with_provenance`], {
+      cwd: root,
+      encoding: "utf-8",
+      env: {
+        PATH: process.env.PATH ?? "",
+        HOME: root,
+        NPM_CONFIG_USERCONFIG: resolve(root, "empty-npmrc"),
+        NPM_CONFIG_CACHE: resolve(root, "cache"),
+        NPM_CONFIG_DRY_RUN: "true"
+      }
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+test("a same-day suffix release publishes as latest instead of being refused as an untagged prerelease", () => {
+  const suffix = dryRunPublish("2026.11.11-1");
+  assert.equal(suffix.status, 0, suffix.stderr);
+  assert.match(`${suffix.stdout}${suffix.stderr}`, /pm-context-publish-tag-fixture@2026\.11\.11-1/);
+  assert.match(suffix.stderr, /with tag latest/);
+  // Must allow: an ordinary calendar release keeps publishing as latest.
+  const stable = dryRunPublish("2026.11.11");
+  assert.equal(stable.status, 0, stable.stderr);
+  assert.match(stable.stderr, /with tag latest/);
+});
+
+test("the dry-run harness detects an untagged prerelease publish", { skip: npmMajor < 11 && "npm before 11 has no prerelease tag rule" }, () => {
+  // Proves the case above can fail: the same function without its tag is refused by npm 11.
+  const untagged = dryRunPublish("2026.11.11-1", (source) => source.replace(/ --tag latest/, ""));
+  assert.notEqual(untagged.status, 0);
+  assert.match(untagged.stderr, /You must specify a tag using --tag when publishing a prerelease version/);
+});
+
 test("publication is proven possible before anything is mutated", () => {
   // The failure this guards against is not "publish broke" - it is "publish
   // broke and nothing said so". Because the bump and the release commit land

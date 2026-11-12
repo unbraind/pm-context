@@ -960,8 +960,12 @@ jobs:
             echo "::notice::${pkg_name}@${NPM_VERSION} already published and attested; skipping publish step."
             exit 0
           fi
+          # Same-day recovery releases get a numeric suffix (2026.11.11-1), which
+          # semver reads as a prerelease, and npm 11 refuses to publish a
+          # prerelease on the default tag. A suffix release is still the newest
+          # release, so it is published explicitly as latest, as every release is.
           publish_with_provenance() {
-            npm publish --access public --provenance --ignore-scripts
+            npm publish --access public --provenance --ignore-scripts --tag latest
           }
           attempt=0
           while (( attempt < max_attempts )); do
