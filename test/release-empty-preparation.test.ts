@@ -3,7 +3,7 @@ import { execFileSync, spawnSync, type SpawnSyncReturns } from "node:child_proce
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import { parse } from "yaml";
 
 const workflow = parse(readFileSync(".github/workflows/release.yml", "utf8")) as {
@@ -12,10 +12,20 @@ const workflow = parse(readFileSync(".github/workflows/release.yml", "utf8")) as
 const steps = workflow.jobs.release.steps;
 const releaseEnvironment = workflow.jobs.release.env;
 
+/** Execute unmodified workflow source from a script file; paths and values remain separate arguments. */
+function runWorkflowStep(root: string, name: string, variables: NodeJS.ProcessEnv = {}): SpawnSyncReturns<string> {
+  const script = steps.find(step => step.name === name)?.run;
+  assert.ok(script);
+  const file = join(root, "workflow-step.sh");
+  writeFileSync(file, script);
+  return spawnSync("bash", ["-e", file], { cwd: root, encoding: "utf8", shell: false,
+    env: { ...process.env, ...releaseEnvironment, ...variables } });
+}
+
 /** Exercise the real decision block with an immutable empty prepared commit and newer source work. */
 function selectAfterEmpty(notes: string, recovery = "", published: boolean | "unknown" = false, preparedVersions = ["2026.11.1"]): { output: Record<string, string>; log: string } {
   const root = mkdtempSync(join(tmpdir(), "context-empty-prepared-"));
-  const git = (...args: string[]): string => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: "pipe" });
+  const git = (...args: string[]): string => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: "pipe", shell: false });
   try {
     git("init", "-q", "-b", "main");
     git("config", "user.name", "Fixture");
@@ -38,12 +48,10 @@ function selectAfterEmpty(notes: string, recovery = "", published: boolean | "un
     }
     mkdirSync(join(root, "bin"));
     writeFileSync(join(root, "bin/npm"), published === "unknown" ? "#!/bin/sh\necho '{\"error\":{\"code\":\"E503\"}}'\nexit 1\n" : published ? "#!/bin/sh\necho '\"2026.11.1\"'\n" : "#!/bin/sh\necho '{\"error\":{\"code\":\"E404\"}}'\nexit 1\n", { mode: 0o755 });
-    const script = steps.find(step => step.name === "Decide release")?.run;
-    assert.ok(script);
-    const result: SpawnSyncReturns<string> = spawnSync("bash", ["-e", "-c", script], { cwd: root, encoding: "utf8", env: {
-      ...process.env, ...releaseEnvironment, PATH: join(root, "bin") + ":" + process.env.PATH, GITHUB_OUTPUT: join(root, "output"), GITHUB_STEP_SUMMARY: join(root, "summary"),
+    const result = runWorkflowStep(root, "Decide release", {
+      PATH: join(root, "bin") + ":" + process.env.PATH, GITHUB_OUTPUT: join(root, "output"), GITHUB_STEP_SUMMARY: join(root, "summary"),
       RELEASE_TIMEZONE: "Europe/Vienna", RECOVERY_NOTES_SHA: recovery,
-    } });
+    });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.equal(git("tag", "--list"), "v2026.10.31\n", "selection must never create, delete or retag a release");
     return { output: Object.fromEntries(readFileSync(join(root, "output"), "utf8").trim().split("\n").map(line => line.split("="))), log: result.stdout };
@@ -74,8 +82,6 @@ test("generation rejects an older section, placeholder and heading-only notes be
   try {
     mkdirSync(join(root, "node_modules/.bin"), { recursive: true });
     writeFileSync(join(root, "node_modules/.bin/pm-changelog"), '#!/bin/sh\ncase " $* " in *" --stdout "*) cat fixture.md ;; esac\n', { mode: 0o755 });
-    const script = steps.find(step => step.name === "Generate changelog and release notes")?.run;
-    assert.ok(script);
     for (const [notes, success] of [
       ["## 2026.10.31 - 2026-10-31\nOld change\n", false],
       ["## 2026.11.1 - 2026-11-01\r\nNo changes.\r\n", false],
@@ -85,9 +91,10 @@ test("generation rejects an older section, placeholder and heading-only notes be
       ["## 2026.11.1 - 2026-11-01\n- Delivered fix\n", true],
     ] as const) {
       writeFileSync(join(root, "fixture.md"), notes);
-      const result: SpawnSyncReturns<string> = spawnSync("bash", ["-e", "-c", script], { cwd: root, encoding: "utf8", env: { ...process.env, ...releaseEnvironment, RELEASE_TAG: "v2026.11.01", NPM_VERSION: "2026.11.1" } });
+      const result = runWorkflowStep(root, "Generate changelog and release notes", { RELEASE_TAG: "v2026.11.01", NPM_VERSION: "2026.11.1" });
       assert.equal(result.status === 0, success, result.stderr);
       if (success) assert.equal(readFileSync(join(root, "RELEASE_NOTES.md"), "utf8"), notes);
+      else assert.match(result.stdout, /::error::No usable release notes for v2026\.11\.01:.*section is missing, duplicated, or has no visible changes/);
     }
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -95,11 +102,9 @@ test("generation rejects an older section, placeholder and heading-only notes be
 test("restoration refuses same-version placeholders and headings without content", () => {
   const root = mkdtempSync(join(tmpdir(), "context-empty-restore-"));
   try {
-    const script = steps.find(step => step.name === "Restore prepared release notes")?.run;
-    assert.ok(script);
     for (const content of ["No changes.\n", "### Fixed\n"]) {
       writeFileSync(join(root, "CHANGELOG.md"), `## 2026.11.1 - 2026-11-01\n${content}\n## 2026.10.31 - 2026-10-31\nOld fix\n`);
-      const result: SpawnSyncReturns<string> = spawnSync("bash", ["-e", "-c", script], { cwd: root, encoding: "utf8", env: { ...process.env, ...releaseEnvironment, NPM_VERSION: "2026.11.1", RECOVERY_NOTES_SHA: "" } });
+      const result = runWorkflowStep(root, "Restore prepared release notes", { NPM_VERSION: "2026.11.1", RECOVERY_NOTES_SHA: "" });
       assert.equal(result.status, 1);
       assert.equal(readFileSync(join(root, "RELEASE_NOTES.md"), "utf8"), "");
     }
@@ -117,9 +122,9 @@ test("published preparations remain resumable and recovery can select a later em
 });
 
 test("the locked generator emits the exact unpadded section for a padded pending tag", () => {
-  const root = mkdtempSync(join(tmpdir(), "context-real-generation-"));
+  const root = mkdtempSync(join(tmpdir(), "context real generation ' $(no-command) -"));
   const repository = process.cwd();
-  const run = (bin: string, args: string[]): string => execFileSync(bin, args, { cwd: root, encoding: "utf8", stdio: "pipe", env: { ...process.env, PM_PATH: join(root, ".agents/pm"), GITHUB_STEP_SUMMARY: join(root, "summary"), ...releaseEnvironment, RELEASE_TAG: "v2026.11.01", NPM_VERSION: "2026.11.1" } });
+  const run = (bin: string, args: string[]): string => execFileSync(bin, args, { cwd: root, encoding: "utf8", stdio: "pipe", shell: false, env: { ...process.env, PM_PATH: join(root, ".agents/pm"), GITHUB_STEP_SUMMARY: join(root, "summary"), ...releaseEnvironment, RELEASE_TAG: "v2026.11.01", NPM_VERSION: "2026.11.1" } });
   try {
     symlinkSync(join(repository, "node_modules"), join(root, "node_modules"), "dir");
     run("git", ["init", "-q", "-b", "main"]);
@@ -129,11 +134,86 @@ test("the locked generator emits the exact unpadded section for a padded pending
     run(process.execPath, [join(repository, "node_modules/@unbrained/pm-cli/dist/cli.js"), "init", "synthetic", "--defaults", "--agent-guidance", "skip"]);
     run(process.execPath, [join(repository, "node_modules/@unbrained/pm-cli/dist/cli.js"), "create", "issue", "Delivered exact section", "--status", "closed", "--close-reason", "Delivered", "--release", "2026.11.1"]);
     writeFileSync(join(root, "package.json"), '{"version":"2026.11.1"}');
-    const script = steps.find(step => step.name === "Generate changelog and release notes")?.run;
-    assert.ok(script); run("bash", ["-e", "-c", script]);
+    const result = runWorkflowStep(root, "Generate changelog and release notes", { PM_PATH: join(root, ".agents/pm"), GITHUB_STEP_SUMMARY: join(root, "summary"), RELEASE_TAG: "v2026.11.01", NPM_VERSION: "2026.11.1" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
     const notes = readFileSync(join(root, "RELEASE_NOTES.md"), "utf8");
     assert.match(notes, /^## 2026\.11\.1 - 2026-11-01/m);
     assert.match(notes, /Delivered exact section/);
     assert.doesNotMatch(notes, /## 2026\.10\.31/);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+/** Build a real release history and deterministic registry/clock commands without shell interpolation. */
+function releaseHistory(t: Pick<TestContext, 'after'>) {
+  const root = mkdtempSync(join(tmpdir(), "context-release-coordinates-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args: string[]): string => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: "pipe", shell: false }).trim();
+  git("init", "-q", "-b", "main"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid");
+  git("remote", "add", "origin", root);
+  /** Append exactly the immutable metadata and notes that selection will inspect. */
+  const prepare = (tag: string, usable = false): string => {
+    const version = tag.slice(1).split("-")[0].split(".").map(part => String(Number(part))).join(".") + (tag.includes("-") ? tag.slice(tag.indexOf("-")) : "");
+    for (const file of ["package.json", "manifest.json", "package-lock.json"]) writeFileSync(join(root, file), JSON.stringify({ version }));
+    writeFileSync(join(root, "CHANGELOG.md"), usable ? `## ${version} - 2026-11-11\n- Delivered fixture fix\n` : "# Changelog\nOld notes\n");
+    git("add", "package.json", "manifest.json", "package-lock.json", "CHANGELOG.md");
+    git("commit", "--allow-empty", "-qm", `Release pm-context ${tag}`);
+    return git("rev-parse", "HEAD");
+  };
+  prepare("v2026.10.31", true); git("tag", "v2026.10.31");
+  mkdirSync(join(root, "bin"));
+  writeFileSync(join(root, "bin/date"), '#!/bin/sh\nprintf "%s\\n" "$FIXTURE_RELEASE_DATE"\n', { mode: 0o755 });
+  writeFileSync(join(root, "bin/npm"), '#!/bin/sh\nif [ "$2" = "pm-context@$FIXTURE_PUBLISHED_VERSION" ]; then printf \'"%s"\\n\' "$FIXTURE_PUBLISHED_VERSION"; else echo \'{"error":{"code":"E404"}}\'; exit 1; fi\n', { mode: 0o755 });
+  /** Run selection against unchanged metadata, with all fixture values confined to environment entries. */
+  const select = (published = "", date = "2026.11.11"): Record<string, string> => {
+    writeFileSync(join(root, "output"), "");
+    const result = runWorkflowStep(root, "Decide release", { PATH: join(root, "bin") + ":" + process.env.PATH,
+      GITHUB_OUTPUT: join(root, "output"), GITHUB_STEP_SUMMARY: join(root, "summary"), RECOVERY_NOTES_SHA: "",
+      FIXTURE_RELEASE_DATE: date, FIXTURE_PUBLISHED_VERSION: published });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    return Object.fromEntries(readFileSync(join(root, "output"), "utf8").trim().split("\n").map(line => line.split("=")));
+  };
+  return { git, prepare, select };
+}
+
+test("publish-before-tag retry burns the abandoned coordinate and resumes the new preparation", t => {
+  const history = releaseHistory(t);
+  const abandoned = history.prepare("v2026.11.11");
+  const allocation = history.select();
+  assert.equal(allocation.resume, "false");
+  assert.equal(allocation.npm_version, "2026.11.11-1");
+  const current = history.prepare(allocation.tag, true);
+  const retried = history.select(allocation.npm_version);
+  assert.equal(retried.resume, "true");
+  assert.equal(retried.release_sha, current);
+  assert.notEqual(retried.release_sha, abandoned);
+  assert.equal(history.git("tag", "--list"), "v2026.10.31");
+});
+
+test("a single empty unpublished preparation is abandoned and today proceeds with a fresh suffix", t => {
+  const history = releaseHistory(t);
+  history.prepare("v2026.11.11");
+  const allocation = history.select();
+  assert.equal(allocation.should_release, "true");
+  assert.equal(allocation.resume, "false");
+  assert.equal(allocation.tag, "v2026.11.11-1");
+});
+
+test("newest usable or published preparation wins over an older abandoned duplicate", t => {
+  const history = releaseHistory(t);
+  const abandoned = history.prepare("v2026.11.11");
+  const usable = history.prepare("v2026.11.11", true);
+  assert.equal(history.select("2026.11.11").release_sha, usable);
+  assert.notEqual(history.select("2026.11.11").release_sha, abandoned);
+  const published = history.prepare("v2026.11.11-1");
+  assert.equal(history.select("2026.11.11-1").release_sha, published);
+});
+
+test("allocation reserves every preparation suffix and existing tag using normalized dates", t => {
+  const history = releaseHistory(t);
+  history.git("tag", "v2026.11.01-2");
+  history.prepare("v2026.11.1");
+  history.prepare("v2026.11.1-4");
+  const allocation = history.select("", "2026.11.01");
+  assert.equal(allocation.resume, "false");
+  assert.equal(allocation.tag, "v2026.11.01-5");
 });

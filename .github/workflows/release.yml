@@ -123,8 +123,8 @@ jobs:
             exit 0
           fi
           # A protected release PR can merge before npm accepts the artifact.
-          # Find the oldest release commit after the last tag and complete that
-          # immutable transaction before choosing another calendar version.
+          # Resume the newest usable preparation after the last tag before choosing
+          # another calendar version. Every preparation burns its version coordinate.
           # The commit can be behind HEAD when source work landed meanwhile.
           range="${latest_tag:+${latest_tag}..}HEAD"
           if [[ -n "${RECOVERY_NOTES_SHA:-}" ]]; then
@@ -133,6 +133,15 @@ jobs:
               exit 1
             fi
           fi
+          # Normalize both preparation and tag coordinates through the same numeric identity.
+          npm_version_for_tag() {
+            local core="${1#v}" year tail month day_and_suffix day suffix
+            year="${core%%.*}"; tail="${core#*.}"
+            month="${tail%%.*}"; day_and_suffix="${tail#*.}"
+            day="${day_and_suffix%%-*}"; suffix="${day_and_suffix#"$day"}"
+            printf '%s.%s.%s%s\n' "$((10#$year))" "$((10#$month))" "$((10#$day))" "$suffix"
+          }
+          preparation_tags=()
           while IFS= read -r candidate_sha; do
             [[ -z "$candidate_sha" ]] && continue
             subject="$(git show -s --format=%s "$candidate_sha")"
@@ -141,6 +150,7 @@ jobs:
               echo "::error::Release commit ${candidate_sha} has an invalid version title: ${subject}"
               exit 1
             fi
+            preparation_tags+=("$candidate_tag")
             if git show-ref --verify --quiet "refs/tags/${candidate_tag}"; then
               tagged_sha="$(git rev-list -n 1 "$candidate_tag")"
               if [[ "$tagged_sha" != "$candidate_sha" ]]; then
@@ -149,14 +159,7 @@ jobs:
               fi
               continue
             fi
-            version_core="${candidate_tag#v}"
-            year="${version_core%%.*}"
-            version_tail="${version_core#*.}"
-            month="${version_tail%%.*}"
-            day_and_suffix="${version_tail#*.}"
-            day="${day_and_suffix%%-*}"
-            suffix="${day_and_suffix#"$day"}"
-            candidate_version="$((10#$year)).$((10#$month)).$((10#$day))${suffix}"
+            candidate_version="$(npm_version_for_tag "$candidate_tag")"
             package_version="$(git show "${candidate_sha}:package.json" | jq -r .version)"
             manifest_version="$(git show "${candidate_sha}:manifest.json" | jq -r .version)"
             lock_version="$(git show "${candidate_sha}:package-lock.json" | jq -r .version)"
@@ -193,39 +196,36 @@ jobs:
             } >> "$GITHUB_OUTPUT"
             echo "Resuming untagged ${candidate_tag} from ${candidate_sha}." >> "$GITHUB_STEP_SUMMARY"
             exit 0
-          done < <(git log --reverse --format='%H%x09%s' "$range" | awk -F '\t' '$2 ~ /^Release pm-context v/ { print $1 }')
+          done < <(git log --topo-order --format='%H%x09%s' "$range" | awk -F '\t' '$2 ~ /^Release pm-context v/ { print $1 }')
           if [[ -n "${RECOVERY_NOTES_SHA:-}" ]]; then
             echo "::error::No pending prepared release matches the authorized recovery notes."
             exit 1
           fi
           release_date="$(TZ="$RELEASE_TIMEZONE" date +%Y.%m.%d)"
           base_tag="v${release_date}"
+          version_base="$(npm_version_for_tag "$base_tag")"
           max_suffix=-1
           while IFS= read -r existing_tag; do
-            if [[ "$existing_tag" == "$base_tag" ]]; then
+            # Other tag families do not reserve calendar-release coordinates.
+            if ! grep -Eq '^v[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}(-[0-9]+)?$' <<< "$existing_tag"; then continue; fi
+            existing_version="$(npm_version_for_tag "$existing_tag")"
+            if [[ "$existing_version" == "$version_base" ]]; then
               (( max_suffix < 0 )) && max_suffix=0
               continue
             fi
-            if [[ "$existing_tag" == "$base_tag-"* ]]; then
-              suffix="${existing_tag#"$base_tag-"}"
+            if [[ "$existing_version" == "$version_base-"* ]]; then
+              suffix="${existing_version#"$version_base-"}"
               if [[ "$suffix" =~ ^[0-9]+$ ]] && (( suffix > max_suffix )); then
                 max_suffix="$suffix"
               fi
             fi
-          done < <(git tag -l "${base_tag}*")
+          done < <(git tag -l; printf '%s\n' "${preparation_tags[@]}")
           if (( max_suffix >= 0 )); then
             tag="${base_tag}-$((max_suffix + 1))"
           else
             tag="$base_tag"
           fi
-          version_core="${tag#v}"
-          year="${version_core%%.*}"
-          version_tail="${version_core#*.}"
-          month="${version_tail%%.*}"
-          day_and_suffix="${version_tail#*.}"
-          day="${day_and_suffix%%-*}"
-          suffix="${day_and_suffix#"$day"}"
-          npm_version="$((10#$year)).$((10#$month)).$((10#$day))${suffix}"
+          npm_version="$(npm_version_for_tag "$tag")"
           echo "should_release=true" >> "$GITHUB_OUTPUT"
           echo "resume=false" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -422,9 +422,13 @@ jobs:
           ./node_modules/.bin/pm-changelog "${common[@]}" --mode replace --output CHANGELOG.md --check
           # Extract the exact pending version, never an older section returned by --limit 1.
           # A heading alone or the include-empty placeholder is not usable release evidence.
+          notes_status=0
           ./node_modules/.bin/pm-changelog "${common[@]}" --stdout --limit 1 \
-            | awk -v version="$NPM_VERSION" "$RELEASE_NOTES_AWK" > RELEASE_NOTES.md
-          [[ -s RELEASE_NOTES.md ]]
+            | awk -v version="$NPM_VERSION" "$RELEASE_NOTES_AWK" > RELEASE_NOTES.md || notes_status=$?
+          if (( notes_status != 0 )) || [[ ! -s RELEASE_NOTES.md ]]; then
+            echo "::error::No usable release notes for ${RELEASE_TAG}: generation failed or the requested ${NPM_VERSION} section is missing, duplicated, or has no visible changes."
+            exit 1
+          fi
 
       - name: Run release checks
         if: steps.decide.outputs.should_release == 'true' && steps.decide.outputs.resume != 'true'
