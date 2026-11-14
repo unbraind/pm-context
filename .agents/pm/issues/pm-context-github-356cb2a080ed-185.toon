@@ -1,0 +1,25 @@
+id: pm-context-github-356cb2a080ed-185
+title: Daily Release workflow is failing
+description: "GH issue #185: https://github.com/unbraind/pm-context/issues/185 · author @github-actions[bot] · state reason completed · created 2026-10-26T10:49:55Z · updated 2026-10-26T14:42:39Z"
+type: Issue
+status: closed
+priority: 2
+tags[3]: "gh:unbraind/pm-context#185","github_author:github-actions[bot]",release-failure
+created_at: "2026-10-26T10:49:55Z"
+updated_at: "2026-11-14T07:39:30.883Z"
+closed_at: "2026-10-26T14:42:39Z"
+completed_at: "2026-10-26T14:42:39Z"
+author: pm-github
+release: v2026.10.28
+close_reason: "Closed on GitHub as completed on 2026-10-26T14:42:39Z"
+github_close_reason: "Closed on GitHub as completed on 2026-10-26T14:42:39Z"
+github_closed_at: "2026-10-26T14:42:39Z"
+github_created_at: "2026-10-26T10:49:55Z"
+github_link_only: false
+github_number: 185
+github_release: v2026.10.28
+github_state: closed
+github_state_reason: completed
+github_updated_at: "2026-10-26T14:42:39Z"
+github_url: "https://github.com/unbraind/pm-context/issues/185"
+body: "The `release` job of the Daily Release workflow failed.\n\n- Failing job: `release`\n- Run URL: https://github.com/unbraind/pm-context/actions/runs/40297300114\n- Commit: 41fa36e1eae25b7ce692de6b9d198c0b05730acd\n- Date (UTC): 2026-10-26T10:49:52Z\n\n\n---\n\n### GitHub comments (1)\n\n> **@unbraind** (2026-10-26T14:42:38Z)\n>\n> Recovered: pm-context@2026.10.26 is published on npm (`npm view pm-context version` → 2026.10.26); successful release run: https://github.com/unbraind/pm-context/actions/runs/40315950699. The earlier failure was the release PR's required checks still queued after the job's 30-minute merge wait (runner pool saturated); the host release-rerun sweep re-ran it."
