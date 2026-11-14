@@ -1420,11 +1420,11 @@ function setupCommands(api: ExtensionApi): void {
         const value = ctx.options[option];
         if (value !== undefined) overrides[key] = value;
       }
-      // GH-1665 delivers declared string flags under their canonical SDK keys.
-      const fields = ctx.options.includeFields as string | undefined;
-      if (fields !== undefined) overrides.include_fields = fields.split(",");
-      const budget = ctx.options.byteBudget as string | undefined;
-      if (budget !== undefined) overrides.byte_budget = budget.trim() ? Number(budget) : budget;
+      // GH-1665 canonicalizes string flags but preserves explicit null for shared validation.
+      const fields = ctx.options.includeFields;
+      if (fields !== undefined) overrides.include_fields = typeof fields === "string" ? fields.split(",") : fields;
+      const budget = ctx.options.byteBudget;
+      if (budget !== undefined) overrides.byte_budget = typeof budget === "string" && budget.trim() ? Number(budget) : budget;
       if (ctx.global.json && overrides.format === undefined) overrides.format = "json";
       return renderedCommandResult(encodePhaseContext(await buildPhaseContext({ ...input, ...overrides } as unknown as PhaseContextRequest, ctx.pm_root)));
     },

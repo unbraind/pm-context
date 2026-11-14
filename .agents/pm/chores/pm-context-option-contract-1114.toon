@@ -6,9 +6,9 @@ status: in_progress
 priority: 2
 tags[3]: dependencies,"gh:unbraind/pm-context#227","gh:unbraind/pm-context#228"
 created_at: "2026-11-14T10:46:54.905Z"
-updated_at: "2026-11-14T14:56:02.576Z"
+updated_at: "2026-11-14T16:55:08.595Z"
 author: codex-toolchain-1114a
-comments[7]{created_at,author,text}:
+comments[13]{created_at,author,text}:
   "2026-11-14T10:47:28.353Z",codex-toolchain-1114a,"Failure -> cause -> fix: supplied unusable CLI guards test treats check:false/0 as invalid types -> GH-1665 (pm-cli CHANGELOG 2026.11.8) now coerces them into the valid CLI filename strings false/0 -> replace the unusable-check cases with tab and nonbreaking-space strings and retain explicit empty/blank/null refusals before packet access. Keep format:false/0 as unsupported-format refusals. Additionally create valid plans under both normalized filenames, prove each check succeeds, then tamper with its cost and require INVALID_PLAN exit 2. Both source and compiled harnesses run the corpus; the complete tracker fingerprint must remain unchanged. No production source or threshold change."
   "2026-11-14T10:49:48.864Z",codex-toolchain-1114a,"Verification: the changed guard corpus passes with both source and compiled modules, including valid normalized filenames, tampered-plan refusals and unchanged tracker fingerprint. npm/Bun typecheck, build:test and docstring gate (63 declarations) pass. The linked full next-evidence file remains running through its existing 500-operation SDK-read corpus; release gates are queued serially with unchanged thresholds. The original current-pin guard case fails before adaptation, providing migration revert proof. No production source changed and no standalone lint script is declared."
   "2026-11-14T10:50:43.957Z",codex-toolchain-1114a,"The linked next-evidence file completed: 13 tests passed, zero failures, cancellations or skips (105 seconds), including the 500-operation SDK corpus and installed non-git CLI acceptance."
@@ -16,7 +16,13 @@ comments[7]{created_at,author,text}:
   "2026-11-14T11:52:08.033Z",codex-toolchain-1114a,"Normalized-adapter checks pass 2/2 through the linked test and direct run, with zero failures/cancellations/skips: native non-git phase JSON/TOON accepts canonical SDK keys and CLI spellings, all malformed phase/field/budget cases retain INVALID_REQUEST exit 2, and receipt usage refuses atomically. npm/Bun typecheck, build:test and docstrings pass. Built index outputs are regenerated. The full coverage run will repeat with the unreachable branches removed and original thresholds unchanged; its previous 486/486 test pass remains separate from its failed coverage decision. This source correction and PM evidence will wait for the dispatch hold before pushing."
   "2026-11-14T13:29:35.979Z",codex-toolchain-1114a,"Complete release evidence for source commit 046e9e74c0157be293290564224a01bbaefb47a7: npm run release:check and bun run release:check both exit 0, each with 486 passing tests and zero failures, cancellations or skips. All 18 required runtime sources are reported and measured lines, branches, functions and statements are 100% at unchanged thresholds. This resolves the first full run: 486 tests passed but four unreachable legacy/raw-type/error fallback branches prevented coverage certification. Strict public JSON validation remains unchanged. Typecheck, docstrings, audit, pack and release attestation/date gates pass. Source-head CI is queued at https://github.com/unbraind/pm-context/actions/runs/43599143160. The shared-runner hold was honored before source publication; final evidence publication will check it again. The item remains released and in progress for orchestrator verification."
   "2026-11-14T14:56:02.576Z",codex-toolchain-1114a,"Failure | Cause (host contract) | Fix\n--- | --- | ---\nsupplied unusable CLI guards refuse before packet access instead of silently disabling checks | GH-1665: check:false and check:0 become filename strings. | Retain blank/null guard refusals. Add valid plans named false and 0, then require INVALID_PLAN exit 2 after tampering; source/compiled paths retain the tracker fingerprint.\nunchanged full coverage gate after host normalization | Canonical SDK keys and declared string normalization make legacy/raw phase-adapter branches unreachable. | Remove obsolete spelling/type branches and the owned receipt-store non-Error fallback; retain strict public JSON parsing, rebuild tracked dist and measure 100% coverage at unchanged thresholds.\n\nContract reference: [pm-cli 2026.11.8 migration entries](https://github.com/unbraind/pm-cli/blob/main/CHANGELOG.md#2026118---2026-11-08). Full gate results and timing limits are recorded in the preceding validation receipts. No workload or coverage threshold was lowered. This final comment makes the failure/cause/fix mapping explicit; source files are unchanged."
-files[7]{path,scope}:
+  "2026-11-14T16:12:39.743Z",codex-toolchain-1114a,"Round 2: rechecked the clean existing PR branch and tracker. Addressing the valid review finding with explicit regression coverage and behavioral revert proof; review threads will remain untouched."
+  "2026-11-14T16:15:29.156Z",codex-toolchain-1114a,"Thread PRRT_kwDOSzDuFs63eKPq: explicit null is preserved by the host. Restored typeof checks before includeFields.split and byteBudget.trim; non-strings reach parsePhaseContextRequest for INVALID_REQUEST, exit 2 and a remedy. Added null, array and object cases for both options in the source and compiled harness paths. Audited all option reads changed by this PR: phase, previousPhase and format already delegate unknown values to the shared parser; no other changed option value invokes a string method. New tests fail on the prior adapter (missing typed rejection)."
+  "2026-11-14T16:18:18.518Z",codex-toolchain-1114a,"Independent behavioral revert proofs in a disposable package copy: reverting only the includeFields string guard fails the new SDK regression at includeFields:null; reverting only the byteBudget string guard fails it at byteBudget:null. Each reports missing expected typed rejection. Rebuilt compiled output for each proof; the package worktree stayed fixed. Restored source and compiled SDK cases pass, including malformed nonempty arrays and objects; unchanged complete tracker fingerprint. Empty arrays are intentionally omitted by host option normalization, so malformed arrays use a blank element."
+  "2026-11-14T16:21:54.691Z",codex-toolchain-1114a,"After both independent guard reverts, the restored complete task-phase.test.ts passes 10/10 with zero skips or cancellations, including the 500 seeded operation sequences and installed no-git CLI. Linked new SDK regression passes 1/1. npm/Bun typecheck, test compilation and docstrings (63 declarations) pass; no lint script is defined. Running the full npm release gate with isolated HOME and system/global Git configuration disabled; thresholds are unchanged."
+  "2026-11-14T16:39:07.770Z",codex-toolchain-1114a,"Full isolated-identity npm run release:check passes: 487/487 tests, zero failures/skips/cancellations, all 18 required runtime sources reported and 100% lines/branches/functions/statements. index.ts is individually 100% in all four dimensions (1940 lines/statements, 68 functions, 775 branches). All workflow, audit, pack inspection and release attestation/date gates pass. Required Bun release gate is running next with the same isolated identity configuration."
+  "2026-11-14T16:55:07.819Z",codex-toolchain-1114a,"Round 2 final verification: bun run release:check also passes 487/487 tests with zero failures/skips/cancellations; all 18 required runtime sources reported and measured coverage is 100% lines/branches/functions/statements at unchanged thresholds. npm and Bun complete release gates both pass under isolated HOME with global/system Git configuration disabled. Both independent null-guard revert proofs fail as expected; restored complete phase file passes 10/10 and linked new regression 1/1. No lint script exists; docstring, test compilation and changelog checks pass. Review threads were not replied to, resolved or reacted to."
+files[8]{path,scope}:
   dist/index.d.ts.map,project
   dist/index.js,project
   dist/index.js.map,project
@@ -24,7 +30,29 @@ files[7]{path,scope}:
   package-lock.json,project
   package.json,project
   test/next-evidence.test.ts,project
-tests[2]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
-  node --test --test-concurrency=2 test/next-evidence.test.ts,project,600,codex-toolchain-1114a,"2026-11-14T10:47:35.339Z",local_mutation,chore/adopt-pm-cli-option-contract
-  "node --test --test-concurrency=2 --test-name-pattern=\"installed CLI and compiled SDK|usage command rejects\" test/task-phase.test.ts test/context-receipts.test.ts",project,600,codex-toolchain-1114a,"2026-11-14T11:48:18.983Z",local_mutation,chore/adopt-pm-cli-option-contract
+  test/task-phase.test.ts,project
+tests[3]:
+  - command: node --test --test-concurrency=2 test/next-evidence.test.ts
+    scope: project
+    timeout_seconds: 600
+    provenance:
+      author: codex-toolchain-1114a
+      created_at: "2026-11-14T10:47:35.339Z"
+      source_kind: local_mutation
+      source_ref: chore/adopt-pm-cli-option-contract
+  - command: "node --test --test-concurrency=2 --test-name-pattern=\"installed CLI and compiled SDK|usage command rejects\" test/task-phase.test.ts test/context-receipts.test.ts"
+    scope: project
+    timeout_seconds: 600
+    provenance:
+      author: codex-toolchain-1114a
+      created_at: "2026-11-14T11:48:18.983Z"
+      source_kind: local_mutation
+      source_ref: chore/adopt-pm-cli-option-contract
+  - command: "node --test --test-concurrency=2 --test-name-pattern=\"SDK phase options refuse\" test/task-phase.test.ts"
+    scope: project
+    provenance:
+      author: codex-toolchain-1114a
+      created_at: "2026-11-14T16:16:58.124Z"
+      source_kind: local_mutation
+      source_ref: chore/adopt-pm-cli-option-contract
 body: ""
