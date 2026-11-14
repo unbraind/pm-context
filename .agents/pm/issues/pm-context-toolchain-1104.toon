@@ -1,14 +1,17 @@
 id: pm-context-toolchain-1104
-title: Adopt November 4 SDK clearing in shared-evidence fixtures
-description: "Verify issue #212 and update https://github.com/unbraind/pm-context/pull/211 to the November 4 toolchain without weakening shared-evidence contracts."
-type: Chore
-status: in_progress
+title: SDK 2026.10.30 aborts six shared-evidence regressions on obsolete fixture sentinels
+description: "GH issue #212: https://github.com/unbraind/pm-context/issues/212 · author @unbraind · state reason completed · created 2026-11-03T21:02:18Z · updated 2026-11-04T21:28:33Z"
+type: Issue
+status: closed
 priority: 2
-tags[5]: dependencies,"gh:unbraind/pm-context#211","gh:unbraind/pm-context#212",migration,sdk
-created_at: "2026-11-04T19:10:53.847Z"
-updated_at: "2026-11-04T20:31:42.465Z"
+tags[3]: "gh:unbraind/pm-context#212","github_author:unbraind",release-failure
+created_at: "2026-11-03T21:02:18Z"
+updated_at: "2026-11-14T07:39:30.835Z"
+closed_at: "2026-11-04T21:28:33Z"
+completed_at: "2026-11-04T21:28:33Z"
 author: codex-toolchain-1104
 acceptance_criteria: "Native fixture clears preserve focus isolation, all 500 sequences, revision and no-write assertions; full coverage and typecheck pass at unchanged thresholds."
+release: v2026.11.13
 comments[7]{created_at,author,text}:
   "2026-11-04T19:14:23.827Z",codex-toolchain-1104,"Verified issue #212 on SDK 2026.11.4: six targeted cases abort with the GH-1614 typed parent sentinel refusal (introduced 2026.10.30). Classification: test fixtures pinned old behavior. Replace create/update and injected child-process parent/goal/objective/assignee sentinels with explicit unset; preserve all 500 seeded sequences, focus isolation, ABA/revision, closure and zero-write assertions."
   "2026-11-04T19:14:28.622Z",codex-toolchain-1104,"Auxiliary host-pin coupling: packed-shared-evidence.ts silently defaulted to SDK 2026.10.28. It now defaults to the declared development SDK, with an explicit compatibility override; the documented invocation follows the same default. The minimum SDK declarations and historical evidence stay deliberate."
@@ -30,4 +33,15 @@ docs[4]{path,scope,note}:
   docs/sdk-adoption.md,project,Audit version is historical; current pin belongs to package.json
   docs/shared-evidence-validation.md,project,Host follows the declared SDK by default
   README.md,project,Empty daily release-window policy
-body: ""
+close_reason: "Closed on GitHub as completed on 2026-11-04T21:28:33Z"
+github_close_reason: "Closed on GitHub as completed on 2026-11-04T21:28:33Z"
+github_closed_at: "2026-11-04T21:28:33Z"
+github_created_at: "2026-11-03T21:02:18Z"
+github_link_only: false
+github_number: 212
+github_release: v2026.11.13
+github_state: closed
+github_state_reason: completed
+github_updated_at: "2026-11-04T21:28:33Z"
+github_url: "https://github.com/unbraind/pm-context/issues/212"
+body: "## Evidence\nPR #211 at `2a898d448c49ee5ddb3af40820cca3db5f834b70` upgrades SDK2026.10.28 to2026.10.30. Both Node22 and Node26 stop at440/446 passing tests; six native shared-evidence tests fail with `--parent must not use placeholder token \"none\". Use --unset parent to clear this field.`\nhttps://github.com/unbraind/pm-context/actions/runs/41698956515/job/126177496307\nhttps://github.com/unbraind/pm-context/actions/runs/41698956515/job/126177496272\n\nExact fixture evidence: `tracker()` passes parent/goal/objective/assignee:`\"none\"` at shared-evidence.test.ts31. The reference-closure fixture repeats it at shared-reference-closure.test.ts97; additional updates also use sentinels.\nhttps://github.com/unbraind/pm-context/blob/2a898d448c49ee5ddb3af40820cca3db5f834b70/test/shared-evidence.test.ts#L31\nhttps://github.com/unbraind/pm-context/blob/2a898d448c49ee5ddb3af40820cca3db5f834b70/test/shared-reference-closure.test.ts#L97\n\nThe aborted cases cover twenty bindings/one fragment, finite JSON fidelity,500 seeded native-state sequences, competing SDK transitions, installed no-Git CLI behavior, and expanded/factored native references. Aggregate coverage also falls below unchanged gates after these refusals.\n\n## Goal and expected behavior\nThe delivered shared-fragment feature requires complete citation paths, distinct revision identity and equivalent expanded/factored coverage:\nhttps://github.com/unbraind/pm-context/blob/800b5af548ec1e7f765c4a441316c147eca2a8f7/.agents/pm/features/pm-context-shared-fragment-evidence.toon\n\nFixtures must initialize and mutate through the supported SDK clearing contract so these regressions actually reach their behavioral assertions on the upgraded SDK.\n\n## Acceptance and limits\nMigrate all affected fixture create/update/child-process calls to typed clearing semantics while preserving ambient-focus non-inheritance, all500 seeds, history/ABA/revision assertions, no-mutation checks and installed no-Git coverage. Restore full Node22/26 and packed gates at unchanged thresholds. Do not remove real SDK calls or replace them with mocks to make acceptance green.\n\nThis is a bounded fixture/upgrade acceptance defect, not evidence that production shared-evidence reads corrupt or mutate trackers. Exact immutable source and hosted logs were inspected; no local whole-suite rerun. All211 issue/PR bodies and101 current canonical records were checked; no existing owner for this SDK10.30 refusal was found. #197 is the separate resolved ENOTEMPTY cleanup failure.\n\n---\n\n### GitHub comments (1)\n\n> **@unbraind** (2026-11-04T21:28:32Z)\n>\n> Fixed by #211 (merged as 363e8bc): the six shared-evidence regressions now clear typed fields with `unset` (pm-cli GH-1614), and coverage passes at unchanged thresholds on pm-cli 2026.11.4."

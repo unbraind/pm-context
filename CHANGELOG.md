@@ -1,10 +1,19 @@
 # Changelog
 
+## Unreleased
+
+No changes.
+
 ## 2026.11.13 - 2026-11-13
 
 ### Fixed
 
 - Abandon prepared releases without usable notes and validate the exact new section ([pm-context-empty-prepared-release](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-empty-prepared-release.toon))
+- SDK 2026.10.30 aborts six shared-evidence regressions on obsolete fixture sentinels ([pm-context-toolchain-1104](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-toolchain-1104.toon))
+
+### Closed
+
+- Closed: Exact-budget CLI fixture cleanup fails with ENOTEMPTY in Node 22 Bun release gate ([pm-context-github-356cb2a080ed-197](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-197.toon))
 
 ## 2026.10.31 - 2026-10-31
 
@@ -29,10 +38,17 @@
 
 - Keep mandatory task-phase context fields and explain phase switches ([pm-context-task-phase-contracts](https://github.com/unbraind/pm-context/blob/main/.agents/pm/features/pm-context-task-phase-contracts.toon))
 
+### Fixed
+
+- Point the npm homepage at the package's website and link the author ([pm-context-78wz](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-78wz.toon))
+
 ### Other
 
 - Stop Hound from linting generated dist/ output ([pm-context-hound-generated-dist](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-hound-generated-dist.toon))
-- Point the npm homepage at the package catalog and link the author ([pm-context-78wz](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-78wz.toon))
+
+### Closed
+
+- Closed: Daily Release workflow is failing ([pm-context-github-356cb2a080ed-185](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-185.toon))
 
 ## 2026.10.26 - 2026-10-26
 
@@ -95,11 +111,14 @@ No changes.
 - Enable GitHub CodeQL code scanning ([pm-context-f4tl](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-f4tl.toon))
 - Certify pm-context on PM CLI/SDK 2026.10.4 and consolidate pending dependency updates ([pm-context-ht20](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-ht20.toon))
 
-## 2026.10.21 - 2026-10-21
-
 ### Closed
 
-- Closed: Daily Release workflow is failing ([pm-context-github-356cb2a080ed-81](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-81.toon))
+- Closed: File focus loses valid repository roots ending in whitespace ([pm-context-github-356cb2a080ed-154](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-154.toon))
+- Closed: File-focused --max-items packing can discard the highest-overlap item despite equal costs ([pm-context-github-356cb2a080ed-153](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-153.toon))
+
+## 2026.10.21 - 2026-10-21
+
+No changes.
 
 ## 2026.10.20 - 2026-10-20
 
@@ -200,6 +219,10 @@ No changes.
 ### Other
 
 - Recognize context-usage delivery events on pm-cli 2026.9.5 ([pm-context-d77x](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-d77x.toon))
+
+### Closed
+
+- Closed: Daily Release workflow is failing ([pm-context-github-356cb2a080ed-81](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-81.toon))
 
 ## 2026.8.31 - 2026-08-31
 
