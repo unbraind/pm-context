@@ -1132,15 +1132,16 @@ function setupCommands(api) {
             if (input === null || typeof input !== "object" || Array.isArray(input))
                 throw new PhaseContextError("INVALID_REQUEST", "Supply a JSON object with phase, contracts and items.");
             const overrides = {};
-            for (const [option, camel, key] of [["phase", "phase", "phase"], ["previous-phase", "previousPhase", "previous_phase"], ["format", "format", "format"]]) {
-                const value = Object.hasOwn(ctx.options, option) ? ctx.options[option] : ctx.options[camel];
+            for (const [option, key] of [["phase", "phase"], ["previousPhase", "previous_phase"], ["format", "format"]]) {
+                const value = ctx.options[option];
                 if (value !== undefined)
                     overrides[key] = value;
             }
-            const fields = Object.hasOwn(ctx.options, "include-fields") ? ctx.options["include-fields"] : ctx.options.includeFields;
+            // GH-1665 canonicalizes string flags but preserves explicit null for shared validation.
+            const fields = ctx.options.includeFields;
             if (fields !== undefined)
                 overrides.include_fields = typeof fields === "string" ? fields.split(",") : fields;
-            const budget = Object.hasOwn(ctx.options, "byte-budget") ? ctx.options["byte-budget"] : ctx.options.byteBudget;
+            const budget = ctx.options.byteBudget;
             if (budget !== undefined)
                 overrides.byte_budget = typeof budget === "string" && budget.trim() ? Number(budget) : budget;
             if (ctx.global.json && overrides.format === undefined)
@@ -1610,7 +1611,8 @@ function setupCommands(api) {
                     await recordReceiptUsage(ctx.pm_root, { receipt_id: receiptId, session, citations, touched_items: touchedItems, edited_files: editedFiles });
                 }
                 catch (error) {
-                    throw new CommandError(error instanceof Error ? error.message : String(error), EXIT_CODE.USAGE);
+                    // The owned receipt store and native lock/filesystem APIs throw Error objects.
+                    throw new CommandError(error.message, EXIT_CODE.USAGE);
                 }
             }
             const bundles = reportContextReceipts(ctx.pm_root, { session, author, since: since ?? undefined,
