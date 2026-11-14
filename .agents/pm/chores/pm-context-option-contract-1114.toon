@@ -6,16 +6,23 @@ status: in_progress
 priority: 2
 tags[2]: dependencies,"gh:unbraind/pm-context#227"
 created_at: "2026-11-14T10:46:54.905Z"
-updated_at: "2026-11-14T10:50:43.958Z"
+updated_at: "2026-11-14T11:52:11.333Z"
 author: codex-toolchain-1114a
-comments[3]{created_at,author,text}:
+comments[5]{created_at,author,text}:
   "2026-11-14T10:47:28.353Z",codex-toolchain-1114a,"Failure -> cause -> fix: supplied unusable CLI guards test treats check:false/0 as invalid types -> GH-1665 (pm-cli CHANGELOG 2026.11.8) now coerces them into the valid CLI filename strings false/0 -> replace the unusable-check cases with tab and nonbreaking-space strings and retain explicit empty/blank/null refusals before packet access. Keep format:false/0 as unsupported-format refusals. Additionally create valid plans under both normalized filenames, prove each check succeeds, then tamper with its cost and require INVALID_PLAN exit 2. Both source and compiled harnesses run the corpus; the complete tracker fingerprint must remain unchanged. No production source or threshold change."
   "2026-11-14T10:49:48.864Z",codex-toolchain-1114a,"Verification: the changed guard corpus passes with both source and compiled modules, including valid normalized filenames, tampered-plan refusals and unchanged tracker fingerprint. npm/Bun typecheck, build:test and docstring gate (63 declarations) pass. The linked full next-evidence file remains running through its existing 500-operation SDK-read corpus; release gates are queued serially with unchanged thresholds. The original current-pin guard case fails before adaptation, providing migration revert proof. No production source changed and no standalone lint script is declared."
   "2026-11-14T10:50:43.957Z",codex-toolchain-1114a,"The linked next-evidence file completed: 13 tests passed, zero failures, cancellations or skips (105 seconds), including the 500-operation SDK corpus and installed non-git CLI acceptance."
-files[3]{path,scope}:
+  "2026-11-14T11:48:07.305Z",codex-toolchain-1114a,"Full release evidence: all 486 tests pass with zero failures/cancellations/skips, statements/lines/functions reach 100%, but the unchanged Node branch gate fails at 99.90% versus 100% and outer c8 fails at 99.86% versus 99.9%. Exact uncovered adapter branches are index.ts legacy include-fields/byte-budget lookups, the raw non-string include-fields arm, and the non-Error receipt-message arm. GH-1665 now canonicalizes those CLI keys and string values before dispatch, making the legacy/raw arms unreachable from real CLI or the normalized harness; remove them and keep strict public JSON request validation. The owned receipt store plus native lock/filesystem APIs throw Error objects, so retain the usage exit conversion without its unreachable non-Error fallback. Existing native phase overrides and receipt refusal tests verify the surviving contract; no threshold is lowered. Coverage-gate failure with the previous adapters is the revert evidence for this dead-code removal."
+  "2026-11-14T11:52:08.033Z",codex-toolchain-1114a,"Normalized-adapter checks pass 2/2 through the linked test and direct run, with zero failures/cancellations/skips: native non-git phase JSON/TOON accepts canonical SDK keys and CLI spellings, all malformed phase/field/budget cases retain INVALID_REQUEST exit 2, and receipt usage refuses atomically. npm/Bun typecheck, build:test and docstrings pass. Built index outputs are regenerated. The full coverage run will repeat with the unreachable branches removed and original thresholds unchanged; its previous 486/486 test pass remains separate from its failed coverage decision. This source correction and PM evidence will wait for the dispatch hold before pushing."
+files[7]{path,scope}:
+  dist/index.d.ts.map,project
+  dist/index.js,project
+  dist/index.js.map,project
+  index.ts,project
   package-lock.json,project
   package.json,project
   test/next-evidence.test.ts,project
-tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+tests[2]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
   node --test --test-concurrency=2 test/next-evidence.test.ts,project,600,codex-toolchain-1114a,"2026-11-14T10:47:35.339Z",local_mutation,chore/adopt-pm-cli-option-contract
+  "node --test --test-concurrency=2 --test-name-pattern=\"installed CLI and compiled SDK|usage command rejects\" test/task-phase.test.ts test/context-receipts.test.ts",project,600,codex-toolchain-1114a,"2026-11-14T11:48:18.983Z",local_mutation,chore/adopt-pm-cli-option-contract
 body: ""
