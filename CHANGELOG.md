@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The release commits a CHANGELOG.md without --include-empty, so CI's changelog:check fails on main after every release ([pm-context-3zzd](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-3zzd.toon))
+
 ## 2026.11.13 - 2026-11-13
 
 ### Fixed
