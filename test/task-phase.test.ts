@@ -250,11 +250,30 @@ test("installed CLI and compiled SDK work with Git absent and expose typed priva
     }
     await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: {}, global: {} }), code("INVALID_REQUEST"));
     for (const options of [{ phase: " " }, { "previous-phase": " " }, { format: " " }, { "include-fields": " " }, { "byte-budget": " " }, { includeFields: 0 }, { byteBudget: 0 }, { phase: null }]) {
-      await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: { packet: path, ...options }, global: {} }), code("INVALID_REQUEST"));
+      await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: { packet: path, ...options }, global: {} }), code("INVALID_REQUEST"), JSON.stringify(options));
     }
     for (const invalid of [null, [], 2]) {
       writeFileSync(bad, JSON.stringify(invalid));
       await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot, options: { packet: bad }, global: {} }), code("INVALID_REQUEST"));
+    }
+  }
+  assert.equal(fingerprint(client.pmRoot), before);
+});
+
+/** Explicit null and malformed compound options retain the shared parser's typed refusal. */
+test("SDK phase options refuse null and malformed arrays or objects before tracker writes", async (t) => {
+  const { root, client, item } = await tracker(); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const path = join(root, "phase.json"); writeFileSync(path, JSON.stringify(request(item.id)));
+  const before = fingerprint(client.pmRoot);
+  for (const module of [extension, builtExtension]) {
+    const harness = await createExtensionTestHarness(module, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] });
+    t.after(() => harness.deactivate());
+    for (const options of [
+      { includeFields: null }, { includeFields: [" "] }, { includeFields: {} },
+      { byteBudget: null }, { byteBudget: [" "] }, { byteBudget: {} },
+    ]) {
+      await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot,
+        options: { packet: path, ...options }, global: {} }), code("INVALID_REQUEST"), JSON.stringify(options));
     }
   }
   assert.equal(fingerprint(client.pmRoot), before);
