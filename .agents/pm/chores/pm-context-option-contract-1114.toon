@@ -1,0 +1,21 @@
+id: pm-context-option-contract-1114
+title: Adopt pm-cli option contract and current pm-toolchain
+description: Supersede Dependabot PR 227 while retaining invalid guard refusals and proving normalized check paths are enforced.
+type: Chore
+status: in_progress
+priority: 2
+tags[2]: dependencies,"gh:unbraind/pm-context#227"
+created_at: "2026-11-14T10:46:54.905Z"
+updated_at: "2026-11-14T10:50:43.958Z"
+author: codex-toolchain-1114a
+comments[3]{created_at,author,text}:
+  "2026-11-14T10:47:28.353Z",codex-toolchain-1114a,"Failure -> cause -> fix: supplied unusable CLI guards test treats check:false/0 as invalid types -> GH-1665 (pm-cli CHANGELOG 2026.11.8) now coerces them into the valid CLI filename strings false/0 -> replace the unusable-check cases with tab and nonbreaking-space strings and retain explicit empty/blank/null refusals before packet access. Keep format:false/0 as unsupported-format refusals. Additionally create valid plans under both normalized filenames, prove each check succeeds, then tamper with its cost and require INVALID_PLAN exit 2. Both source and compiled harnesses run the corpus; the complete tracker fingerprint must remain unchanged. No production source or threshold change."
+  "2026-11-14T10:49:48.864Z",codex-toolchain-1114a,"Verification: the changed guard corpus passes with both source and compiled modules, including valid normalized filenames, tampered-plan refusals and unchanged tracker fingerprint. npm/Bun typecheck, build:test and docstring gate (63 declarations) pass. The linked full next-evidence file remains running through its existing 500-operation SDK-read corpus; release gates are queued serially with unchanged thresholds. The original current-pin guard case fails before adaptation, providing migration revert proof. No production source changed and no standalone lint script is declared."
+  "2026-11-14T10:50:43.957Z",codex-toolchain-1114a,"The linked next-evidence file completed: 13 tests passed, zero failures, cancellations or skips (105 seconds), including the 500-operation SDK corpus and installed non-git CLI acceptance."
+files[3]{path,scope}:
+  package-lock.json,project
+  package.json,project
+  test/next-evidence.test.ts,project
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/next-evidence.test.ts,project,600,codex-toolchain-1114a,"2026-11-14T10:47:35.339Z",local_mutation,chore/adopt-pm-cli-option-contract
+body: ""

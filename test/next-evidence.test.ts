@@ -164,18 +164,35 @@ test("supplied unusable CLI guards refuse before packet access instead of silent
   await init("guards", { defaults: true, author: "fixture-agent", agentGuidance: "skip" }, { cwd: root, pmRoot });
   const path = join(root, "packet.json"); const saved = join(root, "plan.json"); const input = packet();
   writeFileSync(path, JSON.stringify(input)); writeFileSync(saved, JSON.stringify(planNextEvidence(input)));
+  const before = fingerprint(pmRoot);
   for (const module of [extension, builtExtension]) {
     const harness = await createExtensionTestHarness(module, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] }); t.after(() => harness.deactivate());
     for (const field of ["check", "format"]) {
-      for (const value of ["", " \r\n ", false, 0, null]) {
+      // GH-1665 coerces check:false/0 into filename strings; blank strings remain unusable guards.
+      const values = field === "check" ? ["", " \r\n ", "\t", "\u00a0", null] : ["", " \r\n ", false, 0, null];
+      for (const value of values) {
         await assert.rejects(harness.runCommand({ command: "context-next-evidence", pmRoot, options: { packet: join(root, "absent.json"), [field]: value }, global: {} }), code("INVALID_ARGUMENT"));
       }
     }
+    const cwd = process.cwd();
+    process.chdir(root);
+    try {
+      for (const check of [false, 0]) {
+        const file = join(root, String(check));
+        writeFileSync(file, JSON.stringify(planNextEvidence(input)));
+        const checked = await harness.runCommand({ command: "context-next-evidence", pmRoot, options: { packet: path, check }, global: {} });
+        assert.equal(checked.handled, true);
+        assert.equal(checked.errorMessage, undefined);
+        writeFileSync(file, JSON.stringify({ ...planNextEvidence(input), cost: 0 }));
+        await assert.rejects(harness.runCommand({ command: "context-next-evidence", pmRoot, options: { packet: path, check }, global: {} }), code("INVALID_PLAN"));
+      }
+    } finally { process.chdir(cwd); }
     for (const options of [{ packet: path }, { packet: path, check: saved }, { packet: path, check: ` ${saved} `, format: " json " }, { packet: path, format: "toon" }]) {
       const result = await harness.runCommand({ command: "context-next-evidence", pmRoot, options, global: {} });
       assert.equal(result.errorMessage, undefined);
     }
   }
+  assert.equal(fingerprint(pmRoot), before);
 });
 
 test("saved JSON plans bind every source contract and estimate; malformed or modified plans refuse", () => {
