@@ -2,28 +2,35 @@ id: pm-context-release-caller-rollout
 title: Adopt the released reusable Daily Release caller
 description: "Fleet rollout for unbraind/pm-ops#272 after the successful pm-jira cross-repository OIDC pilot. Replace copied release orchestration with the released SHA caller, matching validator, explicit empty changelog hooks and package-owned caller contracts. No merge, dispatch or publication."
 type: Task
-status: open
+status: in_progress
 priority: 2
-tags[2]: "area:release","gh:unbraind/pm-ops#272"
+tags[3]: "area:release","gh:unbraind/pm-context#232","gh:unbraind/pm-ops#272"
 created_at: "2026-11-14T21:39:28.095Z"
-updated_at: "2026-11-15T03:00:39.679Z"
+updated_at: "2026-11-15T16:40:07.092Z"
 author: codex-ops272-1114
-comments[6]{created_at,author,text}:
+comments[10]{created_at,author,text}:
   "2026-11-14T21:39:34.980Z",codex-ops272-1114,"Orient and start the authorized fleet rollout. Verified released v2026.11.14 at 7687a35d7522482bd8361d60dbc2589e9afbc81c. Preserve this package approval, schedule, preparation and publication hooks through canonical inputs. The merged Jira pilot proves cross-repository npm identity acceptance; this package must still pass its own first-run preflight. Run caller contracts, installed attestation, strict YAML, actionlint and regenerated changelog checks. Shared-runner hold gates every push. No review-thread action, merge, dispatch or publication."
   "2026-11-14T21:46:16.922Z",codex-ops272-1114,"Rolled the Jira pilot contract into this package: released workflow pin 7687a35d7522482bd8361d60dbc2589e9afbc81c (v2026.11.14), exact pm-ops 2026.11.14 validator, explicit include-empty changelog generation/check/notes hooks, and declared yaml for caller tests. Preserved package-owned approval, schedule and preparation inputs. Focused gates passed 43/43, zero failures/skips; linked caller test passed 6/6 in a scratch pm project to avoid tracker run artifacts. Reverting only release.yml to the old copy in a disposable fixture failed 5 of 6 contracts. Actionlint passed 1/1, strict workflow/Dependabot YAML parsing 2/2, installed publish-attestation passed 1/1. Regenerate changelog and check after this final tracker write. Full npm/Bun certification remains with CI; no full local pass is claimed. Cross-repository npm OIDC evidence is Jira run 43639146392, recorded on pm-ops#272; first package activation must still pass its preflight. Every push waits on the shared-runner hold. No merge, dispatch, publication or review-thread action. Leave this item open and release only this author claim."
   "2026-11-15T00:16:33.948Z",codex-ops272-1114,"Round 2 audit found release-copy remnants or package-level regression tests needing restoration. Keep the pinned caller and package hooks; remove obsolete local release orchestration and stale references, restore independent package behavior tests, and retarget mutation proofs to the caller contract. Run touched tests, unchanged coverage gates, typecheck and lint, then regenerate and check the changelog after final tracker writes. No merge, dispatch, publication or review-thread actions."
   "2026-11-15T00:52:57.514Z",codex-ops272-1114,"Round 2 for https://github.com/unbraind/pm-context/pull/232: Removed the obsolete copied-workflow YAML verifier, its c8 inventory entry and stale documentation reference. Retained the active package alert hook; coverage thresholds are unchanged. Targeted tests passed 12/12. Full npm run coverage certification is pending exact-head CI at unchanged thresholds; the local coverage attempt timed out after 30 minutes. npm run typecheck passed. Retirement contract passes and restoring only a retired artefact fails in a disposable copy. Linked tests passed in a copied scratch tracker, keeping run artefacts outside this tracker. Regenerate and check the changelog after this final tracker write. CI must verify the pushed head; no merge, dispatch, publication or review-thread action."
   "2026-11-15T02:46:16.097Z",codex-ops272-1114,"Round 2 CI follow-up: canonical tag lookup can return unverified-offline. The old inline-publisher success-message assertion then fails despite a valid caller. Update the package attestation test to assert structured recognition, require an explicit deferral without an attestation claim offline, and preserve all refusal checks. Prove it with forced offline execution in a disposable Git fixture; keep coverage source inventory and thresholds unchanged."
   "2026-11-15T03:00:35.495Z",codex-ops272-1114,"Round 2 attestation follow-up: targeted tests passed 20/20, including the retained caller and package behavior contracts. Forced offline verification explicitly reports unverified-offline and defers attestation; it never claims verified provenance. In a disposable Git fixture, the fixed assertion passes, reverting only to the old assertion fails, and restoring the fix passes. Unattested-publish refusal checks remain intact. Typecheck passed; coverage source inventory and thresholds remain unchanged. Linked tests passed in a copied scratch tracker. Regenerate and check the changelog after this final write. Exact pushed-head npm/Bun coverage and release certification remain CI gates. No merge, release dispatch, publication or review-thread action."
-files[5]{path,scope}:
+  "2026-11-15T16:31:19.645Z",codex-sol,"The migration dropped the inline stamp of the plain-object default extension in index.ts; the shared helper only stamps literal defineExtension descriptors. Restoring a package-specific release:prepare hook and testing the actual scratch-version build, including a revert proof."
+  "2026-11-15T16:36:30.566Z",codex-sol,"Real scratch-version build passes at 2099.1.2-3; package and manifest match the built runtime. Reverting only the prepare-script input makes that same build test fail specifically on the stale runtime assertion; the caller was then restored. Typecheck, build:test and docstrings passed. No lint script is defined in this package. Latest npm tarball runtime matches package/manifest; exact fleet evidence is recorded in the audit documentation."
+  "2026-11-15T16:39:32.928Z",codex-sol,"Final targeted gates passed: npm run typecheck; node --test test/release-runtime-version.test.ts test/release-workflow.test.ts (9/9, zero skipped); npm run changelog:check. The combined command was run through pm test with progress in source workspace and tracker context. npm run build:test and npm run docstring also passed; lint is not defined. Revert proof repeated after the final implementation: removing only the caller hook fails the stale built-runtime assertion; restored caller passes. No full coverage or npm/Bun publication certification is claimed. Claims released for orchestrator review; items remain in_progress."
+  "2026-11-15T16:40:07.091Z",codex-sol,"Current origin/main includes a timeout-only change to the retired release-merge-wait test, producing a modify/delete conflict with the rollout cleanup. Will incorporate origin/main into the existing rollout branch and retain deletion of the obsolete test, then repeat required gates. No CI v2 or pin branch is modified."
+files[7]{path,scope}:
   .github/workflows/release.yml,project
   package-lock.json,project
   package.json,project
+  scripts/prepare-release-version.ts,project
+  test/release-runtime-version.test.ts,project
   test/release-workflow.test.ts,project
   test/verify-release-publish-attestation.test.ts,project
-tests[2]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+tests[3]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
   node --test --test-concurrency=2 test/release-workflow.test.ts,project,codex-ops272-1114,"2026-11-14T21:45:53.788Z",local_mutation,codex/ops272-fleet-1114
   node --test --test-concurrency=2 test/verify-release-publish-attestation.test.ts,project,codex-ops272-1114,"2026-11-15T03:00:26.567Z",local_mutation,codex/ops272-fleet-1114
+  "npm run typecheck && node --test test/release-runtime-version.test.ts test/release-workflow.test.ts && npm run changelog:check",project,codex-sol,"2026-11-15T16:36:32.326Z",local_mutation,codex/ops272-fleet-1114
 docs[1]{path,scope}:
   docs/release-caller-rollout.md,project
 body: ""

@@ -33,7 +33,8 @@
     "docstring": "node scripts/docstring-gate.ts",
     "verify:release-changelog-date": "node scripts/verify-release-changelog-date.ts",
     "release:alert": "bash scripts/alert-on-release-failure.sh",
-    "release:notes": "pm-changelog --pm-root .agents/pm --stdout --since-previous-tag --until-release-tag --release-version-from-package --date-from-version --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm --respect-item-release --pm-bin ./node_modules/.bin/pm --pm-arg=--output-budget --pm-arg=unbounded --pm-arg=--output-limit --pm-arg=unbounded --include-empty"
+    "release:notes": "pm-changelog --pm-root .agents/pm --stdout --since-previous-tag --until-release-tag --release-version-from-package --date-from-version --item-url-base https://github.com/unbraind/pm-context/blob/main/.agents/pm --respect-item-release --pm-bin ./node_modules/.bin/pm --pm-arg=--output-budget --pm-arg=unbounded --pm-arg=--output-limit --pm-arg=unbounded --include-empty",
+    "release:prepare": "node scripts/prepare-release-version.ts"
   },
   "keywords": [
     "pm-cli",
