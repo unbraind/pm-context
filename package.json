@@ -108,8 +108,7 @@
     "all": true,
     "include": [
       "*.ts",
-      "scripts/*.ts",
-      ".agents/pm/verify-release-yaml.mjs"
+      "scripts/*.ts"
     ],
     "exclude": [
       "test/**"

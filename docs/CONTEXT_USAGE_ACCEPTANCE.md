@@ -124,9 +124,9 @@ modules, six TypeScript scripts, one JavaScript verifier and one shell script.
 The configured six-file native Node gate measured 3278/3278 lines,
 1038/1038 branches and 219/219 functions. Its scope excludes
 `scripts/main-invocation.ts`, `scripts/prepare-merge-driver.ts`,
-`scripts/verify-release-changelog-date.ts`, `.agents/pm/verify-release-yaml.mjs`
-and `scripts/alert-on-release-failure.sh`; these existing exclusions were not
-changed. Docstrings passed for nine TypeScript files and 31 declarations
+`scripts/verify-release-changelog-date.ts` and the package alert hook
+`scripts/alert-on-release-failure.sh`. The obsolete copied-workflow YAML verifier
+was removed with its c8 entry when Daily Release moved to the canonical caller. Docstrings passed for nine TypeScript files and 31 declarations
 selected by the analyzer's rules; JavaScript and shell documentation are outside
 that denominator.
 
