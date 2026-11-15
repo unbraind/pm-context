@@ -1,3 +1,4 @@
+import { testTimeout } from "./support/depth.ts";
 /** Execute the checked-in merge loop with a local GitHub transport fixture. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -51,7 +52,7 @@ function runMergeWait(state: string, options: { readFailure?: boolean; refused?:
     `], {
       cwd: root,
       encoding: "utf8",
-      timeout: 15000,
+      timeout: testTimeout(15000),
       env: {
         ...process.env,
         GITHUB_REPOSITORY: "example/package",

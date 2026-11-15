@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -135,10 +136,10 @@ test("released v1 contracts and largest escaped revisions remain compatible and 
   }
 });
 
-test("500 seeded boundary mutations refuse sparse and extreme packets without changing their valid source plans", () => {
+test(`${testDepth(500)} seeded boundary mutations refuse sparse and extreme packets without changing their valid source plans`, () => {
   let seed = 0x48cd1028;
   const random = (maximum: number) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % maximum; };
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     const input = packet(); const saved = planNextEvidence(input);
     const invalid = structuredClone(input);
     const location = sequence % 4;
@@ -222,7 +223,7 @@ function assertJsonNumbers(value: unknown, decoded: unknown): void {
   }
 }
 
-test("500 random plans retain Object.is-equal numeric outputs and pass command --check after JSON round trips", async (t) => {
+test(`${testDepth(500)} random plans retain Object.is-equal numeric outputs and pass command --check after JSON round trips`, async (t) => {
   const root = mkdtempSync(join(tmpdir(), "next-evidence-numbers-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const pmRoot = join(root, ".agents", "pm");
   await init("numbers", { defaults: true, author: "fixture-agent", agentGuidance: "skip" }, { cwd: root, pmRoot });
@@ -232,7 +233,7 @@ test("500 random plans retain Object.is-equal numeric outputs and pass command -
   const random = (n: number) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return Math.floor(seed / 4294967296 * n); };
   const estimate = (maximum: number) => [-0, 0, maximum, random(maximum + 1)][random(4)]!;
   const file = join(root, "packet.json"); const saved = join(root, "plan.json");
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     const input: NextEvidencePacket = {
       contract_revision: `numbers-${sequence}`, tool_call_tokens: sequence % 2 ? 1000000 : 1,
       missing: Array.from({ length: sequence < 3 ? 12 : random(7) }, (_, index) => `C${index}`), reads: [],
@@ -298,7 +299,7 @@ function reference(input: NextEvidencePacket) {
   return { cost: best, uncovered: input.missing.filter((entry) => !coverable.has(entry)).sort() };
 }
 
-test("500 seeded operation sequences: replay, whitespace, revisions and serialization preserve optimal plans and SDK-read tracker state", async (t) => {
+test(`${testDepth(500)} seeded operation sequences: replay, whitespace, revisions and serialization preserve optimal plans and SDK-read tracker state`, async (t) => {
   const root = mkdtempSync(join(tmpdir(), "next-evidence-model-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const pmRoot = join(root, ".agents", "pm");
   await init("acquisition", { defaults: true, author: "fixture-agent", agentGuidance: "skip" }, { cwd: root, pmRoot });
@@ -312,7 +313,7 @@ test("500 seeded operation sequences: replay, whitespace, revisions and serializ
   let seed = 0x2a105eed;
   const random = (n: number) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % n; };
   const file = join(root, "packet.json");
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     const input: NextEvidencePacket = { contract_revision: `revision-${sequence} \r\n`, missing: Array.from({ length: 1 + random(6) }, (_, i) => `C${i}`), reads: [], tool_call_tokens: 1 + random(20) };
     input.reads = Array.from({ length: random(8) }, (_, i) => ({ id: `R${i}`, source: `S${i}`, revision: `r${random(10)} \r\n`, covers: input.missing.filter(() => random(3) === 0), estimated_tokens: 1 + random(100), estimated_tool_calls: random(3) }));
     const old = structuredClone(input); const saved = planNextEvidence(input);

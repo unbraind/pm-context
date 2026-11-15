@@ -1,3 +1,4 @@
+import { testDepth, testTimeout } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -14,7 +15,7 @@ import { FileFocusError, fileLinkCommand } from "../file-focus.ts";
 
 /** Ask a real POSIX shell to split the display, then print each argument with NUL framing. */
 function shellRoundtrip(value: SuggestedCommand, root: string) {
-  const result = spawnSync("/bin/sh", ["-c", `/bin/sh -c 'for a; do printf "%s\\0" "$a"; done' sh ${value.command}`], { cwd: root, encoding: "utf8", timeout: 3000 });
+  const result = spawnSync("/bin/sh", ["-c", `/bin/sh -c 'for a; do printf "%s\\0" "$a"; done' sh ${value.command}`], { cwd: root, encoding: "utf8", timeout: testTimeout(3000) });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, "", "the quoting probe must emit no diagnostic or extra command output");
   assert.ok(result.stdout.endsWith("\0"), "the complete output must be NUL-framed; reject trailing injected output");
@@ -34,13 +35,13 @@ function commands(value: unknown): SuggestedCommand[] {
   return [...result, ...Object.values(row).flatMap(commands)];
 }
 
-test("one POSIX renderer round-trips 500 seeded arbitrary keys and values without shell effects", (t) => {
+test(`one POSIX renderer round-trips ${testDepth(500)} seeded arbitrary keys and values without shell effects`, (t) => {
   const root = mkdtempSync(join(tmpdir(), "command-argv-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const fixed = ["a;printf X", "a;printf injected > shell-side-effect", "$(printf hit > shell-side-effect)", "`printf hit > shell-side-effect`", "", " ", "'", '"', ";|&$()<>", "\n", "\t", "-leading", "é📚", "plain_field"];
   let seed = 0x181c0de;
   /** Deterministic generator includes shell syntax as data rather than executable test setup. */
   function random(max: number) { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % max; }
-  for (let i = 0; i < 500; i++) {
+  for (let i = 0; i < testDepth(500); i++) {
     const key = i < fixed.length ? fixed[i]! : Array.from({ length: random(8) }, () => fixed[random(fixed.length)]!).join("");
     const value = fixed[random(fixed.length)]! + fixed[random(fixed.length)]!;
     const command = buildSuggestedCommand(["pm", "get", value, "--fields", key, "--output-budget", "unbounded"]);
@@ -92,7 +93,7 @@ test("fixed review key refuses unsupported restoration; every emitted phase rece
       shellRoundtrip(command, root);
       // Execute the exact emitted argv after replacing only the executable with
       // the repository-pinned entrypoint. No flag repairs or selector rewrites.
-      const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: 15000 });
+      const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: testTimeout(15000) });
       assert.equal(result.status, 0, `${JSON.stringify(command.argv)}: ${result.stderr}`);
       const restored = (command.argv.includes("--json") ? JSON.parse(result.stdout) : decodeToon(result.stdout)) as { item: Record<string, unknown> };
       const index = command.argv.indexOf("--fields");
@@ -113,7 +114,7 @@ test("fixed review key refuses unsupported restoration; every emitted phase rece
     assert.equal("restore_reference_with" in packet.read_session!, false, "unsafe SDK legacy template stays out of the package wire format");
   }
   for (const command of [fileLinkCommand(), buildSuggestedCommand(["pm", "comments", "--help"]), buildSuggestedCommand(["pm", "history", "--help"])]) {
-    const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: 15000 });
+    const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: testTimeout(15000) });
     assert.equal(result.status, 0, result.stderr); executed++;
   }
   t.diagnostic(`${executed} exact emitted commands accepted by the pinned CLI outside Git`);
@@ -182,14 +183,14 @@ test("runtime refreshes, discovery, recovery and static help examples execute th
   let executed = 0;
   for (const command of pending) {
     shellRoundtrip(command, root);
-    const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: 15000 });
+    const result = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...command.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: testTimeout(15000) });
     assert.equal(result.status, 0, `${JSON.stringify(command.argv)}: ${result.stderr}`); executed++;
     if (command.argv.includes("--json") || command.argv.includes("json")) {
       const output: unknown = JSON.parse(result.stdout);
       // Exercise commands produced by the actual CLI response, including refresh
       // argv, rather than constructing a matching invocation in the test.
       for (const suggestion of commands(output)) {
-        const restored = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...suggestion.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: 15000 });
+        const restored = spawnSync(process.execPath, [join(packageRoot, "node_modules/@unbrained/pm-cli/dist/cli.js"), ...suggestion.argv.slice(1)], { cwd: root, encoding: "utf8", env: environment, timeout: testTimeout(15000) });
         assert.equal(restored.status, 0, `${JSON.stringify(suggestion.argv)}: ${restored.stderr}`); executed++;
       }
     }
