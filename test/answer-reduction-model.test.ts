@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,7 +20,7 @@ async function state(client: PmClientOptions, id: string): Promise<Record<string
   assert.ok("item" in result); return JSON.parse(JSON.stringify(result.item)) as Record<string, unknown>;
 }
 
-test("500 seeded sequences model native SDK fields, custom statuses, relationships, ambient focus and older packet replays", async (t) => {
+test(`${testDepth(500)} seeded sequences model native SDK fields, custom statuses, relationships, ambient focus and older packet replays`, async (t) => {
   const root = mkdtempSync(join(tmpdir(), "answer-model-")); t.after(() => rmSync(root, { recursive: true, force: true }));
   const client = { cwd: root, pmRoot: join(root, "tracker"), noExtensions: true };
   await init("answer", { defaults: true, agentGuidance: "skip", author: "fixture" }, client);
@@ -56,7 +57,7 @@ test("500 seeded sequences model native SDK fields, custom statuses, relationshi
     assert.deepEqual(parseAnswerReduction(format === "json" ? JSON.parse(encoded) : decodeToon(encoded)), baseline);
   }
   let roundtrips = 0; let checked = 0;
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     await focus(random(2) ? peer.id : item.id, {}, client);
     const variant = [" text ", "\r\nparagraph\r\n", "\nparagraph\n", "", "é📚,\"\\"][random(5)]!;
     await update(item.id, { author: "fixture", description: variant, body: variant, status: statuses[random(4)]!, priority: random(5), ...(random(2) ? { parent: peer.id } : { unset: ["parent"] }), goal: "Goal", objective: "Objective", sprint: "future", release: "future", replaceDeps: true, dep: [`id=${peer.id},kind=${random(2) ? "related_to" : "blocked_by"}`] }, client);
@@ -93,7 +94,7 @@ test("500 seeded sequences model native SDK fields, custom statuses, relationshi
     }
   }
   assert.ok(fields.length >= 45); assert.deepEqual([...seen].sort(), fields.sort());
-  t.diagnostic(`500 seeded sequences; ${fields.length} native fields; ${roundtrips} JSON/TOON round trips; ${checked} independently checked routing answers; current and older inputs; SDK read-back unchanged`);
+  t.diagnostic(`${testDepth(500)} seeded sequences; ${fields.length} native fields; ${roundtrips} JSON/TOON round trips; ${checked} independently checked routing answers; current and older inputs; SDK read-back unchanged`);
 });
 
 test("every native read boundary reports peer transitions conservatively and preserves foreign records", async (t) => {

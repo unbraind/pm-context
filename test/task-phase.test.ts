@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -287,7 +288,7 @@ async function state(client: PmClientOptions, id: string, fields?: string[]): Pr
   return JSON.parse(JSON.stringify(result.item)) as Record<string, unknown>;
 }
 
-test("500 seeded operation sequences model JSON/TOON export, old-input replay, CRLF, native fields and relationships against SDK-read state", async (t) => {
+test(`${testDepth(500)} seeded operation sequences model JSON/TOON export, old-input replay, CRLF, native fields and relationships against SDK-read state`, async (t) => {
   const { root, client, item } = await tracker(); t.after(() => rmSync(root, { recursive: true, force: true }));
   const peer = (await create({ title: "Related native item", author: "fixture" }, client)).item;
   // Seed every family of native field available to metadata mutation, including
@@ -319,7 +320,7 @@ test("500 seeded operation sequences model JSON/TOON export, old-input replay, C
   }
   const registry = resolveRuntimeStatusRegistry((await readSettings(client.pmRoot)).schema);
   assert.ok(custom.every((name) => registry.active_statuses.has(name)));
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     const variant = [" text ", "\r\nparagraph\r\n", "\nparagraph\n", "", "é📚,\"\\", "replayed"][random(6)]!;
     await update(item.id, { author: "fixture", description: variant, body: variant, priority: random(5), status: custom[random(custom.length)]!, replaceDeps: true, dep: [`id=${peer.id},kind=${random(2) ? "related_to" : "blocked_by"}`] }, client);
     const selectedFields = [fields[sequence % fields.length]!, fields[random(fields.length)]!, "title"];

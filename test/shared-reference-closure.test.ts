@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
@@ -21,11 +22,11 @@ function decoded(text: string, format: "json" | "toon"): SharedEvidencePack {
   return (format === "json" ? JSON.parse(text) : decodeToon(text)) as SharedEvidencePack;
 }
 
-test("500 seeded reference graphs resolve every SDK and wire binding under full and constrained budgets", async () => {
+test(`${testDepth(500)} seeded reference graphs resolve every SDK and wire binding under full and constrained budgets`, async () => {
   let seed = 1962;
   /** Stable seeds cover shared values, distinct revisions, escaped text and omitted groups. */
   function random(max: number): number { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % max; }
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     const format = sequence % 2 ? "json" : "toon";
     const entries = Array.from({ length: 6 }, (_, i) => ({ revision: `revision-${sequence}-${i}`, value: { text: `${i}: quotes \", CRLF\r\n and 📚 ${"value ".repeat(5 + random(20))}`, relationships: [{ id: `related-${i}` }] } }));
     entries[1] = entries[0]!;

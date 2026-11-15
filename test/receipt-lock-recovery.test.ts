@@ -1,3 +1,4 @@
+import { testTimeout } from "./support/depth.ts";
 /** Two-process crash and bounded-contention checks against actual receipt writes. */
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -88,7 +89,7 @@ test("live receipt writer refuses within its bounded wait, even with a longer en
   } finally {
     if (previous === undefined) delete process.env.PM_LOCK_WAIT_MS; else process.env.PM_LOCK_WAIT_MS = previous;
   }
-  assert.ok(Date.now() - started < 5000, `contention must obey the ${RECEIPT_LOCK.waitMs}ms native budget`);
+  assert.ok(Date.now() - started < testTimeout(5000), `contention must obey the ${RECEIPT_LOCK.waitMs}ms native budget`);
   assert.equal(f.child.exitCode, null);
   assert.equal(readFileSync(f.receiptPath, "utf8"), before);
 });

@@ -1,0 +1,30 @@
+id: pm-context-ci-v2
+title: Split quick PR CI from exhaustive local deep validation
+description: "Fleet CI v2; companion pm-cli-website-dyhg. Preserve required checks and committed dist verification, reduce deterministic seed depth for PRs, retain exhaustive npm/Bun gates after merge and nightly."
+type: Task
+pm_format_version: 2
+status: in_progress
+priority: 2
+tags[2]: ci,performance
+created_at: "2026-11-15T11:43:07.824Z"
+updated_at: "2026-11-15T11:47:01.807Z"
+assignee: codex-sol
+claim_principal: codex-sol
+author: codex-sol
+acceptance_criteria: Required test (22) and test (26) checks remain; docs-only fast path; full original gates retained in deep tier; unchanged coverage thresholds; evidence and timing recorded
+comments[3]{created_at,author,text}:
+  "2026-11-15T11:43:10.343Z",codex-sol,"Search found no matching flaky or CI performance task. Existing pm-context-3zzd owns release changelog drift and remains separate. Required contexts are exactly test (22) and test (26); CodeQL is not required. Pilot PR is unbraind/pm-csv#258. Plan: hosted quick PR matrix, exhaustive local deep matrix, deterministic seed prefixes, unchanged coverage gates, bounded validation and early PR feedback. Companion: pm-cli-website-dyhg."
+  "2026-11-15T11:45:13.803Z",codex-sol,"Detailed baseline log: run 43629665845 Node 22 execution 15m51s, Node 26 8m05s, queue-inclusive run 56m02s. Slowest seed corpora: answer reduction 113.59s, shared evidence 111.74s, task phase 80.55s, phase restoration 73.63s. Run 43623071562 --log-failed was empty; individual job log confirms npm release gate passed and changelog:check failed. No timed test failure was reported there. Removed unrelated since-packing one-second assertion in favor of its existing whole-pack serialization count and exact bytes. Release verifier files remain untouched."
+  "2026-11-15T11:47:01.796Z",codex-sol,"Implementation ready for early CI: ten seeded 500-case loops now use the deterministic 50-case quick prefix. Strict coverage thresholds and source scope unchanged. Added helper regression tests and scaled operational deadlines in affected process/lock tests; product serialization count replaces the fragile one-second assertion. Typecheck, test compilation, docstring lint and release-workflow verifier passed; strict unique-key YAML parse passed (actionlint unavailable). Local touched-test validation is running; the first linked invocation has the CLI default timeout and its metadata is corrected to 1200 seconds for subsequent execution."
+files[6]{path,scope}:
+  .github/workflows/ci-deep.yml,project
+  .github/workflows/ci.yml,project
+  .github/workflows/codeql.yml,project
+  test/depth.test.ts,project
+  test/since-production.test.ts,project
+  test/support/depth.ts,project
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref},updated_by,updated_at}:
+  PM_TEST_DEPTH=quick node --test --test-concurrency=2 test/depth.test.ts test/answer-reduction-model.test.ts test/shared-evidence.test.ts test/shared-reference-closure.test.ts test/task-phase.test.ts test/next-evidence.test.ts test/zero-budget.test.ts test/phase-restoration.test.ts test/suggested-command.test.ts test/since-production.test.ts test/witnesses.test.ts test/release-merge-wait.test.ts test/answer-reduction-review.test.ts,project,1200,codex-sol,"2026-11-15T11:45:49.203Z",local_mutation,ci/quick-pr-tier-deep-local-tier,codex-sol,"2026-11-15T11:46:59.402Z"
+docs[1]{path,scope}:
+  docs/ci-tiers.md,project
+body: ""
