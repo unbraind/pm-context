@@ -80,3 +80,20 @@ No wall-clock test failure appears in that run. The existing release-changelog
 item `pm-context-3zzd` owns that defect; release workflows and verifier scripts
 remain outside this change. Quick/full timing and CI receipts are recorded in the
 package task and PR; full depth is not run on the overloaded development host.
+
+Local quick validation passed on Node 26: 75/75 touched tests in 4m05.829s;
+5/5 helper and receipt-lock checks at time scale 3 in 7.349s; one
+`PM_TEST_DEPTH=quick npm run coverage` in 8m11.159s, 489/489 tests with zero
+failures, cancellations or skips. Native coverage reached 100% in all three
+reported dimensions; c8 reached 100% statements/lines/functions/branches
+(6,161 lines/statements, 269 functions, 2,956 branches). Thresholds and source
+scope are unchanged; no late-seed-only branch regressions were needed.
+Typecheck, test compilation, docstring lint, strict YAML parsing, changelog,
+strict tracker health, release workflow verification, and bunx TypeScript
+smoke passed. Fresh builds leave committed dist unchanged.
+
+The baseline hosted Node 22 npm/Bun full gate steps took 7m46s/7m36s.
+Local quick and hosted full timings differ in hardware and command scope;
+they are not a controlled speedup comparison. PR job created-to-completed
+latency remains unavailable while the required jobs are queued; consult the
+PR/task for current run links. Full depth remains pending post-merge deep CI.
