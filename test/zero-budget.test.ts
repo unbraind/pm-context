@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import { removeBunFixture } from "./bun-fixture.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -15,7 +16,7 @@ async function unread(): Promise<never> { assert.fail("receipt-only packet read 
 
 test("zero remaining capacity is successful for every evidence producer and transport at exact receipt boundaries", async () => {
   let seed = 196;
-  for (let i = 0; i < 500; i++) {
+  for (let i = 0; i < testDepth(500); i++) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     const format = i % 2 ? "toon" : "json";
     const representation = i % 4 < 2 ? "factored" : "expanded";

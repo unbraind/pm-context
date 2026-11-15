@@ -1,3 +1,4 @@
+import { testDepth, testTimeout } from "./support/depth.ts";
 import { removeBunFixture } from "./bun-fixture.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -31,7 +32,7 @@ function inspect(packet: PhaseContextPacket, state: Record<string, unknown>, col
   assert.deepEqual(packet.session_restore!.argv.slice(3), ["--fields", "id", "--output-budget", "unbounded", "--json"], "session recovery must not suggest a broad projection that overwrites raw metadata");
 }
 
-test("500 replayed runtime-field models exclude every SDK-derived collision in SDK, CLI and packed Node/Bun packets", async (t) => {
+test(`${testDepth(500)} replayed runtime-field models exclude every SDK-derived collision in SDK, CLI and packed Node/Bun packets`, async (t) => {
   const root = mkdtempSync(join(tmpdir(), "phase-meaning-"));
   t.after(() => removeBunFixture(root));
   const client = { cwd: root, pmRoot: join(root, "tracker"), noExtensions: true };
@@ -60,7 +61,7 @@ test("500 replayed runtime-field models exclude every SDK-derived collision in S
   let model: Record<string, string> = Object.fromEntries([...collisions, "custom_signal"].map((field) => [field, `stored:${field}:initial`]));
   const old: Record<string, string>[] = [];
   let state: Record<string, unknown> = {};
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     old.push({ ...model });
     if (sequence > 0 && random(3) === 0) model = { ...old[random(old.length)]! };
     else for (const field of [...collisions, "custom_signal"]) model[field] = `stored:${field}:${sequence}:${atoms[random(atoms.length)]}${atoms[random(atoms.length)]}:end`;
@@ -80,7 +81,7 @@ test("500 replayed runtime-field models exclude every SDK-derived collision in S
   const packageRoot = resolve(import.meta.dirname, "..");
   // Consume the actual npm artifact. Supply the already-pinned dependencies to
   // keep the test offline; CI separately proves npm and Bun dependency installs.
-  const packed = spawnSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", root], { cwd: packageRoot, encoding: "utf8", timeout: 30000 });
+  const packed = spawnSync("npm", ["pack", "--ignore-scripts", "--json", "--pack-destination", root], { cwd: packageRoot, encoding: "utf8", timeout: testTimeout(30000) });
   assert.equal(packed.status, 0, packed.stderr);
   const filename = (JSON.parse(packed.stdout) as Array<{ filename: string }>)[0]!.filename;
   const consumer = join(root, "consumer");
@@ -106,7 +107,7 @@ test("500 replayed runtime-field models exclude every SDK-derived collision in S
     const path = join(root, "request.json"); writeFileSync(path, JSON.stringify(input));
     const expected = await buildPhaseContext(input, client.pmRoot);
     for (const [runtime, args] of [[process.execPath, [script, path, client.pmRoot]], [bun.stdout, [script, path, client.pmRoot]], [process.execPath, [cli, "context-phase", "--packet", path]]] as const) {
-      const result = spawnSync(runtime, [...args], { cwd: consumer, env: environment, encoding: "utf8", timeout: 30000 });
+      const result = spawnSync(runtime, [...args], { cwd: consumer, env: environment, encoding: "utf8", timeout: testTimeout(30000) });
       assert.equal(result.status, 0, result.stderr);
       const packet = (format === "json" ? JSON.parse(result.stdout) : decodeToon(result.stdout)) as PhaseContextPacket;
       assert.deepEqual(packet, expected);
@@ -116,7 +117,7 @@ test("500 replayed runtime-field models exclude every SDK-derived collision in S
       const commands = [...packet.bindings, ...packet.omission_receipt.omitted_field_groups].flatMap((row) => row.restore_argv ? [row.restore_argv] : []);
       commands.push(packet.session_restore!.argv);
       for (const argv of commands) {
-        const restored = spawnSync(process.execPath, [cli, ...argv.slice(1)], { cwd: consumer, env: environment, encoding: "utf8", timeout: 15000 });
+        const restored = spawnSync(process.execPath, [cli, ...argv.slice(1)], { cwd: consumer, env: environment, encoding: "utf8", timeout: testTimeout(15000) });
         assert.equal(restored.status, 0, restored.stderr);
         const output = JSON.parse(restored.stdout) as { item: Record<string, unknown> };
         const field = argv[argv.indexOf("--fields") + 1]!;
@@ -128,5 +129,5 @@ test("500 replayed runtime-field models exclude every SDK-derived collision in S
     }
   }
   assert.deepEqual(readFileSync(itemPath), before);
-  t.diagnostic(`500 models; ${collisions.length} registered derived-name collisions; 6 packed Node/Bun/CLI packets; ${executions} exact value restorations outside Git`);
+  t.diagnostic(`${testDepth(500)} models; ${collisions.length} registered derived-name collisions; 6 packed Node/Bun/CLI packets; ${executions} exact value restorations outside Git`);
 });

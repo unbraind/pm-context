@@ -1,3 +1,4 @@
+import { testTimeout } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, lstatSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -131,13 +132,13 @@ test("measurement refuses linked export roots before copying or changing origina
   chmodSync(source, 0o751); chmodSync(child, 0o750); chmodSync(file, 0o640); symlinkSync(source, link, "dir");
   const modes = [source, child, file].map((path) => lstatSync(path).mode);
   t.after(() => { chmodSync(source, 0o751); chmodSync(child, 0o750); chmodSync(file, 0o640); rmSync(scratch, { recursive: true, force: true }); });
-  const result = spawnSync(process.execPath, [resolve(import.meta.dirname, "measure-answer-reduction.ts"), link], { encoding: "utf8", timeout: 30000 });
+  const result = spawnSync(process.execPath, [resolve(import.meta.dirname, "measure-answer-reduction.ts"), link], { encoding: "utf8", timeout: testTimeout(30000) });
   assert.deepEqual([source, child, file].map((path) => lstatSync(path).mode), modes, "the original export modes are unchanged");
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /Supply a real export directory, not a symlink/);
   // The ordinary directory path still reaches the existing snapshot validation.
   const copy = join(scratch, "ordinary"); cpSync(source, copy, { recursive: true });
-  const regular = spawnSync(process.execPath, [resolve(import.meta.dirname, "measure-answer-reduction.ts"), copy], { encoding: "utf8", timeout: 30000 });
+  const regular = spawnSync(process.execPath, [resolve(import.meta.dirname, "measure-answer-reduction.ts"), copy], { encoding: "utf8", timeout: testTimeout(30000) });
   assert.notEqual(regular.status, 0); assert.doesNotMatch(regular.stderr, /not a symlink/);
 });
 

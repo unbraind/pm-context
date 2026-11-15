@@ -1,3 +1,4 @@
+import { testTimeout } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -121,7 +122,7 @@ test("512 claim boundary is deterministic and does not hide conflicts behind com
   assert.deepEqual(report.witness?.claims.map((row) => row.id), ["c000", "c511"]);
 });
 
-test("pointer validation rejects adversarial slash runs without backtracking", { timeout: 120000 }, async (t) => {
+test("pointer validation rejects adversarial slash runs without backtracking", { timeout: testTimeout(120000) }, async (t) => {
   const source = pathToFileURL(resolve(import.meta.dirname, "../witnesses.ts")).href;
   const packet = { claims: [claim("a", { citation: { item: "x", field: "/".repeat(250) + "~" } })] };
   // Start the deadline only after imports complete: a saturated host can load
@@ -139,8 +140,8 @@ process.stdout.write("done\\n");`;
     child.stdout.on("data", (chunk: Buffer) => {
       output += chunk.toString();
       if (!deadline && output.includes("ready\n")) deadline = setTimeout(() => {
-        child.kill("SIGKILL"); reject(new Error("Bounded JSON Pointer validation exceeded five seconds after imports"));
-      }, 5000);
+        child.kill("SIGKILL"); reject(new Error("Bounded JSON Pointer validation exceeded its scaled deadline after imports"));
+      }, testTimeout(5000));
     });
     child.stderr.on("data", (chunk: Buffer) => { errors += chunk.toString(); });
     child.once("error", reject);

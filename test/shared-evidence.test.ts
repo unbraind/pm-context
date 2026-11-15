@@ -1,3 +1,4 @@
+import { testDepth } from "./support/depth.ts";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -146,7 +147,7 @@ test("finite JSON source and output fuzz refuses lossy values and preserves prev
   assert.throws(() => encodeSharedEvidence(pack, "bad" as "json"), code("INVALID_OUTPUT"));
 });
 
-test("500 seeded state sequences preserve all native fields, relationships, old-request replays and whitespace through SDK read-back", async (t) => {
+test(`${testDepth(500)} seeded state sequences preserve all native fields, relationships, old-request replays and whitespace through SDK read-back`, async (t) => {
   const { root, client, item } = await tracker(); t.after(() => rmSync(root, { recursive: true, force: true }));
   const peer = (await create({ title: "Related peer", author: "fixture", unset: ["parent", "goal", "objective", "assignee"], clearDeps: true }, client)).item;
   await update(item.id, {
@@ -166,7 +167,7 @@ test("500 seeded state sequences preserve all native fields, relationships, old-
   const registry = resolveRuntimeStatusRegistry((await readSettings(client.pmRoot)).schema);
   assert.ok(custom.every((name) => registry.active_statuses.has(name)));
   const saved: SharedEvidenceRequest[] = []; const seen = new Set<string>(); let roundtrips = 0; let refusals = 0;
-  for (let sequence = 0; sequence < 500; sequence++) {
+  for (let sequence = 0; sequence < testDepth(500); sequence++) {
     await focus(random(2) ? peer.id : item.id, {}, client);
     const variant = [" text ", "\r\nparagraph\r\n", "\nparagraph\n", "", "é📚,\"\\"][random(5)]!;
     await update(item.id, { author: "fixture", description: variant, body: variant, priority: random(5), status: custom[random(5)]!, ...(random(2) ? { parent: peer.id } : { unset: ["parent"] }), goal: "Goal", objective: "Objective", replaceDeps: true, dep: [`id=${peer.id},kind=${random(2) ? "related_to" : "blocked_by"}`] }, client);
@@ -195,7 +196,7 @@ test("500 seeded state sequences preserve all native fields, relationships, old-
     const reread = await sdkRead({ kind: "item", id: item.id }) as Record<string, unknown>; assert.equal(reread.id, item.id);
   }
   assert.deepEqual([...seen].sort(), fields.sort());
-  t.diagnostic(`500 sequences; ${fields.length} native fields; ${roundtrips} representation round trips; ${refusals} matching missing-field refusals; current and older inputs; no writes`);
+  t.diagnostic(`${testDepth(500)} sequences; ${fields.length} native fields; ${roundtrips} representation round trips; ${refusals} matching missing-field refusals; current and older inputs; no writes`);
 });
 
 test("native reader detects competing SDK transitions at every item/history boundary and supports absent legacy history", async (t) => {
