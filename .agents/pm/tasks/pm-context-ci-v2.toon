@@ -7,22 +7,28 @@ status: in_progress
 priority: 2
 tags[3]: ci,"gh:unbraind/pm-context#234",performance
 created_at: "2026-11-15T11:43:07.824Z"
-updated_at: "2026-11-15T12:02:44.082Z"
+updated_at: "2026-11-16T07:32:19.333Z"
+assignee: codex-sol
+claim_principal: codex-sol
 author: codex-sol
 acceptance_criteria: Required test (22) and test (26) checks remain; docs-only fast path; full original gates retained in deep tier; unchanged coverage thresholds; evidence and timing recorded
-comments[6]{created_at,author,text}:
+comments[9]{created_at,author,text}:
   "2026-11-15T11:43:10.343Z",codex-sol,"Search found no matching flaky or CI performance task. Existing pm-context-3zzd owns release changelog drift and remains separate. Required contexts are exactly test (22) and test (26); CodeQL is not required. Pilot PR is unbraind/pm-csv#258. Plan: hosted quick PR matrix, exhaustive local deep matrix, deterministic seed prefixes, unchanged coverage gates, bounded validation and early PR feedback. Companion: pm-cli-website-dyhg."
   "2026-11-15T11:45:13.803Z",codex-sol,"Detailed baseline log: run 43629665845 Node 22 execution 15m51s, Node 26 8m05s, queue-inclusive run 56m02s. Slowest seed corpora: answer reduction 113.59s, shared evidence 111.74s, task phase 80.55s, phase restoration 73.63s. Run 43623071562 --log-failed was empty; individual job log confirms npm release gate passed and changelog:check failed. No timed test failure was reported there. Removed unrelated since-packing one-second assertion in favor of its existing whole-pack serialization count and exact bytes. Release verifier files remain untouched."
   "2026-11-15T11:47:01.796Z",codex-sol,"Implementation ready for early CI: ten seeded 500-case loops now use the deterministic 50-case quick prefix. Strict coverage thresholds and source scope unchanged. Added helper regression tests and scaled operational deadlines in affected process/lock tests; product serialization count replaces the fragile one-second assertion. Typecheck, test compilation, docstring lint and release-workflow verifier passed; strict unique-key YAML parse passed (actionlint unavailable). Local touched-test validation is running; the first linked invocation has the CLI default timeout and its metadata is corrected to 1200 seconds for subsequent execution."
   "2026-11-15T11:49:29.227Z",codex-sol,"PR opened as unbraind/pm-context#234 at head cee6a60559c4f8d12801e9c16cb282880f5497f9. Initial CI run 43710656373 and CodeQL run 43710656361 queued. Static workflow assertions and eight actual Bash classification fixtures passed, including nested executable tracker code, newline filenames and source-to-docs moves. The initial local pm test invocation hit its default 120-second watchdog without an assertion failure; rerunning with an explicit 1200-second timeout. Strict tracker health passes with pre-existing advisory warnings."
   "2026-11-15T11:53:38.482Z",codex-sol,"Touched quick suites passed 75/75 in 245.829 seconds with no failures, cancellations or skips. Separate scaled helper/receipt-lock run passed 5/5 in 7.349 seconds at PM_TEST_TIME_SCALE=3; bunx --no-install tsc --noEmit also passed. Running the single bounded quick coverage pass next. The default-timeout interruption was infrastructure configuration, not an assertion failure."
   "2026-11-15T12:02:43.229Z",codex-sol,"Single bounded quick coverage passed in 491.159 seconds: 489/489 tests, zero failures/cancellations/skips. Native coverage 100% lines/branches/functions; c8 100% statements/lines/functions/branches, covering 6161 lines/statements, 269 functions and 2956 branches. Source scope and thresholds unchanged; no late-seed-only branch regressions required. Fresh build leaves committed dist unchanged. Baseline hosted Node 22 full npm gate was 7m46s, Bun 7m36s; different hardware and scope prevent a controlled speedup claim. Full depth intentionally reserved for CI Deep after merge. Initial hosted PR jobs remain queued after about 14 minutes, so completed job wall times are unavailable. Final evidence push will supersede that run. No review threads touched and no merges, item closes, protection or variable changes performed."
-files[18]{path,scope}:
+  "2026-11-16T07:23:44.609Z",codex-sol,"Final-template follow-up: audit current main; split deep Node 22/26 by npm/Bun with one gate per job; preserve active deep runs; route executable tracker and docs files through code CI; verify optional CodeQL paths and self-hosted setup. Measure latest successful PR jobs, run workflow contracts, typecheck and available lint. Release claim without closing; no release workflow or verifier edits."
+  "2026-11-16T07:32:18.135Z",codex-sol,"Follow-up audit: required contexts verified through branch protection. CodeQL is optional; ordered paths exclude tracker data, docs, Markdown and lockfiles, then re-include executable tracker files and all tracker extensions. Existing hosted-only npm cache/Bun setup and Bun version logging were audited and retained. Historical PR run 43736972604: test (22) execution 3m41s, wall 42m46s; test (26) execution 3m22s, wall 62m39s. All execution durations are below 15 minutes; long wall times are queueing. Items 1, 2 and 5 changed; item 3 expanded to all executable suffixes/extensions and lockfiles; item 4 already compliant. No item 6 test-depth fix needed."
+  "2026-11-16T07:32:19.318Z",codex-sol,"Local proof passed through the linked pm test command: typecheck, test compilation and focused workflow contracts; lint passed where defined, with the existing docstring gate used for pm-context. Strict YAML parsing passed; actionlint is unavailable. New classifier tests exercise executable tracker/docs suffixes, nested files, tracker extensions and data-only paths. Full depth is deferred to post-merge deep CI. No release workflows or release verifiers changed."
+files[19]{path,scope}:
   .github/workflows/ci-deep.yml,project
   .github/workflows/ci.yml,project
   .github/workflows/codeql.yml,project
   test/answer-reduction-model.test.ts,project
   test/answer-reduction-review.test.ts,project
+  test/ci-tiers.test.ts,project
   test/depth.test.ts,project
   test/next-evidence.test.ts,project
   test/phase-restoration.test.ts,project
@@ -36,7 +42,7 @@ files[18]{path,scope}:
   test/task-phase.test.ts,project
   test/witnesses.test.ts,project
   test/zero-budget.test.ts,project
-tests[3]:
+tests[4]:
   - command: PM_TEST_DEPTH=quick node --test --test-concurrency=2 test/depth.test.ts test/answer-reduction-model.test.ts test/shared-evidence.test.ts test/shared-reference-closure.test.ts test/task-phase.test.ts test/next-evidence.test.ts test/zero-budget.test.ts test/phase-restoration.test.ts test/suggested-command.test.ts test/since-production.test.ts test/witnesses.test.ts test/release-merge-wait.test.ts test/answer-reduction-review.test.ts
     scope: project
     timeout_seconds: 1200
@@ -63,6 +69,14 @@ tests[3]:
       created_at: "2026-11-15T11:53:39.427Z"
       source_kind: local_mutation
       source_ref: ci/quick-pr-tier-deep-local-tier
+  - command: "npm run typecheck && npm run docstring && npm run build:test && PM_TEST_DEPTH=quick node --test --test-concurrency=2 test/ci-tiers.test.ts test/release-workflow.test.ts test/codeql-action-sync.test.ts"
+    scope: project
+    timeout_seconds: 600
+    provenance:
+      author: codex-sol
+      created_at: "2026-11-16T07:28:17.060Z"
+      source_kind: local_mutation
+      source_ref: ci/v2-template-followup
 docs[1]{path,scope}:
   docs/ci-tiers.md,project
 body: ""

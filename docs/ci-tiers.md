@@ -5,7 +5,7 @@ Required checks remain exactly `test (22)` and `test (26)`. Both run on
 runs, and have a 25-minute timeout (expected quick execution: 6–10 minutes).
 CodeQL is not a required check. No additional platform jobs existed.
 
-| Check / contract | Code PR Node 22 | Code PR Node 26 | Tracker/docs-only PR (both) | Deep Node 22 and 26 |
+| Check / contract | Code PR Node 22 | Code PR Node 26 | Tracker/docs-only PR (both) | Deep Node 22/26 × npm/Bun |
 | --- | --- | --- | --- | --- |
 | npm ci / prepare merge drivers | yes | yes | yes | yes |
 | Strict pm health / required merge drivers | — | yes | yes | yes |
@@ -29,15 +29,19 @@ gate once, and Node 22 runs `npm test` without coverage, changelog or packing.
 The docs/tracker path runs only dependency installation, strict health and
 changelog verification. Change detection compares PR base/head with NUL delimiters
 and disables rename folding, so moving code into docs retains its source deletion.
-Executable `.mjs`, `.cjs`, `.js` and `.ts` tracker files select the code path.
-Manual dispatch always selects code validation. CodeQL ignores tracker data,
-Markdown, docs and `package-lock.json` on PR/main events; its weekly Monday
+Executable JavaScript, TypeScript and shell files in the tracker or docs, and
+all tracker extensions, select the code path.
+Manual dispatch always selects code validation. Ordered CodeQL paths ignore tracker
+data, Markdown, docs and lockfiles, then re-include executable tracker files
+and all tracker extensions on PR/main events; its weekly Monday
 03:03 UTC scan still analyzes the complete source, including tracker helpers.
 
-Deep checks are named `deep (22)` and `deep (26)`, never required PR contexts.
+Deep checks are `deep (22, npm)`, `deep (22, bun)`, `deep (26, npm)` and
+`deep (26, bun)`, never required PR contexts.
 They run on pushes to main, daily at 02:41 UTC (release: 03:23 UTC), or dispatch.
-Each executes both original npm and Bun full release gates at `PM_TEST_DEPTH=full`
-and `PM_TEST_TIME_SCALE=3`, with a 120-minute timeout and cancellation per ref.
+Each matrix job executes exactly one original npm or Bun full release gate at
+`PM_TEST_DEPTH=full` and `PM_TEST_TIME_SCALE=3`, with a 120-minute timeout.
+Per-ref concurrency preserves the active run and retains one pending run.
 The controller-owned `PM_LOCAL_DEEP` variable routes jobs to `[self-hosted, pm-local]`
 unless set to `off`, which selects `ubuntu-latest`. Local runners reuse persistent
 npm cache and preinstalled Bun; hosted runners use setup-node caching and setup-bun.
@@ -97,3 +101,24 @@ Local quick and hosted full timings differ in hardware and command scope;
 they are not a controlled speedup comparison. PR job created-to-completed
 latency remains unavailable while the required jobs are queued; consult the
 PR/task for current run links. Full depth remains pending post-merge deep CI.
+
+## Final-template follow-up (2026-11-16)
+
+Latest successful PR CI: [run 43736972604](https://github.com/unbraind/pm-context/actions/runs/43736972604).
+These are historical workflow job measurements, not a controlled benchmark of this change.
+
+| Job | Execution (started → completed) | Wall time (created → completed) |
+| --- | --- | --- |
+| test (22) | 3m41s | 42m46s |
+| test (26) | 3m22s | 62m39s |
+
+Every measured job executed within the 15-minute quick-tier target. Queueing
+explains any larger wall time. No test-depth adjustment or sharding is included.
+CodeQL is optional: ordered paths exclude tracker data, Markdown, docs and
+lockfiles, then restore all executable tracker suffixes (`mjs,cjs,js,jsx,ts,tsx,mts,cts,sh`)
+and `.agents/pm/extensions/**`. Required CI still runs on every PR.
+
+The workflow contracts strictly parse all three tier YAML files, exercise each PR
+classifier against data and executable paths, and verify one full gate per matrix
+job, self-hosted setup, the runner expression and non-cancelling deep concurrency.
+Full-depth execution remains post-merge deep-CI evidence.
