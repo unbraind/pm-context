@@ -76,23 +76,41 @@ test('every PR detector routes executable tracker and docs paths to code', () =>
   }
 });
 
+/** Require GitHub's ordered tracker exclusion before every executable re-inclusion. */
+function assertCodeqlPaths(trigger: Workflow['on'][string], event: string): void {
+  assert.equal(trigger['paths-ignore'], undefined);
+  const patterns = trigger.paths;
+  assert.ok(patterns);
+  assert.equal(patterns[0], '**');
+  const trackerExclusion = patterns.indexOf('!.agents/pm/**');
+  assert.ok(trackerExclusion > 0, `${event}: tracker exclusion must follow **`);
+  for (const inclusion of [...extensions.map(extension => `.agents/pm/**/*.${extension}`), '.agents/pm/extensions/**']) {
+    assert.ok(patterns.indexOf(inclusion) > trackerExclusion, `${event}: ${inclusion} must follow tracker exclusion`);
+  }
+  const included = (path: string): boolean => patterns.reduce((selected, pattern) => {
+    const negative = pattern.startsWith('!');
+    return matchesGlob(path, negative ? pattern.slice(1) : pattern) ? !negative : selected;
+  }, false);
+  for (const path of ['README.md', 'docs/guide.md', 'package-lock.json', 'bun.lock', 'bun.lockb', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json', '.agents/pm/tasks/item.toon', '.agents/pm/history/item.jsonl']) {
+    assert.equal(included(path), false, `${event}: ${path}`);
+  }
+  for (const path of [...extensions.map(extension => `.agents/pm/nested/tool.${extension}`), '.agents/pm/extensions/plugin/manifest.json', '.agents/pm/extensions/README.md', 'src/index.ts']) {
+    assert.equal(included(path), true, `${event}: ${path}`);
+  }
+}
+
 test('optional CodeQL excludes data and lockfiles but re-includes executable tracker paths', () => {
   const codeql = workflow('codeql');
   for (const event of ['push', 'pull_request']) {
+    assertCodeqlPaths(codeql.on[event], event);
+  }
+});
+
+test('CodeQL path contract rejects a missing tracker exclusion for both events', () => {
+  const codeql = workflow('codeql');
+  for (const event of ['push', 'pull_request']) {
     const trigger = codeql.on[event];
-    assert.equal(trigger['paths-ignore'], undefined);
-    const patterns = trigger.paths;
-    assert.ok(patterns);
-    assert.equal(patterns[0], '**');
-    const included = (path: string): boolean => patterns.reduce((selected, pattern) => {
-      const negative = pattern.startsWith('!');
-      return matchesGlob(path, negative ? pattern.slice(1) : pattern) ? !negative : selected;
-    }, false);
-    for (const path of ['README.md', 'docs/guide.md', 'package-lock.json', 'bun.lock', 'bun.lockb', 'pnpm-lock.yaml', 'yarn.lock', 'npm-shrinkwrap.json', '.agents/pm/tasks/item.toon', '.agents/pm/history/item.jsonl']) {
-      assert.equal(included(path), false, `${event}: ${path}`);
-    }
-    for (const path of [...extensions.map(extension => `.agents/pm/nested/tool.${extension}`), '.agents/pm/extensions/plugin/manifest.json', '.agents/pm/extensions/README.md', 'src/index.ts']) {
-      assert.equal(included(path), true, `${event}: ${path}`);
-    }
+    const paths = trigger.paths?.filter(pattern => pattern !== '!.agents/pm/**');
+    assert.throws(() => assertCodeqlPaths({ ...trigger, paths }, event), /tracker exclusion must follow/u);
   }
 });
