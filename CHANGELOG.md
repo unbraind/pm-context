@@ -2,7 +2,9 @@
 
 ## 2026.11.16 - 2026-11-16
 
-No changes.
+### Other
+
+- Adopt November 4 SDK clearing in shared-evidence fixtures ([pm-context-toolchain-1104](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-toolchain-1104.toon))
 
 ## 2026.11.13 - 2026-11-13
 

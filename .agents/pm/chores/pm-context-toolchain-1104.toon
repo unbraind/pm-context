@@ -2,13 +2,18 @@ id: pm-context-toolchain-1104
 title: Adopt November 4 SDK clearing in shared-evidence fixtures
 description: "Verify issue #212 and update https://github.com/unbraind/pm-context/pull/211 to the November 4 toolchain without weakening shared-evidence contracts."
 type: Chore
-status: in_progress
+status: closed
 priority: 2
 tags[5]: dependencies,"gh:unbraind/pm-context#211","gh:unbraind/pm-context#212",migration,sdk
 created_at: "2026-11-04T19:10:53.847Z"
-updated_at: "2026-11-04T20:31:42.465Z"
+updated_at: "2026-11-16T20:26:09.702Z"
+closed_at: "2026-11-16T20:26:09.615Z"
+completed_at: "2026-11-16T20:26:09.615Z"
 author: codex-toolchain-1104
 acceptance_criteria: "Native fixture clears preserve focus isolation, all 500 sequences, revision and no-write assertions; full coverage and typecheck pass at unchanged thresholds."
+resolution: Implemented and merged in #211 (363e8bc).
+expected_result: The change described by this item is on main.
+actual_result: "Merged in #211 as 363e8bc; checks successful at head 4574f28: CodeQL, codeql, enable-auto-merge, semgrep-cloud-platform/scan, test (22), test (26)."
 comments[7]{created_at,author,text}:
   "2026-11-04T19:14:23.827Z",codex-toolchain-1104,"Verified issue #212 on SDK 2026.11.4: six targeted cases abort with the GH-1614 typed parent sentinel refusal (introduced 2026.10.30). Classification: test fixtures pinned old behavior. Replace create/update and injected child-process parent/goal/objective/assignee sentinels with explicit unset; preserve all 500 seeded sequences, focus isolation, ABA/revision, closure and zero-write assertions."
   "2026-11-04T19:14:28.622Z",codex-toolchain-1104,"Auxiliary host-pin coupling: packed-shared-evidence.ts silently defaulted to SDK 2026.10.28. It now defaults to the declared development SDK, with an explicit compatibility override; the documented invocation follows the same default. The minimum SDK declarations and historical evidence stay deliberate."
@@ -30,4 +35,5 @@ docs[4]{path,scope,note}:
   docs/sdk-adoption.md,project,Audit version is historical; current pin belongs to package.json
   docs/shared-evidence-validation.md,project,Host follows the declared SDK by default
   README.md,project,Empty daily release-window policy
+close_reason: "Delivered by #211 \"chore(deps-dev): bump the pm-toolchain group with 3 updates\" (merged as 363e8bc). Checks successful at the PR head 4574f28: CodeQL, codeql, enable-auto-merge, semgrep-cloud-platform/scan, test (22), test (26)."
 body: ""
