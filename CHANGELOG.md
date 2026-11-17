@@ -10,6 +10,10 @@ No changes.
 
 - Abandon prepared releases without usable notes and validate the exact new section ([pm-context-empty-prepared-release](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-empty-prepared-release.toon))
 
+### Other
+
+- Adopt November 4 SDK clearing in shared-evidence fixtures ([pm-context-toolchain-1104](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-toolchain-1104.toon))
+
 ## 2026.10.31 - 2026-10-31
 
 ### Fixed
