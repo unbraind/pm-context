@@ -1,3 +1,7 @@
+import { buildClaimResume, CLAIM_RESUME_INTENT } from "./claim-resume.js";
+export { buildClaimResume, CLAIM_RESUME_INTENT } from "./claim-resume.js";
+/** Package declarations discoverable by the host context intent registry. */
+export const contextIntents = [CLAIM_RESUME_INTENT];
 import { buildSuggestedCommand } from "./suggested-command.js";
 import { reduceAnswerContext, encodeAnswerReduction, readAnswerReductionJson, validateAnswerReduction, AnswerReductionError } from "./answer-reduction.js";
 export { reduceAnswerContext, encodeAnswerReduction, parseAnswerReductionRequest, parseAnswerReduction, readAnswerReductionJson, validateAnswerReduction, AnswerReductionError } from "./answer-reduction.js";
@@ -18,7 +22,7 @@ import { buildSincePack, encodeSincePack } from "./since.js";
 import { writeFileSync } from "node:fs";
 import { isDeepStrictEqual } from "node:util";
 import { resolveFileFocus, matchFileFocus, rankFileFocus, renderFileFocus, fileLinkCommand, readFileFocusItems } from "./file-focus.js";
-import { estimatePmOutputTokens, createRelationshipKindRegistry, readSettings, resolveRuntimeStatusRegistry, resolveWorkspaceRelationshipKindRegistry, } from "@unbrained/pm-cli/sdk";
+import { estimatePmOutputTokens, readAuthorEnvironment, createRelationshipKindRegistry, readSettings, resolveRuntimeStatusRegistry, resolveWorkspaceRelationshipKindRegistry, } from "@unbrained/pm-cli/sdk";
 import { listAllComplete } from "@unbrained/pm-cli/sdk/core";
 import { buildItemContextRelevanceCandidates, certifyCompleteListResult, PmCompleteListValidationError, defaultScoreContextCandidates, packContextCandidates, recordContextUsageServing, } from "@unbrained/pm-cli/sdk/query";
 import { DEFAULT_REPORT_LIMIT, renderUsageReport, reportContextUsage, resolveSince } from "./context-usage.js";
@@ -1114,6 +1118,26 @@ export function commandExamples() {
 /** Register commands with structured help and argv-first refresh suggestions. */
 function setupCommands(api) {
     api.registerCommand({
+        name: "context-resume",
+        description: "Show verified net item changes since an author's latest recorded claim.",
+        intent: "Resume one previously claimed item with bounded context.",
+        arguments: [{ name: "id", description: "Previously claimed item id", required: true }],
+        flags: [
+            { long: "--claim-author", value_name: "id", description: "Recorded claim author (defaults to the invocation author)", value_type: "string" },
+            { long: "--for", value_name: "intent", description: "Projection intent (resume)", value_type: "string" },
+            { long: "--token-budget", value_name: "n", description: "Complete output token estimate ceiling (default 1600)", value_type: "number", value_validation: "strict" },
+        ],
+        async run(ctx) {
+            return renderedCommandResult((await buildClaimResume({
+                id: ctx.args[0],
+                author: ctx.options.claimAuthor ?? ctx.global.author ?? readAuthorEnvironment() ?? "",
+                intent: ctx.options.for,
+                tokenBudget: ctx.options.tokenBudget,
+                format: ctx.global.json ? "json" : "toon",
+            }, ctx.pm_root)).text);
+        },
+    });
+    api.registerCommand({
         name: "context-phase",
         description: "Preserve mandatory task-phase fields or refuse; explain changes and reuse SDK session facts.",
         flags: [
@@ -1656,7 +1680,7 @@ export default {
         setupCommands(api);
         if (typeof api.registerRenderer === "function") {
             const rendererOwnership = {
-                commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-evidence-shared", "context-next-evidence", "context-phase", "context-reduce"],
+                commands: ["context-resume", "context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-evidence-shared", "context-next-evidence", "context-phase", "context-reduce"],
                 resultDiscriminator: isRenderedCommandResult,
             };
             api.registerRenderer("toon", renderCommandResult, rendererOwnership);

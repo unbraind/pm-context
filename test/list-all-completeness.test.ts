@@ -136,7 +136,7 @@ test("the pm host gate refuses every version below the declared floor", () => {
   assert.equal(below.compatible, false, "the known-bad 2026.8.14 host must be refused");
   assert.deepStrictEqual(below.findings.map((f) => f.code), ["pm_min_version_unmet"]);
   assert.equal(
-    checkExtensionManifestCompatibility(manifest, { pmVersion: "2026.10.23" }).compatible,
+    checkExtensionManifestCompatibility(manifest, { pmVersion: "2026.10.27" }).compatible,
     true,
     "the declared floor itself must load",
   );

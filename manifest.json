@@ -3,7 +3,7 @@
   "version": "2026.11.18",
   "description": "Generate deterministic pm context packs for agent handoffs, reviews, and status briefs",
   "author": "@unbraind",
-  "pm_min_version": "2026.10.23",
+  "pm_min_version": "2026.10.27",
   "entry": "dist/index.js",
   "capabilities": [
     "commands",

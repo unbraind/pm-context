@@ -400,6 +400,63 @@ scope. The alert and workflow-verifier migration also requires coordinating the
 existing `pm-context-qu0a` ownership before migrating its linked paths. No helper
 has been marked removed while that dependency remains unresolved.
 
+## Resume an item from your last claim
+
+```sh
+PM_AUTHOR=agent-a pm context-resume project-task
+pm context-resume project-task --claim-author agent-a --for resume --token-budget 1200 --json
+```
+
+Run this before claiming the item again. The `resume` intent selects the latest
+retained claim by the exact recorded author on that item. Use `--claim-author`
+when resuming under a different identity. The command verifies the history
+against the live item, then compares the claim snapshot with the verified head.
+It returns current title, status, priority and assignee, plus the net changes
+since the claim. Reverted edits and changes on other items are outside this
+comparison. The command is read-only and works without Git. A missing claim,
+compacted-away claim, or unverifiable history produces a typed refusal.
+
+Changes are `set`, `remove` or `append`. An `append` includes the previous
+array length and only the added entries when the original prefix is identical.
+An edited or reordered array is returned as a whole `set`. The budget fits
+whole changes, preserving current item state and both history coordinates. The
+default ceiling is 1,600 SDK-estimated tokens over the entire TOON or JSON
+output. The `omission_receipt` lists audit-only fields and fields deferred for
+budget. Run its `restore_argv.claim` and `restore_argv.head` in the same tracker
+to recover the two projected snapshots. For \`raw_restore_fields\`, use SDK
+\`getItemAt\` at both recorded versions to recover the stored value. The CLI's
+\`restore_argv.history\` returns the raw patches in replay order for the same
+purpose. This handles stored field names shared by derived CLI output. If
+history has been rewritten, regenerate the brief before using those versions.
+The typed SDK entry point
+`buildClaimResume(request, pmRoot)` returns both the packet and its measured
+rendering. This package requires pm 2026.10.27 or newer for SDK output fitting.
+
+### Public tracker measurement
+
+Run from pm-context at `13a9f0c` with pm 2026.11.18 and this extension installed.
+The selected author's latest claim for `pm-context-ci-v2` is version 28. The
+tracker at that revision ends at version 34 for this item.
+
+```sh
+id=pm-context-ci-v2
+fields=id,title,status,assignee,priority,blocked_reason,blocked_by,dependencies,acceptance_criteria,description,body,comments,notes,files,docs,tests
+pm --output-budget unbounded --output-limit unbounded history "$id" --compact
+pm --output-budget unbounded get "$id" --at 28 --fields "$fields"
+pm --output-budget unbounded get "$id" --fields "$fields"
+pm context-resume "$id" --claim-author codex-sol --for resume
+```
+
+| Complete TOON responses | UTF-8 bytes | `o200k_base` tokens | SDK estimated tokens |
+| --- | ---: | ---: | ---: |
+| Core compact history plus two projected item reads | 23,936 | 6,587 | 5,985 |
+| Claim-based resume brief | 3,894 | 1,145 | 974 |
+
+Count each command's stdout separately with `tiktoken` using `o200k_base`, then
+sum each workflow. The brief returned all five work-field changes in one
+response, saving 5,442 tokenizer tokens (82.6%). The SDK estimate is the sum
+of each response's UTF-8 byte length divided by four and rounded up.
+
 ## Resume since your last session
 
 ```sh

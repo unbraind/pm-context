@@ -1,3 +1,10 @@
+import { buildClaimResume, CLAIM_RESUME_INTENT } from "./claim-resume.ts";
+export { buildClaimResume, CLAIM_RESUME_INTENT } from "./claim-resume.ts";
+export type { ClaimResumeChange, ClaimResumePacket, ClaimResumeRequest, ClaimResumeResult, ClaimResumeRevision } from "./claim-resume.ts";
+
+/** Package declarations discoverable by the host context intent registry. */
+export const contextIntents = [CLAIM_RESUME_INTENT];
+
 import { buildSuggestedCommand } from "./suggested-command.ts";
 import { reduceAnswerContext, encodeAnswerReduction, readAnswerReductionJson, validateAnswerReduction, AnswerReductionError } from "./answer-reduction.ts";
 export { reduceAnswerContext, encodeAnswerReduction, parseAnswerReductionRequest, parseAnswerReduction, readAnswerReductionJson, validateAnswerReduction, AnswerReductionError } from "./answer-reduction.ts";
@@ -42,6 +49,7 @@ import type {
 } from "@unbrained/pm-cli/sdk";
 import {
   estimatePmOutputTokens,
+  readAuthorEnvironment,
   createRelationshipKindRegistry,
   readSettings,
   resolveRuntimeStatusRegistry,
@@ -1400,6 +1408,26 @@ export function commandExamples(): Record<"context-pack" | "context-handoff" | "
 /** Register commands with structured help and argv-first refresh suggestions. */
 function setupCommands(api: ExtensionApi): void {
   api.registerCommand({
+    name: "context-resume",
+    description: "Show verified net item changes since an author's latest recorded claim.",
+    intent: "Resume one previously claimed item with bounded context.",
+    arguments: [{ name: "id", description: "Previously claimed item id", required: true }],
+    flags: [
+      { long: "--claim-author", value_name: "id", description: "Recorded claim author (defaults to the invocation author)", value_type: "string" },
+      { long: "--for", value_name: "intent", description: "Projection intent (resume)", value_type: "string" },
+      { long: "--token-budget", value_name: "n", description: "Complete output token estimate ceiling (default 1600)", value_type: "number", value_validation: "strict" },
+    ],
+    async run(ctx) {
+      return renderedCommandResult((await buildClaimResume({
+        id: ctx.args[0]!,
+        author: (ctx.options.claimAuthor as string | undefined) ?? ctx.global.author ?? readAuthorEnvironment() ?? "",
+        intent: ctx.options.for as string | undefined,
+        tokenBudget: ctx.options.tokenBudget as number | undefined,
+        format: ctx.global.json ? "json" : "toon",
+      }, ctx.pm_root)).text);
+    },
+  });
+  api.registerCommand({
     name: "context-phase",
     description: "Preserve mandatory task-phase fields or refuse; explain changes and reuse SDK session facts.",
     flags: [
@@ -1930,7 +1958,7 @@ export default {
     setupCommands(api);
     if (typeof api.registerRenderer === "function") {
       const rendererOwnership = {
-        commands: ["context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-evidence-shared", "context-next-evidence", "context-phase", "context-reduce"],
+        commands: ["context-resume", "context-pack", "context-pack since", "context-handoff", "context-usage", "context-freshness record", "context-freshness resume", "context-witnesses", "context-evidence", "context-evidence-shared", "context-next-evidence", "context-phase", "context-reduce"],
         resultDiscriminator: isRenderedCommandResult,
       };
       api.registerRenderer("toon", renderCommandResult, rendererOwnership);

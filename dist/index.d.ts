@@ -1,3 +1,14 @@
+export { buildClaimResume, CLAIM_RESUME_INTENT } from "./claim-resume.ts";
+export type { ClaimResumeChange, ClaimResumePacket, ClaimResumeRequest, ClaimResumeResult, ClaimResumeRevision } from "./claim-resume.ts";
+/** Package declarations discoverable by the host context intent registry. */
+export declare const contextIntents: {
+    command: "context-resume";
+    intent: "resume";
+    description: string;
+    included_field_groups: string[];
+    token_budget: number;
+    source: "package";
+}[];
 export { reduceAnswerContext, encodeAnswerReduction, parseAnswerReductionRequest, parseAnswerReduction, readAnswerReductionJson, validateAnswerReduction, AnswerReductionError } from "./answer-reduction.ts";
 export type { AnswerValue, AnswerVariable, AnswerPredicate, AnswerRule, AnswerFragment, AnswerReductionRequest, AnswerIrrelevanceProof, ReducedAnswerFragment, AnswerReduction } from "./answer-reduction.ts";
 export { createSharedEvidenceReader, packSharedEvidence, encodeSharedEvidence, parseSharedEvidenceRequest, SharedEvidenceError } from "./shared-evidence.ts";
