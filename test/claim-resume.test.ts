@@ -6,8 +6,9 @@ import { join, resolve } from "node:path";
 import test, { type TestContext } from "node:test";
 import {
   createHistoryEntry, decodeToon, emptyImportedDocument, estimatePmOutputTokens,
-  getItemAt, historyCompact, init, readAuthorEnvironment, verifyHistoryEntries, writeAuthorEnvironment,
+  getItemAt, historyCompact, init, readAuthorEnvironment, replayHistoryToTarget, schemaAddField, verifyHistoryEntries, writeAuthorEnvironment,
 } from "@unbrained/pm-cli/sdk";
+import type { HistoryEntry } from "@unbrained/pm-cli/sdk";
 import { claim, comments, create, release, update } from "@unbrained/pm-cli/sdk/core";
 import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
 import extension, { buildClaimResume } from "../index.ts";
@@ -184,9 +185,17 @@ test("real SDK command dispatch honors explicit, global and environment claim au
 
 test("installed CLI uses real tracker history and restores deferred data by version without Git", async (t) => {
   const f = await fixture(t);
+  await schemaAddField("custom_signal", { type: "string", cliFlag: "custom-signal", commands: ["update"], author }, f.client);
+  await schemaAddField("notes_count", { type: "string", cliFlag: "stored-notes-count", commands: ["update"], author }, f.client);
+  const initial = { customSignal: "Initial signal", storedNotesCount: "Initial stored field", author };
+  await update(f.id, initial, f.client);
   await claim(f.id, { author }, f.client);
-  await update(f.id, { body: "🧪 changed body ".repeat(600), author }, f.client);
-  await comments(f.id, { add: "Small change after claim", author }, f.client);
+  const updated = {
+    body: "🧪 changed body ".repeat(600), customSignal: "Current signal ".repeat(200),
+    storedNotesCount: "Current stored field ".repeat(200), author,
+  };
+  await update(f.id, updated, f.client);
+  await comments(f.id, { add: "Large deferred collection entry ".repeat(300), author }, f.client);
   const packageRoot = resolve(import.meta.dirname, "..");
   const installed = join(f.client.pmRoot, "extensions", "pm-context");
   mkdirSync(installed, { recursive: true });
@@ -212,13 +221,26 @@ test("installed CLI uses real tracker history and restores deferred data by vers
   assert.equal(json.status, 0, json.stderr);
   const packet = JSON.parse(json.stdout) as ClaimResumePacket;
   assert.deepEqual(packet, (await f.build({ tokenBudget: 600, format: "json" })).packet);
-  const { claim: claimArgv, head: headArgv } = packet.omission_receipt.restore_argv!;
-  const prior = run(claimArgv.slice(1));
-  const current = run(headArgv.slice(1));
-  assert.equal(prior.status, 0, prior.stderr);
-  assert.equal(current.status, 0, current.stderr);
-  assert.equal(JSON.parse(prior.stdout).item.body, "Original body");
-  assert.equal(JSON.parse(current.stdout).item.body, "🧪 changed body ".repeat(600).trimEnd());
+  assert.deepEqual(packet.omission_receipt.deferred_fields, ["comments", "body", "custom_signal", "notes_count"]);
+  assert.deepEqual(packet.omission_receipt.raw_restore_fields, ["notes_count"]);
+  const recovery = packet.omission_receipt.restore_argv!;
+  const history = run(recovery.history!.slice(1));
+  assert.equal(history.status, 0, history.stderr);
+  const entries = (JSON.parse(history.stdout) as { history: HistoryEntry[] }).history;
+  for (const side of ["claim", "head"] as const) {
+    const revision = packet[side];
+    const result = run(recovery[side].slice(1));
+    assert.equal(result.status, 0, result.stderr);
+    const actual = JSON.parse(result.stdout).item;
+    const { document } = await getItemAt(f.id, String(revision.version), f.client);
+    assert.equal(actual.body, document.body);
+    assert.deepEqual(actual.comments, document.metadata.comments);
+    const metadata = document.metadata as unknown as Record<string, unknown>;
+    assert.equal(actual.custom_signal, metadata.custom_signal);
+    assert.equal(entries[revision.version - 1]!.after_hash, revision.item_hash);
+    const replay = replayHistoryToTarget(entries, revision.version - 1);
+    assert.equal(replay.metadata.notes_count, metadata.notes_count);
+  }
 
   const explicit = run(["context-resume", f.id, "--author", author, "--json"], other);
   assert.equal(explicit.status, 0, explicit.stderr);

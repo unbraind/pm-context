@@ -1,6 +1,7 @@
 /** Verified, budgeted net changes for one item since a recorded claim. */
 import { isDeepStrictEqual } from "node:util";
 import { createOutputOmissionReceipt, encodeToon, estimatePmOutputTokens, fitOutputEnvelope, getHistoryPath, locateItem, PmCliError, readHistoryEntries, readLocatedItem, readSettingsWithMetadata, replayHistoryToTarget, resolveContextIntentContract, resolveItemTypeRegistry, verifyHistoryEntries, } from "@unbrained/pm-cli/sdk";
+import { listGetProjectionFields, listListProjectionFields } from "@unbrained/pm-cli/sdk/query";
 import { buildSuggestedCommand } from "./suggested-command.js";
 /** Package intent for resuming an item with a previous claim in its retained history. */
 export const CLAIM_RESUME_INTENT = {
@@ -11,6 +12,8 @@ export const CLAIM_RESUME_INTENT = {
     token_budget: 1600,
     source: "package",
 };
+const storedProjectionFields = new Set(listListProjectionFields());
+const derivedProjectionFields = new Set(listGetProjectionFields().filter((name) => !storedProjectionFields.has(name)));
 const auditFields = new Set(["author", "claim_principal", "created_at", "id", "pm_format_version", "updated_at"]);
 const resumeOrder = [
     "status", "assignee", "blocked_by", "blocked_reason", "dependencies", "title", "priority",
@@ -98,6 +101,9 @@ export async function buildClaimResume(request, pmRoot) {
     const [restoreClaim, restoreHead] = [claimVersion, headVersion].map((version) => buildSuggestedCommand([
         "pm", "get", itemId, "--at", String(version), "--full", "--output-budget", "unbounded", "--json",
     ]));
+    const restoreHistory = buildSuggestedCommand([
+        "pm", "history", itemId, "--full", "--output-limit", "unbounded", "--output-budget", "unbounded", "--json",
+    ]);
     try {
         const fitted = fitOutputEnvelope(changes, {
             tokenBudget: budget,
@@ -106,11 +112,14 @@ export async function buildClaimResume(request, pmRoot) {
             buildEnvelope(rows, fit) {
                 const included = new Set(fit.included_indices);
                 const deferred = fields.filter((_field, index) => !included.has(index));
+                const rawFields = deferred.filter((field) => derivedProjectionFields.has(field));
                 const groups = [];
                 if (omittedAuditFields.length)
                     groups.push({ name: "audit_fields", restore_with: restoreHead.command });
                 if (deferred.length)
-                    groups.push({ name: "deferred_fields", restore_with: restoreHead.command });
+                    groups.push({
+                        name: "deferred_fields", restore_with: rawFields.length ? restoreHistory.command : restoreHead.command,
+                    });
                 return {
                     version: 1,
                     intent: CLAIM_RESUME_INTENT.intent,
@@ -122,7 +131,13 @@ export async function buildClaimResume(request, pmRoot) {
                         ...createOutputOmissionReceipt(groups),
                         audit_fields: omittedAuditFields,
                         deferred_fields: deferred,
-                        ...(groups.length ? { restore_argv: { claim: restoreClaim.argv, head: restoreHead.argv } } : {}),
+                        ...(rawFields.length ? { raw_restore_fields: rawFields } : {}),
+                        ...(groups.length ? {
+                            restore_argv: {
+                                claim: restoreClaim.argv, head: restoreHead.argv,
+                                ...(rawFields.length ? { history: restoreHistory.argv } : {}),
+                            },
+                        } : {}),
                     },
                 };
             },

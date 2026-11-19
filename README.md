@@ -423,8 +423,12 @@ whole changes, preserving current item state and both history coordinates. The
 default ceiling is 1,600 SDK-estimated tokens over the entire TOON or JSON
 output. The `omission_receipt` lists audit-only fields and fields deferred for
 budget. Run its `restore_argv.claim` and `restore_argv.head` in the same tracker
-to recover the two snapshots. If history has been rewritten, regenerate the
-brief before using those versions. The typed SDK entry point
+to recover the two projected snapshots. For \`raw_restore_fields\`, use SDK
+\`getItemAt\` at both recorded versions to recover the stored value. The CLI's
+\`restore_argv.history\` returns the raw patches in replay order for the same
+purpose. This handles stored field names shared by derived CLI output. If
+history has been rewritten, regenerate the brief before using those versions.
+The typed SDK entry point
 `buildClaimResume(request, pmRoot)` returns both the packet and its measured
 rendering. This package requires pm 2026.10.27 or newer for SDK output fitting.
 

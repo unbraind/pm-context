@@ -55,9 +55,11 @@ export interface ClaimResumePacket {
     omission_receipt: OutputOmissionReceipt & {
         audit_fields: string[];
         deferred_fields: string[];
+        raw_restore_fields?: string[];
         restore_argv?: {
             claim: string[];
             head: string[];
+            history?: string[];
         };
     };
     output_fit: Readonly<OutputEnvelopeFitReceipt>;
