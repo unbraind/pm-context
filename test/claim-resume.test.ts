@@ -6,10 +6,11 @@ import { join, resolve } from "node:path";
 import test, { type TestContext } from "node:test";
 import {
   createHistoryEntry, decodeToon, emptyImportedDocument, estimatePmOutputTokens,
-  getItemAt, historyCompact, init, verifyHistoryEntries,
+  getItemAt, historyCompact, init, readAuthorEnvironment, verifyHistoryEntries, writeAuthorEnvironment,
 } from "@unbrained/pm-cli/sdk";
 import { claim, comments, create, release, update } from "@unbrained/pm-cli/sdk/core";
-import { buildClaimResume } from "../index.ts";
+import { createExtensionTestHarness } from "@unbrained/pm-cli/sdk/testing";
+import extension, { buildClaimResume } from "../index.ts";
 import type { ClaimResumePacket, ClaimResumeRequest } from "../index.ts";
 
 const author = "resume-agent";
@@ -150,6 +151,35 @@ test("refuses verified legacy streams whose selected claim belongs to an earlier
     writeFileSync(f.history, entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
     await assert.rejects(f.build(), code("RESUME_HISTORY_UNVERIFIED"));
   }
+});
+
+test("real SDK command dispatch honors explicit, global and environment claim authors", async (t) => {
+  const f = await fixture(t);
+  await claim(f.id, { author }, f.client);
+  const runner = await createExtensionTestHarness(extension, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] });
+  t.after(() => runner.deactivate());
+  const previousAuthor = readAuthorEnvironment();
+  t.after(() => writeAuthorEnvironment(previousAuthor));
+  const command = { command: "context-resume", pmRoot: f.client.pmRoot, args: [f.id] };
+
+  writeAuthorEnvironment(other);
+  for (const invocation of [
+    { options: { claimAuthor: author, for: "resume", tokenBudget: 600 }, global: { author: other, json: true } },
+    { options: {}, global: { author, json: false } },
+  ]) {
+    const result = await runner.runCommand({ ...command, ...invocation });
+    assert.equal(result.handled, true);
+    const { output } = result.result as { output: string };
+    const packet = (invocation.global.json ? JSON.parse(output) : decodeToon(output)) as ClaimResumePacket;
+    assert.equal(packet.claim.author, author);
+    assert.equal(packet.output_fit.token_budget, invocation.options.tokenBudget ?? 1600);
+  }
+  writeAuthorEnvironment(author);
+  const implicit = await runner.runCommand({ ...command, global: { json: true } });
+  assert.equal(implicit.handled, true);
+  assert.equal(JSON.parse((implicit.result as { output: string }).output).claim.author, author);
+  writeAuthorEnvironment(undefined);
+  await assert.rejects(runner.runCommand(command), code("INVALID_RESUME_REQUEST"));
 });
 
 test("installed CLI uses real tracker history and restores deferred data by version without Git", async (t) => {

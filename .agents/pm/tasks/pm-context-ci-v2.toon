@@ -7,10 +7,10 @@ status: in_progress
 priority: 2
 tags[4]: ci,"gh:unbraind/pm-context#234","gh:unbraind/pm-context#235",performance
 created_at: "2026-11-15T11:43:07.824Z"
-updated_at: "2026-11-16T11:46:47.861Z"
+updated_at: "2026-11-19T05:04:17.243Z"
 author: codex-sol
 acceptance_criteria: Required test (22) and test (26) checks remain; docs-only fast path; full original gates retained in deep tier; unchanged coverage thresholds; evidence and timing recorded
-comments[13]{created_at,author,text}:
+comments[14]{created_at,author,text}:
   "2026-11-15T11:43:10.343Z",codex-sol,"Search found no matching flaky or CI performance task. Existing pm-context-3zzd owns release changelog drift and remains separate. Required contexts are exactly test (22) and test (26); CodeQL is not required. Pilot PR is unbraind/pm-csv#258. Plan: hosted quick PR matrix, exhaustive local deep matrix, deterministic seed prefixes, unchanged coverage gates, bounded validation and early PR feedback. Companion: pm-cli-website-dyhg."
   "2026-11-15T11:45:13.803Z",codex-sol,"Detailed baseline log: run 43629665845 Node 22 execution 15m51s, Node 26 8m05s, queue-inclusive run 56m02s. Slowest seed corpora: answer reduction 113.59s, shared evidence 111.74s, task phase 80.55s, phase restoration 73.63s. Run 43623071562 --log-failed was empty; individual job log confirms npm release gate passed and changelog:check failed. No timed test failure was reported there. Removed unrelated since-packing one-second assertion in favor of its existing whole-pack serialization count and exact bytes. Release verifier files remain untouched."
   "2026-11-15T11:47:01.796Z",codex-sol,"Implementation ready for early CI: ten seeded 500-case loops now use the deterministic 50-case quick prefix. Strict coverage thresholds and source scope unchanged. Added helper regression tests and scaled operational deadlines in affected process/lock tests; product serialization count replaces the fragile one-second assertion. Typecheck, test compilation, docstring lint and release-workflow verifier passed; strict unique-key YAML parse passed (actionlint unavailable). Local touched-test validation is running; the first linked invocation has the CLI default timeout and its metadata is corrected to 1200 seconds for subsequent execution."
@@ -24,6 +24,7 @@ comments[13]{created_at,author,text}:
   "2026-11-16T11:41:16.966Z",codex-sol,"Review round N: validating PRRT_kwDOSzDuFs632NG4 against the CodeQL path contract. The Node glob reducer can skip leading-dot tracker paths; require the ordered include, tracker exclusion, executable and extension re-inclusion for both push and pull_request, plus a regression that removes the exclusion."
   "2026-11-16T11:45:58.064Z",codex-sol,"Verified PRRT_kwDOSzDuFs632NG4: added assertCodeqlPaths with explicit include-before-exclusion-before-re-inclusion assertions for every executable extension and the extensions subtree. A mutation regression removes the tracker exclusion for push and pull_request and requires an assertion failure. Existing executable inclusion checks remain. Linked row 4 passed typecheck, docstring, build:test and 13 tier/release/CodeQL contracts; direct Node 22.18.0 run passed all four ci-tiers tests. No lint script exists in this package."
   "2026-11-16T11:46:44.350Z",codex-sol,"Final verification: npm run changelog:check passed; the newly linked ci-tiers-only command also passed. Typecheck, docstring, build:test and workflow contracts passed earlier, including Node 22.18.0. Releasing the claim for orchestrator verification; item remains in_progress."
+  "2026-11-19T05:04:17.215Z",codex-sol-df,"Round DF deep coverage follow-up from pm-context-claim-resume. A full-depth npm run coverage invocation completed all 465 tests, then c8 exhausted the default Node heap while aggregating coverage. Reproduce the full-depth report on supported CI Node versions and record its heap requirements separately from the native coverage thresholds. The quick and deep test scopes remain tracked here."
 files[19]{path,scope}:
   .github/workflows/ci-deep.yml,project
   .github/workflows/ci.yml,project
