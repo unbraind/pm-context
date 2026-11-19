@@ -90,8 +90,8 @@ test("extension has required shape", () => {
   assert.equal(typeof extension.activate, "function");
 });
 
-test("activate registers context-pack command", async () => {
-  assert.deepEqual(await registeredCommands(), ["context-phase", "context-pack", "context-reduce", "context-next-evidence", "context-evidence-shared", "context-evidence", "context-witnesses", "context-freshness record", "context-freshness resume", "context-pack since", "context-handoff", "context-usage"]);
+test("activate registers all context commands in order", async () => {
+  assert.deepEqual(await registeredCommands(), ["context-resume", "context-phase", "context-pack", "context-reduce", "context-next-evidence", "context-evidence-shared", "context-evidence", "context-witnesses", "context-freshness record", "context-freshness resume", "context-pack since", "context-handoff", "context-usage"]);
 });
 
 test("activate exposes selector aliases for both commands", async () => {
