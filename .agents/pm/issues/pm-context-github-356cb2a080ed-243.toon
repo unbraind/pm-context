@@ -1,0 +1,21 @@
+id: pm-context-github-356cb2a080ed-243
+title: context-usage silently drops earlier repeated --cite values
+description: "GH issue #243: https://github.com/unbraind/pm-context/issues/243 · author @unbraind · created 2026-11-19T17:29:35Z · updated 2026-11-19T17:29:35Z"
+type: Issue
+status: open
+priority: 2
+tags[2]: "gh:unbraind/pm-context#243","github_author:unbraind"
+created_at: "2026-11-19T17:29:35Z"
+updated_at: "2026-11-20T08:39:35.734Z"
+author: pm-github
+github_close_reason: ""
+github_closed_at: ""
+github_created_at: "2026-11-19T17:29:35Z"
+github_link_only: false
+github_number: 243
+github_release: ""
+github_state: open
+github_state_reason: unspecified
+github_updated_at: "2026-11-19T17:29:35Z"
+github_url: "https://github.com/unbraind/pm-context/issues/243"
+body: "### Reproduced on the published packages\n\nTested official `pm-context@2026.11.19` and `@unbrained/pm-cli@2026.11.19`, Node 24.22.3, in disposable no-Git trackers. The [shipped README](https://github.com/unbraind/pm-context/blob/v2026.11.19/README.md#L226-L230) promises repeated and comma-separated citation values and refusal of the whole submission on any unknown citation.\n\nCreate two synthetic tasks and run `pm context-pack --ids \"$ITEM_A,$ITEM_B\" --format json`. Use the receipt ID `R` and any two distinct served fact IDs `A` and `B` from that receipt. Use a fresh equivalent receipt for each invocation so recorded usage cannot affect the comparison.\n\n| Arguments after `pm context-usage --receipt \"$R\"` | Exit | Used / cited facts |\n| --- | ---: | ---: |\n| `--cite \"$A\" --cite \"$B\" --json` | 0 | 1 / 1 |\n| `--cite \"$A,$B\" --json` | 0 | 2 / 2 |\n| `--cite unserved-synthetic-fact --cite \"$B\" --json` | 0 | 1 / 1 |\n| `--cite \"unserved-synthetic-fact,$B\" --json` | 2 | Refused |\n\nThis undercounts context actually used and lets a preceding unknown ID disappear instead of rejecting the submission. **Workaround:** use one comma-separated `--cite` value.\n\nThe [released command declaration](https://github.com/unbraind/pm-context/blob/v2026.11.19/index.ts#L1874) documents repetition but declares a scalar string. The SDK-array refusal in the open dependency [PR #240](https://github.com/unbraind/pm-context/pull/240) is consistent with that mismatch, but the native defect was independently reproduced on published artifacts. Adjacent `--touch` and `--edited-file` repeat behavior was not tested here.\n\n### Acceptance\n\n- Repeated and comma-separated citations preserve the same complete set, including via a supported SDK invocation, without counting duplicate IDs twice.\n- An unknown value in any position refuses the whole submission without recording usage or mutating item/history data.\n- Check the documented repeated forms on the adjacent options; preserve native argument validation and receipt boundaries."
