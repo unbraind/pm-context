@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## 2026.11.22 - 2026-11-22
 
-### Fixed
+### Dependencies
 
-- The release commits a CHANGELOG.md without --include-empty, so CI's changelog:check fails on main after every release ([pm-context-3zzd](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-3zzd.toon))
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#249](https://github.com/unbraind/pm-context/pull/249))
+- Bump unbraind/pm-ops/.github/workflows/daily-release.yml ([#247](https://github.com/unbraind/pm-context/pull/247))
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#248](https://github.com/unbraind/pm-context/pull/248))
 
 ## 2026.11.20 - 2026-11-20
 
