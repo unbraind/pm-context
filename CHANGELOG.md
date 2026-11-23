@@ -2,7 +2,9 @@
 
 ## 2026.11.23 - 2026-11-23
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group across 1 directory with 3 updates
 
 ## 2026.11.22 - 2026-11-22
 
