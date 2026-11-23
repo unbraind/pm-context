@@ -1,0 +1,20 @@
+id: pm-context-closure-1122
+title: Refresh tracker closure PR #222
+description: "Recheck current main, verify delivery evidence, regenerate the changelog and record the validation outcome."
+type: Chore
+status: open
+priority: 2
+tags[1]: tracker-sweep
+created_at: "2026-11-22T23:52:08.781Z"
+updated_at: "2026-11-22T23:58:58.706Z"
+author: codex-agent
+comments[2]{created_at,author,text}:
+  "2026-11-22T23:52:12.298Z",codex-agent,PR #220 delivered the gate alignment. v2026.11.13 is the first containing tag. Regenerate against current main and verify that the published headings and check contract are present.
+  "2026-11-22T23:58:56.465Z",codex-agent,"Focused linked test completed successfully. 32 pass, 0 fail, 0 skipped."
+files[1]{path,scope}:
+  CHANGELOG.md,project
+tests[1]{command,scope,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/identity-audit.test.ts test/verify-release-changelog-date.test.ts test/ci-tiers.test.ts,project,codex-agent,"2026-11-22T23:52:16.215Z",local_mutation,pm-github/closeout
+docs[1]{path,scope}:
+  CHANGELOG.md,project
+body: ""

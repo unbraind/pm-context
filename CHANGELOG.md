@@ -29,6 +29,7 @@ No changes.
 ### Fixed
 
 - Abandon prepared releases without usable notes and validate the exact new section ([pm-context-empty-prepared-release](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-empty-prepared-release.toon))
+- The release commits a CHANGELOG.md without --include-empty, so CI's changelog:check fails on main after every release ([pm-context-3zzd](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-3zzd.toon))
 
 ### Other
 
