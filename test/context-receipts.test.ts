@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, mkdirSync, rmSync, writeFileSync, utimesSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, readdirSync, mkdirSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test, { type TestContext } from "node:test";
 import { init } from "@unbrained/pm-cli/sdk";
 import { create, files, update } from "@unbrained/pm-cli/sdk/core";
@@ -82,7 +83,7 @@ test("source serving paths expose rendered subset, links and idempotent citation
     assert.ok(fact);
     await update(f.first, { title: "Changed after serving", author: "agent-a" }, f.client);
     writeFileSync(join(f.root, "src", "used.ts"), 'export const state = "after";\n');
-    const args = { receipt: receipt.receipt_id, session: command, cite: fact.id, touch: f.first, "edited-file": "./src/used.ts", format: "json" };
+    const args = { receipt: receipt.receipt_id, session: command, cite: [fact.id], touch: [f.first], "edited-file": ["./src/used.ts"], format: "json" };
     const first = bundlesFrom(await f.run("context-usage", args));
     const repeated = bundlesFrom(await f.run("context-usage", args));
     assert.deepEqual(repeated, first);
@@ -113,14 +114,72 @@ test("usage command rejects missing receipt, foreign ids, session mismatch and i
     { receipt: "11111111-1111-1111-1111-111111111111", cite: fact.id },
     { receipt: receipt.receipt_id, session: "other", cite: fact.id },
     { receipt: receipt.receipt_id, cite: `${fact.id},f-unknown` },
+    { receipt: receipt.receipt_id, cite: ["f-unknown", fact.id] },
     { receipt: receipt.receipt_id, touch: "missing" },
+    { receipt: receipt.receipt_id, touch: ["missing", f.first] },
     { receipt: receipt.receipt_id, "edited-file": "src/other.ts" },
-    { receipt: receipt.receipt_id, "edited-file": "../outside" },
+    { receipt: receipt.receipt_id, "edited-file": ["../outside", "src/used.ts"] },
   ]) await assert.rejects(f.run("context-usage", options));
   assert.equal(bundlesFrom(await f.run("context-usage", { receipt: receipt.receipt_id, format: "json" })).totals.used_facts, 0);
   // A section citation uses every fact in that section, including repeat flags.
   const report = bundlesFrom(await f.run("context-usage", { receipt: receipt.receipt_id, cite: [receipt.sections[0].id, fact.id], format: "json" }));
   assert.ok(report.totals.used_facts > 0);
+});
+
+test("repeatable focus selectors keep every host-delivered id and section", async (t) => {
+  const f = await fixture(t);
+  const output = await f.run("context-pack", { id: [f.first, f.second], format: "json", session: "repeat-pack" });
+  const receipt = receiptFrom(output, f.pmRoot);
+  assert.ok(receipt.facts.some((fact) => fact.item_ids.includes(f.first)));
+  assert.ok(receipt.facts.some((fact) => fact.item_ids.includes(f.second)));
+  const handoff = await f.run("context-handoff", { id: [f.second, f.first], section: ["focus", "blockers"], format: "agent", session: "repeat-handoff" });
+  assert.ok(handoff.includes(f.first) && handoff.includes(f.second));
+  assert.match(handoff, /^## Focus \[s-[\da-f]+\]$/m);
+  assert.match(handoff, /^## Blockers \[s-[\da-f]+\]$/m);
+});
+
+test("installed CLI repeated cite keeps every id and refuses an unknown id in any position", async (t) => {
+  const packageRoot = resolve(import.meta.dirname, "..");
+  const root = mkdtempSync(join(tmpdir(), "context-cite-cli-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const initialized = await init("cite", { defaults: true, author: "integration-test", agentGuidance: "skip" }, {
+    cwd: root, pmRoot: join(root, ".agents", "pm"),
+  });
+  const installedRoot = join(initialized.path, "extensions", "pm-context");
+  mkdirSync(installedRoot, { recursive: true });
+  cpSync(join(packageRoot, "manifest.json"), join(installedRoot, "manifest.json"));
+  cpSync(join(packageRoot, "dist"), join(installedRoot, "dist"), { recursive: true });
+  symlinkSync(join(packageRoot, "node_modules"), join(installedRoot, "node_modules"), "dir");
+  const client = { cwd: root, pmRoot: initialized.path };
+  const first = await create({ title: "Cited A", body: "alpha fact", author: "integration-test" }, client);
+  const second = await create({ title: "Cited B", body: "beta fact", author: "integration-test" }, client);
+  const cli = join(packageRoot, "node_modules", "@unbrained", "pm-cli", "dist", "cli.js");
+  const run = (args: string[]) => spawnSync(process.execPath, [cli, ...args], {
+    cwd: root, encoding: "utf8", env: { ...process.env, PM_PATH: initialized.path, PM_AUTHOR: "integration-test" },
+  });
+  const ids = `${first.item.id},${second.item.id}`;
+  const packed = run(["context-pack", "--ids", ids, "--format", "json", "--session", "cli"]);
+  assert.equal(packed.status, 0, packed.stderr);
+  const receipt = (JSON.parse(packed.stdout) as { context_receipt: ContextReceipt }).context_receipt;
+  const firstFact = receipt.facts.find((fact) => fact.item_ids.length === 1 && fact.item_ids[0] === first.item.id);
+  const secondFact = receipt.facts.find((fact) => fact.item_ids.length === 1 && fact.item_ids[0] === second.item.id);
+  assert.ok(firstFact && secondFact);
+  const cited = run(["context-usage", "--receipt", receipt.receipt_id, "--session", "cli", "--cite", firstFact.id, "--cite", secondFact.id, "--format", "json"]);
+  assert.equal(cited.status, 0, cited.stderr);
+  assert.equal((JSON.parse(cited.stdout) as { bundles: ReceiptReport }).bundles.totals.cited_facts, 2);
+  const fresh = run(["context-pack", "--ids", ids, "--format", "json", "--session", "cli-refuse"]);
+  assert.equal(fresh.status, 0, fresh.stderr);
+  const freshReceipt = (JSON.parse(fresh.stdout) as { context_receipt: ContextReceipt }).context_receipt;
+  const known = freshReceipt.facts[0];
+  assert.ok(known);
+  for (const [left, right] of [["f-unknown", known.id], [known.id, "f-unknown"]] as const) {
+    const refused = run(["context-usage", "--receipt", freshReceipt.receipt_id, "--session", "cli-refuse", "--cite", left, "--cite", right, "--format", "json"]);
+    assert.equal(refused.status, 2);
+    assert.match(refused.stderr + refused.stdout, /Citation was not served in this receipt/);
+  }
+  const after = run(["context-usage", "--receipt", freshReceipt.receipt_id, "--session", "cli-refuse", "--format", "json"]);
+  assert.equal(after.status, 0, after.stderr);
+  assert.equal((JSON.parse(after.stdout) as { bundles: ReceiptReport }).bundles.totals.used_facts, 0);
 });
 
 test("serving writes measured output files, leaves explain observational, discloses runtime failure", async (t) => {

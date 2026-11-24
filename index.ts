@@ -1470,7 +1470,7 @@ function setupCommands(api: ExtensionApi): void {
       { long: "--changed", description: "Focus linked files changed from an optional Git base, including working changes", type: "boolean" },
       { long: "--files", value_name: "path", description: "Explicit repository-relative file path (repeatable)", type: "string", repeatable: true },
       { long: "--session", value_name: "id", description: "Usage session id (defaults to PM_CONTEXT_SESSION or the receipt id)", type: "string" },
-      { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
+      { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string", repeatable: true },
       { long: "--ids", value_name: "ids", description: "Comma-separated focus ids (alias for repeated --id)", type: "string" },
       { long: "--status", value_name: "status", description: "Filter focus items by status", type: "string" },
       { long: "--state", value_name: "status", description: "Alias for --status", type: "string" },
@@ -1488,7 +1488,7 @@ function setupCommands(api: ExtensionApi): void {
       { long: "--compress", description: "Minimize output tokens (compact JSON, no blank lines)", type: "boolean" },
       { long: "--include-deps", description: "Include per-item dependency info in the context pack", type: "boolean" },
       { long: "--max-items", value_name: "n", description: "Maximum total items (focus + neighbors) in the pack", type: "string" },
-      { long: "--section", value_name: "section", description: "Include sections (repeatable). Markdown: summary, focus, neighborhood, neighbors, links, deps. Agent/compact: focus, blockers, next-actions, recent, links, deps, refresh", type: "string" },
+      { long: "--section", value_name: "section", description: "Include sections (repeatable). Markdown: summary, focus, neighborhood, neighbors, links, deps. Agent/compact: focus, blockers, next-actions, recent, links, deps, refresh", type: "string", repeatable: true },
       { long: "--explain", description: "Explain emitted items with ranks/scores relative to the packed subset instead of emitting a pack", type: "boolean" },
     ],
     async run(ctx: CommandHandlerContext) {
@@ -1766,7 +1766,7 @@ function setupCommands(api: ExtensionApi): void {
     examples: commandExamples()["context-handoff"].map((example) => example.command),
     flags: [
       { long: "--session", value_name: "id", description: "Usage session id (defaults to PM_CONTEXT_SESSION or the receipt id)", type: "string" },
-      { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string" },
+      { long: "--id", value_name: "id", description: "Focus item id (repeatable or comma-separated)", type: "string", repeatable: true },
       { long: "--ids", value_name: "ids", description: "Comma-separated focus ids (alias for repeated --id)", type: "string" },
       { long: "--status", value_name: "status", description: "Filter focus items by status", type: "string" },
       { long: "--state", value_name: "status", description: "Alias for --status", type: "string" },
@@ -1783,7 +1783,7 @@ function setupCommands(api: ExtensionApi): void {
       { long: "--compress", description: "Minimize output tokens (compact JSON, no blank lines)", type: "boolean" },
       { long: "--include-deps", description: "Include per-item dependency info in the handoff", type: "boolean" },
       { long: "--max-items", value_name: "n", description: "Maximum total items (focus + neighbors) in the handoff", type: "string" },
-      { long: "--section", value_name: "section", description: "Include only specific sections (repeatable): focus, blockers, next-actions, recent, links, deps, refresh", type: "string" },
+      { long: "--section", value_name: "section", description: "Include only specific sections (repeatable): focus, blockers, next-actions, recent, links, deps, refresh", type: "string", repeatable: true },
     ],
     async run(ctx: CommandHandlerContext) {
       const options = ctx.options as Record<string, unknown>;
@@ -1871,9 +1871,9 @@ function setupCommands(api: ExtensionApi): void {
     flags: [
       { long: "--session", value_name: "id", description: "Filter bundle receipts to a session", type: "string" },
       { long: "--receipt", value_name: "id", description: "Filter or report usage against one bundle receipt", type: "string" },
-      { long: "--cite", value_name: "ids", description: "Used fact or section ids (repeatable/comma-separated; requires --receipt)", type: "string" },
-      { long: "--touch", value_name: "ids", description: "Item ids touched in later mutations (requires --receipt)", type: "string" },
-      { long: "--edited-file", value_name: "paths", description: "Repository-relative edited files (requires --receipt)", type: "string" },
+      { long: "--cite", value_name: "ids", description: "Used fact or section ids (repeatable/comma-separated; requires --receipt)", type: "string", repeatable: true },
+      { long: "--touch", value_name: "ids", description: "Item ids touched in later mutations (repeatable/comma-separated; requires --receipt)", type: "string", repeatable: true },
+      { long: "--edited-file", value_name: "paths", description: "Repository-relative edited files (repeatable/comma-separated; requires --receipt)", type: "string", repeatable: true },
       { long: "--by", value_name: "author", description: "Restrict to one recording author", type: "string" },
       { long: "--surface", value_name: "surface", description: "Restrict serve events to one surface: context or next", type: "string" },
       { long: "--since", value_name: "when", description: "Drop events at or before this point (ISO timestamp, or a day offset such as 7d)", type: "string" },

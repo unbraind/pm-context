@@ -261,7 +261,15 @@ test("installed CLI and compiled SDK work with Git absent and expose typed priva
   assert.equal(fingerprint(client.pmRoot), before);
 });
 
-/** Explicit null and malformed compound options retain the shared parser's typed refusal. */
+/** Host single-value flags refuse an array before the extension handler runs. */
+function hostSingleValueArray(flag: string) {
+  return (error: unknown): boolean => {
+    if (!isPmCliExpectedError(error) || error.code !== "extension_flag_value_invalid" || error.exitCode !== 2) return false;
+    const context = error.context as { flag?: unknown };
+    return context.flag === flag && error.message.includes("received an array");
+  };
+}
+/** Null and objects still reach the shared parser; arrays on single-value flags are a host refusal. */
 test("SDK phase options refuse null and malformed arrays or objects before tracker writes", async (t) => {
   const { root, client, item } = await tracker(); t.after(() => rmSync(root, { recursive: true, force: true }));
   const path = join(root, "phase.json"); writeFileSync(path, JSON.stringify(request(item.id)));
@@ -269,14 +277,18 @@ test("SDK phase options refuse null and malformed arrays or objects before track
   for (const module of [extension, builtExtension]) {
     const harness = await createExtensionTestHarness(module, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] });
     t.after(() => harness.deactivate());
-    for (const options of [
-      { includeFields: null }, { includeFields: [" "] }, { includeFields: {} },
-      { byteBudget: null }, { byteBudget: [" "] }, { byteBudget: {} },
-    ]) {
+    for (const options of [{ includeFields: null }, { includeFields: {} }, { byteBudget: null }, { byteBudget: {} }]) {
       await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot,
         options: { packet: path, ...options }, global: {} }), code("INVALID_REQUEST"), JSON.stringify(options));
     }
+    for (const [flag, options] of [["--include-fields", { includeFields: [" "] }], ["--byte-budget", { byteBudget: [" "] }]] as const) {
+      await assert.rejects(harness.runCommand({ command: "context-phase", pmRoot: client.pmRoot,
+        options: { packet: path, ...options }, global: {} }), hostSingleValueArray(flag), JSON.stringify(options));
+    }
   }
+  // The extension parser still refuses malformed arrays when they are not pre-empted by the host.
+  assert.throws(() => parsePhaseContextRequest({ ...request(item.id), include_fields: [" "] }), code("INVALID_REQUEST"));
+  assert.throws(() => parsePhaseContextRequest({ ...request(item.id), byte_budget: [" "] as unknown as number }), code("INVALID_REQUEST"));
   assert.equal(fingerprint(client.pmRoot), before);
 });
 

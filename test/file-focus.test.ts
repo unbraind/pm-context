@@ -332,13 +332,34 @@ test("empty focus stays empty and ranking uses status, priority and deterministi
 test("command uses source workspace and cwd fallbacks with file selectors", async (t) => {
   const f = await fixture(t);
   const harness = await createExtensionTestHarness(extension, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] });
+  t.after(() => harness.deactivate());
+  const handler = harness.activation.commands.handlers.find((entry) => entry.command === "context-pack");
+  assert.ok(handler);
   assert.equal(resolveFileFocus({ changed: false }, [], f.root, f.pmRoot), undefined);
   assert.ok(resolveFileFocus({ files: ["it's.ts"] }, [], f.root, f.pmRoot)!.refresh.includes("'\\''"));
   const previous = process.cwd();
+  const options = { files: ["src/one.ts"], format: "json" };
+  const global = { json: false };
+  const sourceRoot = join(f.root, "..", "source");
+  const selectedFile = join(sourceRoot, "src", "one.ts");
+  mkdirSync(join(sourceRoot, "src"), { recursive: true });
+  writeFileSync(selectedFile, "portable source\n");
+  git(sourceRoot, "init", "-b", "main");
   try {
     process.chdir(f.root);
-    const output = await harness.runCommand({ command: "context-pack", pmRoot: f.pmRoot, options: { files: ["src/one.ts"], format: "json" }, global: { json: false } });
-    assert.ok(output);
+    const hosted = await harness.runCommand({ command: "context-pack", pmRoot: f.pmRoot, options, global });
+    assert.equal(hosted.handled, true);
+    // The newer harness populates portable roots. The handler contract also allows both to be omitted.
+    process.chdir(sourceRoot);
+    const fromCwd = await handler.run({
+      command: "context-pack", args: [], options: { ...options, files: [selectedFile] }, pm_root: f.pmRoot, global,
+    });
+    for (const result of [hosted.result, fromCwd]) {
+      const pack = JSON.parse((result as { output: string }).output) as ContextPack;
+      assert.deepEqual(pack.items.map(({ id, matched_files }) => ({ id, matched_files })), [
+        { id: f.one, matched_files: ["src/one.ts"] },
+      ]);
+    }
   } finally { process.chdir(previous); }
 });
 

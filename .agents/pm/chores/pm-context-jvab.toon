@@ -1,0 +1,12 @@
+id: pm-context-jvab
+title: Resolve the development coverage glob audit advisory
+description: The general npm audit reports GHSA-3g3m-2fjr-6pw4 through the existing development chain c8 12.0.0 to test-exclude 8.0.0 to glob 13.0.6. The same versions are on main. Track the development dependency remediation and retain the current coverage thresholds.
+type: Chore
+status: open
+priority: 2
+tags[3]: coverage,dev-dependencies,security
+created_at: "2026-11-24T07:11:44.812Z"
+updated_at: "2026-11-24T07:11:44.812Z"
+author: codex-agent
+acceptance_criteria: Audit the development and production graphs; resolve the development advisory with a compatible dependency or update; rerun npm and Bun release checks at their existing thresholds
+body: ""

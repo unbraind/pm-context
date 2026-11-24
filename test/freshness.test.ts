@@ -336,6 +336,27 @@ test("registered handlers honor defaults and expose both renderer formats", asyn
   }
 });
 
+test("freshness resolves evidence through the repository root and cwd without a source workspace", async (t) => {
+  const f = await fixture(t);
+  const harness = await createExtensionTestHarness(extension, { name: "pm-context", capabilities: ["commands", "renderers", "schema"] });
+  t.after(() => harness.deactivate());
+  const command = "context-freshness record";
+  const handler = harness.activation.commands.handlers.find((entry) => entry.command === command);
+  assert.ok(handler);
+  const packet = join(f.root, "packet.json");
+  writeFileSync(packet, JSON.stringify(f.packet));
+  const context = { command, args: [], options: { packet }, pm_root: f.pmRoot, global: {} };
+  const fromRepo = await handler.run({ ...context, repo_root: f.root }) as { output: string };
+  assert.deepEqual(JSON.parse(fromRepo.output), f.manifest);
+
+  const previous = process.cwd();
+  try {
+    process.chdir(f.root);
+    const fromCwd = await handler.run(context) as { output: string };
+    assert.deepEqual(JSON.parse(fromCwd.output), f.manifest);
+  } finally { process.chdir(previous); }
+});
+
 
 test("source adapters reject missing values and guarded reads detect concurrent growth or rewrites", async (t) => {
   const f = await fixture(t);

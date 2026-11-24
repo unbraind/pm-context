@@ -4,7 +4,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, syml
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test, { type TestContext } from "node:test";
-import { commitImportedItem, createRelationshipKindRegistry, emptyImportedDocument, init, readSettings } from "@unbrained/pm-cli/sdk";
+import { commitImportedItem, createRelationshipKindRegistry, deleteItem, emptyImportedDocument, init, readSettings } from "@unbrained/pm-cli/sdk";
 import type { ItemMetadata, RelationshipKindDefinition } from "@unbrained/pm-cli/sdk";
 import { create } from "@unbrained/pm-cli/sdk/core";
 import { buildAgentHandoff, buildContextPack, renderAgentHandoff, renderMarkdown } from "../index.ts";
@@ -101,6 +101,25 @@ test("mixed edges deduplicate execution direction and retain dependencies outsid
   assert.equal(JSON.stringify(items), before);
 });
 
+/**
+ * Write extension-owned relationship metadata through the create-only import writer.
+ * The host refuses a second import of an existing id, so the current document is removed first.
+ * The refused overwrite stays asserted so that replacement path cannot silently succeed.
+ */
+async function importRelationshipDocument(pmRoot: string, metadata: ItemMetadata, message: string): Promise<void> {
+  await deleteItem(metadata.id, { author: "integration-test" }, { pmRoot });
+  const document = emptyImportedDocument();
+  document.metadata = metadata;
+  const params = {
+    pmRoot, id: metadata.id, itemPath: join(pmRoot, "tasks", `${metadata.id}.toon`), document,
+    author: "integration-test", message, settings: await readSettings(pmRoot), conflictWarningPrefix: "fixture_conflict",
+  };
+  const imported = await commitImportedItem(params);
+  assert.equal(imported.committed, true);
+  const refused = await commitImportedItem({ ...params, message: `${message} refused` });
+  assert.deepEqual(refused, { committed: false, conflictWarning: `fixture_conflict:${metadata.id}` });
+}
+
 /** Capture stored item documents and complete history streams, excluding disposable runtime receipts. */
 function storedBytes(pmRoot: string): Record<string, string> {
   const bytes: Record<string, string> = {};
@@ -182,18 +201,11 @@ test("installed CLI mixed edges preserve raw kinds and use active extension orde
   for (const id of ["b", "c", "d", "e"]) await create({ id, title: `Context ${id}`, author: "integration-test" }, f.client);
   const focus = await create({ id: "a", title: "Focus", author: "integration-test" }, f.client);
   // Import extension-owned metadata through the real SDK writer, including its audit history.
-  const document = emptyImportedDocument();
   // SDK metadata types still enumerate built-ins; extension-owned imports carry registered string kinds.
-  document.metadata = { ...focus.item, dependencies: [
+  await importRelationshipDocument(f.pmRoot, { ...focus.item, dependencies: [
     { id: "deps-b", kind: "custom_waits" }, { id: "deps-c", kind: "custom_gates" },
     { id: "deps-d", kind: "custom_evidence" }, { id: "deps-e", kind: "related" },
-  ].map((edge) => ({ ...edge, created_at: focus.item.created_at, author: "integration-test" })) } as unknown as ItemMetadata;
-  const imported = await commitImportedItem({
-    pmRoot: f.pmRoot, id: focus.item.id, itemPath: join(f.pmRoot, "tasks", `${focus.item.id}.toon`),
-    document, author: "integration-test", message: "Import custom relationship fixture",
-    settings: await readSettings(f.pmRoot), conflictWarningPrefix: "fixture_conflict",
-  });
-  assert.equal(imported.committed, true);
+  ].map((edge) => ({ ...edge, created_at: focus.item.created_at, author: "integration-test" })) } as unknown as ItemMetadata, "Import custom relationship fixture");
   const before = storedBytes(f.pmRoot);
   const pack = JSON.parse(f.run("context-pack", "json")) as ContextPack;
   assert.deepEqual(pack.deps?.slice().sort((a, b) => a.itemId.localeCompare(b.itemId)), [
@@ -227,16 +239,12 @@ for (const includeDeps of [false, true]) {
       ["related", "deps-b", undefined], ["custom_evidence", "deps-b", undefined],
       ["unknown_kind", "deps-b", undefined],
     ] as const) {
-      const document = emptyImportedDocument();
-      document.metadata = { ...source.item, dependencies: [
+      const metadata = { ...source.item, dependencies: [
         { id: target.item.id, kind, created_at: source.item.created_at, author: "integration-test" },
       ] } as unknown as ItemMetadata;
-      await commitImportedItem({ pmRoot: f.pmRoot, id: source.item.id,
-        itemPath: join(f.pmRoot, "tasks", `${source.item.id}.toon`), document,
-        author: "integration-test", message: "Import ordering handoff fixture",
-        settings: await readSettings(f.pmRoot), conflictWarningPrefix: "fixture_conflict" });
+      await importRelationshipDocument(f.pmRoot, metadata, "Import ordering handoff fixture");
       const before = storedBytes(f.pmRoot);
-      const pack = buildContextPack([document.metadata as unknown as PmItem, target.item as unknown as PmItem], { ids: [focus], includeDeps, relationshipRegistry: registry });
+      const pack = buildContextPack([metadata as unknown as PmItem, target.item as unknown as PmItem], { ids: [focus], includeDeps, relationshipRegistry: registry });
       const expected = blocker ? [{ itemId: focus, blockedBy: blocker, kind,
         title: blocker === "deps-a" ? "Predecessor" : "Successor", status: "open" }] : [];
       const handoff = JSON.parse(f.run("context-handoff", "json", focus, includeDeps)) as ReturnType<typeof buildAgentHandoff>;
