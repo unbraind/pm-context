@@ -1,0 +1,30 @@
+id: pm-context-j4ca
+title: Adopt pm-cli 2026.11.23 host-aligned SDK behaviour
+description: "Companion item: pm-cli-website-spus. Move the package off pm-cli 2026.11.14 onto the current host contract. Documented repeatable flags must be declared repeatable. Single-value flags refuse arrays before the handler. commitImportedItem no longer overwrites an existing item. Changelog entry points keep dependency bullets."
+type: Chore
+status: in_progress
+priority: 2
+tags[3]: dependencies,"gh:unbraind/pm-context#243",sdk
+created_at: "2026-11-24T02:43:01.912Z"
+updated_at: "2026-11-24T05:20:51.897Z"
+author: codex-agent
+acceptance_criteria: "Pinned @unbrained/pm-cli, pm-changelog and pm-ops match current npm latest; Documented repeatable flags declare repeatable so every repeated value is delivered; single-value flags still refuse arrays before the handler; Relationship import fixtures use the create-only writer and prove a second import of an existing id is refused; Changelog entry points retain --dependency-updates; Typecheck, full tests, coverage, identity and changelog checks pass at unchanged thresholds"
+comments[4]{created_at,author,text}:
+  "2026-11-24T04:45:25.323Z",codex-agent,"Continuing the interrupted migration from the existing worktree. npm latest resolves to @unbrained/pm-cli 2026.11.23, pm-changelog 2026.11.20 and pm-ops 2026.11.22. Reproducing the baseline and verifying the existing host-alignment changes and upstream reference-only credential finding."
+  "2026-11-24T04:47:14.247Z",codex-agent,"Confirmed upstream pm-cli#1775 directly on 2026.11.23. Reproduce with scanMutationSecrets(JSON.stringify({ title: [\"api\",\"key\"].join(\"_\") + \": \" + String.fromCharCode(36) + \"{API_KEY}\", updated: \"2026-11-23T00:00:00.000Z\" })); the reference-only title returns rule credential_key_assignment and should return an empty result. No guard or credential test is being bypassed."
+  "2026-11-24T05:04:17.314Z",codex-agent,"The newer harness rejects undeclared arrays before dispatch. Mark selectors and usage flags repeatable; keep scalar phase fields refused as extension_flag_value_invalid and preserve parser-level INVALID_REQUEST. The import helper now checks for an existing ID under its lock, so fixture setup removes a disposable document before importing and tests the precise overwrite refusal. With only the old flag declarations restored, the harness rejected repeated IDs and the installed CLI kept one of two citations. Reverting the changelog flag fails its regression. All three checks pass with the fixes. Clean-home strict health, typecheck, build and the docstring gate pass. Changelog generation kept all 3 published dependency bullets and restores 53 historical bullets."
+  "2026-11-24T05:20:47.477Z",codex-agent,"The linked regression run passed 48/48 tests with the repository CI depth and zero failures, cancellations or skips. The earlier linked run reached its existing 600-second command limit during the 500-sequence task-phase model after all completed assertions passed. The unchanged-threshold npm and Bun release gates will run against the final commit. Upstream pm-cli#1775 remains open."
+files[7]{path,scope}:
+  index.ts,project
+  package-lock.json,project
+  package.json,project
+  test/context-receipts.test.ts,project
+  test/dependency-projection.test.ts,project
+  test/release-workflow.test.ts,project
+  test/task-phase.test.ts,project
+tests[1]{command,scope,timeout_seconds,provenance{author,created_at,source_kind,source_ref}}:
+  node --test --test-concurrency=2 test/context-receipts.test.ts test/dependency-projection.test.ts test/task-phase.test.ts test/release-workflow.test.ts,project,600,codex-agent,"2026-11-24T04:47:25.352Z",local_mutation,deps/adopt-pm-cli-host-alignment-1122
+docs[2]{path,scope}:
+  CHANGELOG.md,project
+  README.md,project
+body: ""

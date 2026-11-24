@@ -44,12 +44,30 @@ No changes.
 - Closed: SDK 2026.10.30 aborts six shared-evidence regressions on obsolete fixture sentinels ([pm-context-github-356cb2a080ed-212](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-212.toon))
 - Closed: Exact-budget CLI fixture cleanup fails with ENOTEMPTY in Node 22 Bun release gate ([pm-context-github-356cb2a080ed-197](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-197.toon))
 
+### Dependencies
+
+- Bump the pm-toolchain group with 2 updates ([#221](https://github.com/unbraind/pm-context/pull/221))
+- Bump the pm-toolchain group with 3 updates ([#219](https://github.com/unbraind/pm-context/pull/219))
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#217](https://github.com/unbraind/pm-context/pull/217))
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#216](https://github.com/unbraind/pm-context/pull/216))
+- Bump the codeql-action group with 2 updates ([#215](https://github.com/unbraind/pm-context/pull/215))
+- Bump the pm-toolchain group with 3 updates ([#211](https://github.com/unbraind/pm-context/pull/211))
+- Bump the pm-toolchain group across 1 directory with 3 updates ([#208](https://github.com/unbraind/pm-context/pull/208))
+- Bump @types/node ([#209](https://github.com/unbraind/pm-context/pull/209))
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#205](https://github.com/unbraind/pm-context/pull/205))
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#206](https://github.com/unbraind/pm-context/pull/206))
+
 ## 2026.10.31 - 2026-10-31
 
 ### Fixed
 
 - Restore generated notes for the prepared 2026.10.29 release ([pm-context-release-notes-1029](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-release-notes-1029.toon))
 - Resume must consume a verified same-version changelog recovery ([pm-context-resume-recovery-sha](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-resume-recovery-sha.toon))
+
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#203](https://github.com/unbraind/pm-context/pull/203))
+- Bump the pm-toolchain group with 3 updates ([#199](https://github.com/unbraind/pm-context/pull/199))
 
 ## 2026.10.29 - 2026-10-29
 
@@ -60,6 +78,10 @@ No changes.
 ### Fixed
 
 - Reject sparse evidence acquisition contracts before planning ([pm-context-acquisition-boundary](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-acquisition-boundary.toon))
+
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#194](https://github.com/unbraind/pm-context/pull/194))
 
 ## 2026.10.28 - 2026-10-28
 
@@ -76,6 +98,12 @@ No changes.
 
 - Closed: Point the npm homepage at the package's website and link the author ([pm-context-github-356cb2a080ed-180](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-180.toon))
 - Closed: Daily Release workflow is failing ([pm-context-github-356cb2a080ed-185](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-185.toon))
+
+### Dependencies
+
+- Bump the pm-toolchain group across 1 directory with 3 updates ([#191](https://github.com/unbraind/pm-context/pull/191))
+- Bump @toon-format/toon ([#192](https://github.com/unbraind/pm-context/pull/192))
+- Bump the pm-toolchain group across 1 directory with 2 updates ([#186](https://github.com/unbraind/pm-context/pull/186))
 
 ## 2026.10.26 - 2026-10-26
 
@@ -110,9 +138,17 @@ No changes.
 - Certify complete context corpora and recover abandoned receipt locks ([pm-context-pbcw](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-pbcw.toon))
 - Correct tracker reconciliation review evidence for PR 163 ([pm-context-r163](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-r163.toon))
 
+### Dependencies
+
+- Bump unbraind/pm-github/.github/workflows/pm-github-sync.yml ([#174](https://github.com/unbraind/pm-context/pull/174))
+- Bump unbraind/pm-github/.github/workflows/pm-github-closeout.yml ([#173](https://github.com/unbraind/pm-context/pull/173))
+- Bump the codeql-action group with 2 updates ([#172](https://github.com/unbraind/pm-context/pull/172))
+
 ## 2026.10.24 - 2026-10-24
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group across 1 directory with 3 updates ([#162](https://github.com/unbraind/pm-context/pull/162))
 
 ## 2026.10.23 - 2026-10-23
 
@@ -149,25 +185,37 @@ No changes.
 
 ## 2026.10.20 - 2026-10-20
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#158](https://github.com/unbraind/pm-context/pull/158))
 
 ## 2026.10.18 - 2026-10-18
 
-No changes.
+### Dependencies
+
+- Bump the codeql-action group with 2 updates ([#156](https://github.com/unbraind/pm-context/pull/156))
 
 ## 2026.10.17 - 2026-10-17
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group with 2 updates ([#152](https://github.com/unbraind/pm-context/pull/152))
 
 ## 2026.10.16 - 2026-10-16
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group with 2 updates ([#146](https://github.com/unbraind/pm-context/pull/146))
 
 ## 2026.10.14 - 2026-10-14
 
 ### Fixed
 
 - Dependency projection relabels non-ordering relationships as depends_on and reverses blocks ([pm-context-github-356cb2a080ed-136](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-136.toon))
+
+### Dependencies
+
+- Bump @types/node ([#142](https://github.com/unbraind/pm-context/pull/142))
 
 ## 2026.10.12 - 2026-10-12
 
@@ -181,11 +229,15 @@ No changes.
 
 ## 2026.10.10 - 2026-10-10
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group with 3 updates ([#134](https://github.com/unbraind/pm-context/pull/134))
 
 ## 2026.10.9 - 2026-10-09
 
-No changes.
+### Dependencies
+
+- Bump the pm-toolchain group with 2 updates ([#132](https://github.com/unbraind/pm-context/pull/132))
 
 ## 2026.10.5 - 2026-10-05
 
@@ -213,6 +265,11 @@ No changes.
 
 - Certify pm CLI 2026.9.21 and install merge drivers through the canonical pm-ops launcher ([pm-context-2axh](https://github.com/unbraind/pm-context/blob/main/.agents/pm/tasks/pm-context-2axh.toon))
 
+### Dependencies
+
+- Bump yaml from 2.9.0 to 2.9.1 ([#116](https://github.com/unbraind/pm-context/pull/116))
+- Bump @types/node from 26.5.1 to 26.6.2 ([#115](https://github.com/unbraind/pm-context/pull/115))
+
 ## 2026.9.18 - 2026-09-18
 
 ### Other
@@ -224,6 +281,12 @@ No changes.
 ### Other
 
 - Certify pm CLI 2026.9.12 and the pm-ops 2026.9.11 auditor ([pm-context-0ruy](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-0ruy.toon))
+
+### Dependencies
+
+- Bump pm-changelog from 2026.9.6 to 2026.9.9 ([#107](https://github.com/unbraind/pm-context/pull/107))
+- Bump @types/node from 26.4.1 to 26.5.1 ([#108](https://github.com/unbraind/pm-context/pull/108))
+- Bump the codeql-action group with 2 updates ([#109](https://github.com/unbraind/pm-context/pull/109))
 
 ## 2026.9.11 - 2026-09-11
 
@@ -251,6 +314,11 @@ No changes.
 
 - Closed: Daily Release workflow is failing ([pm-context-github-356cb2a080ed-81](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-81.toon))
 
+### Dependencies
+
+- Bump @types/node from 26.4.0 to 26.4.1 ([#98](https://github.com/unbraind/pm-context/pull/98))
+- Bump pm-changelog from 2026.8.30 to 2026.9.2 ([#95](https://github.com/unbraind/pm-context/pull/95))
+
 ## 2026.8.31 - 2026-08-31
 
 ### Fixed
@@ -262,6 +330,13 @@ No changes.
 ### Closed
 
 - Closed: Pin pm-changelog 2026.8.30 before the next release ([pm-context-4w80](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-4w80.toon))
+
+### Dependencies
+
+- Bump @types/node from 26.3.0 to 26.4.0 ([#92](https://github.com/unbraind/pm-context/pull/92))
+- Bump @unbrained/pm-cli from 2026.8.26 to 2026.8.27 ([#93](https://github.com/unbraind/pm-context/pull/93))
+- Bump @types/node from 26.2.0 to 26.3.0 ([#86](https://github.com/unbraind/pm-context/pull/86))
+- Bump @unbrained/pm-cli from 2026.8.24 to 2026.8.26 ([#87](https://github.com/unbraind/pm-context/pull/87))
 
 ## 2026.8.29 - 2026-08-29
 
@@ -285,11 +360,23 @@ No changes.
 
 - Closed: The identity gate deadlocks the one remediation its own failure message prescribes ([pm-context-nfxp](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-nfxp.toon))
 
+### Dependencies
+
+- Bump pm-changelog from 2026.8.12 to 2026.8.17 ([#71](https://github.com/unbraind/pm-context/pull/71))
+- Bump @unbrained/pm-cli from 2026.8.15 to 2026.8.19 ([#70](https://github.com/unbraind/pm-context/pull/70))
+- Bump pm-ops from 2026.8.10 to 2026.8.17 ([#69](https://github.com/unbraind/pm-context/pull/69))
+
 ## 2026.8.16 - 2026-08-16
 
 ### Fixed
 
 - A truncated list-all answer is consumed as if it were complete ([pm-context-kfdx](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-kfdx.toon))
+
+### Dependencies
+
+- Bump @types/node from 26.1.2 to 26.2.0 ([#65](https://github.com/unbraind/pm-context/pull/65))
+- Bump pm-changelog from 2026.8.7 to 2026.8.12 ([#66](https://github.com/unbraind/pm-context/pull/66))
+- Bump pm-ops from 2026.8.8 to 2026.8.10 ([#64](https://github.com/unbraind/pm-context/pull/64))
 
 ## 2026.8.10 - 2026-08-10
 
@@ -346,7 +433,10 @@ No changes.
 
 ## 2026.8.3 - 2026-08-03
 
-No changes.
+### Dependencies
+
+- Bump @types/node from 26.1.1 to 26.1.2 ([#48](https://github.com/unbraind/pm-context/pull/48))
+- Bump pm-changelog from 2026.7.25 to 2026.7.29 ([#49](https://github.com/unbraind/pm-context/pull/49))
 
 ## 2026.8.1 - 2026-08-01
 
@@ -398,6 +488,10 @@ No changes.
 
 - Enable governance duplicate-detection advisory mode and adopt pm-cli 2026.7.25 ([pm-context-x5qt](https://github.com/unbraind/pm-context/blob/main/.agents/pm/chores/pm-context-x5qt.toon))
 
+### Dependencies
+
+- Bump pm-changelog from 2026.7.24 to 2026.7.25 ([#34](https://github.com/unbraind/pm-context/pull/34))
+
 ## 2026.7.25 - 2026-07-25
 
 ### Other
@@ -420,7 +514,11 @@ No changes.
 
 ## 2026.7.20 - 2026-07-20
 
-No changes.
+### Dependencies
+
+- Bump actions/setup-node from 6 to 7 ([#25](https://github.com/unbraind/pm-context/pull/25))
+- Bump @unbrained/pm-cli from 2026.7.11 to 2026.7.18 ([#26](https://github.com/unbraind/pm-context/pull/26))
+- Bump pm-changelog from 2026.7.11 to 2026.7.18 ([#27](https://github.com/unbraind/pm-context/pull/27))
 
 ## 2026.7.14 - 2026-07-14
 
@@ -430,11 +528,16 @@ No changes.
 
 ## 2026.7.13 - 2026-07-13
 
-No changes.
+### Dependencies
+
+- Bump pm-changelog from 2026.7.10 to 2026.7.11 ([#23](https://github.com/unbraind/pm-context/pull/23))
+- Bump @unbrained/pm-cli from 2026.7.10 to 2026.7.11 ([#22](https://github.com/unbraind/pm-context/pull/22))
 
 ## 2026.7.11 - 2026-07-11
 
-No changes.
+### Dependencies
+
+- Bump actions/checkout from 6 to 7
 
 ## 2026.7.10-1 - 2026-07-10
 
