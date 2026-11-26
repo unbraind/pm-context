@@ -4,7 +4,7 @@
 
 ### Dependencies
 
-- Bump the codeql-action group with 2 updates
+- Bump the codeql-action group with 2 updates ([#255](https://github.com/unbraind/pm-context/pull/255))
 
 ## 2026.11.23 - 2026-11-23
 

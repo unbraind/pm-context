@@ -40,7 +40,7 @@ updates:
         applies-to: "security-updates"
         patterns:
           - "github/codeql-action*"
-      # The pm-github sync and closeout callers are one reviewed release and move in one pull request.
+      # Every pm-github workflow caller in this repository moves in one pull request, on one reviewed release.
       pm-github-workflows:
         patterns:
           - "unbraind/pm-github/*"
