@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Closed
+
+- Closed: Daily Release workflow is failing ([pm-context-github-356cb2a080ed-190](https://github.com/unbraind/pm-context/blob/main/.agents/pm/issues/pm-context-github-356cb2a080ed-190.toon))
+
 ### Dependencies
 
 - Bump the codeql-action group with 2 updates ([#255](https://github.com/unbraind/pm-context/pull/255))
