@@ -6,17 +6,18 @@ status: closed
 priority: 2
 tags[3]: "gh:unbraind/pm-context#190","github_author:github-actions[bot]",release-failure
 created_at: "2026-10-27T10:28:04Z"
-updated_at: "2026-11-26T09:40:04.048Z"
+updated_at: "2026-11-27T09:44:37.408Z"
 closed_at: "2026-11-24T18:49:29Z"
 completed_at: "2026-11-24T18:49:29Z"
 author: pm-github
+release: v2026.11.26
 close_reason: "Closed on GitHub as completed on 2026-11-24T18:49:29Z"
 github_close_reason: "Closed on GitHub as completed on 2026-11-24T18:49:29Z"
 github_closed_at: "2026-11-24T18:49:29Z"
 github_created_at: "2026-10-27T10:28:04Z"
 github_link_only: false
 github_number: 190
-github_release: ""
+github_release: v2026.11.26
 github_state: closed
 github_state_reason: completed
 github_updated_at: "2026-11-24T18:49:29Z"
